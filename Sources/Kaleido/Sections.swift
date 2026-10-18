@@ -274,6 +274,21 @@ struct PresetEditor: View {
                     SliderRow(preset.look.mode == .hex ? "Tile density" : "Mirrors",
                               value: Binding(get: { Double(preset.look.segments) }, set: { v in app.edit(preset.id) { $0.segments = Int(v.rounded()) } }),
                               range: 2...24, step: 1) { "\(Int($0))" }
+                    Toggle("Dynamic mirrors (slowly change how many)", isOn: bind(\.dynamicMirrors))
+                    if preset.look.dynamicMirrors {
+                        LabeledContent("Between") {
+                            HStack {
+                                Stepper("\(preset.look.mirrorsMin)", value: Binding(get: { preset.look.mirrorsMin },
+                                                                                   set: { v in app.edit(preset.id) { $0.mirrorsMin = min(v, $0.mirrorsMax) } }),
+                                        in: Look.segmentRange)
+                                Text("and")
+                                Stepper("\(preset.look.mirrorsMax)", value: Binding(get: { preset.look.mirrorsMax },
+                                                                                   set: { v in app.edit(preset.id) { $0.mirrorsMax = max(v, $0.mirrorsMin) } }),
+                                        in: Look.segmentRange)
+                            }
+                            .monospacedDigit()
+                        }
+                    }
                     SliderRow("Zoom", value: bind(\.zoom), range: 0.4...3) { String(format: "%.2f×", $0) }
                     SliderRow("Zoom breathing", value: bind(\.breathing), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                     SliderRow("Drift amount", value: bind(\.drift), range: 0...1) { String(format: "%.0f%%", $0 * 100) }

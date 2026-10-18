@@ -18,13 +18,15 @@ enum Shaders {
         float time;
         float aspectA, aspectB;
         float mixAmount;     // 0...1 transition progress (raw)
-        int segments;        // mirrors of the outgoing photo (A)
+        float morph;         // 0...1 cross-fade from `segments` to `segmentsMorph` (dynamic mirrors)
+        int segments;       // mirrors of the outgoing photo (A)
         int mode;            // 0 radial, 1 hex, 2 fractal (A)
         int transition;      // 0 dissolve 1 iris 3 zoom 4 segments
         int hasB;
         int segmentsB;       // the incoming photo (B) can arrive with a different look
         int modeB;
         int original;        // 1 = show the photo itself, uncut (the preview's "Original" tab)
+        int segmentsMorph;   // the mirror count being faded towards
     };
 
     struct VOut { float4 position [[position]]; };
@@ -146,6 +148,11 @@ enum Shaders {
         if (u.hasB == 0) {
             float2 q = kaleidoPoint(p, u, 1.0, u.mode, u.segments, sA);
             col = samplePhoto(texA, smp, q, u.aspectA, sA, u);
+            if (u.morph > 0.0) {
+                // Mirror counts must be whole numbers to stay seamless, so changing count is a slow cross-fade.
+                float2 q2 = kaleidoPoint(p, u, 1.0, u.mode, u.segmentsMorph, sB);
+                col = mix(col, samplePhoto(texA, smp, q2, u.aspectA, sB, u), smoothstep(0.0, 1.0, u.morph));
+            }
         } else {
             float zoomA = 1.0, zoomB = 1.0;
             if (u.transition == 3) { zoomA = 1.0 + 1.6 * t; zoomB = 1.0 / (1.0 + 1.6 * (1.0 - t)); }

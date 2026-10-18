@@ -7,7 +7,7 @@ import MetalKit
 import UniformTypeIdentifiers
 import os
 
-/// Must match `Uniforms` in the shader: 16 floats, then 7 int32s.
+/// Must match `Uniforms` in the shader: 17 floats, then 8 int32s.
 struct GPUUniforms {
     var width: Float = 0, height: Float = 0
     var rotation: Float = 0, sourceRotation: Float = 0
@@ -16,9 +16,9 @@ struct GPUUniforms {
     var hue: Float = 0, saturation: Float = 1, vignette: Float = 0
     var blurLod: Float = 0, time: Float = 0
     var aspectA: Float = 1, aspectB: Float = 1
-    var mixAmount: Float = 0
+    var mixAmount: Float = 0, morph: Float = 0
     var segments: Int32 = 8, mode: Int32 = 0, transition: Int32 = 0, hasB: Int32 = 0
-    var segmentsB: Int32 = 8, modeB: Int32 = 0, original: Int32 = 0
+    var segmentsB: Int32 = 8, modeB: Int32 = 0, original: Int32 = 0, segmentsMorph: Int32 = 8
 }
 
 struct PhotoTexture {
@@ -158,6 +158,8 @@ final class KaleidoRenderer {
     var willStartTransition: (() -> Void)?
     // Mirror mode and count belong to each photo: during a cross-fade the outgoing photo keeps its shape and
     // the incoming one already has the new look, so a look change never snaps mid-fade.
+    private var dynamicCount: Int?, morphTo: Int?, mirrorKey: String?
+    private var morphClock = 0.0, mirrorTimer = 0.0
     private var currentShape = (mode: MirrorMode.radial, segments: 12)
     private var incomingShape = (mode: MirrorMode.radial, segments: 12)
     // Dragging the preview: an extra pan in photo space that keeps gliding after release, like a globe.
@@ -221,7 +223,8 @@ final class KaleidoRenderer {
         // Mirrored-repeat sampling makes any pan valid; keep the number small so float precision holds.
         userPan.x = userPan.x.truncatingRemainder(dividingBy: 40)
         userPan.y = userPan.y.truncatingRemainder(dividingBy: 40)
-        if transitionClock == nil { currentShape = (look.mode, look.segments) }
+        updateDynamicMirrors(dt)
+        if transitionClock == nil { currentShape = (look.mode, dynamicCount ?? look.segments) }
 
         if var t = transitionClock {
             t += dt
@@ -250,7 +253,7 @@ final class KaleidoRenderer {
                 } else {
                     willStartTransition?()   // may change targetLook (look shuffle)
                     if targetLook.mode != look.mode || targetLook.segments != look.segments { look = look.eased(toward: targetLook, by: 0) }
-                    incomingShape = (targetLook.mode, targetLook.segments)
+                    incomingShape = (targetLook.mode, startingMirrorCount(for: targetLook))
                     incoming = tex; incomingID = id; incomingRef = ref
                     activeStyle = transitionStyle == .random ? TransitionStyle.concrete.randomElement()! : transitionStyle
                     transitionClock = 0
@@ -258,6 +261,44 @@ final class KaleidoRenderer {
             }
         }
         if pending == nil, !loading, transitionClock == nil { startLoad() }
+    }
+
+    // MARK: Dynamic mirrors
+
+    /// Seconds between mirror-count changes and how long each cross-fade lasts, at speed 1.
+    private let mirrorChangeInterval = 50.0, mirrorMorphSeconds = 10.0
+
+    private func dynamicKey(_ l: Look) -> String { "\(l.mode.rawValue)-\(l.segments)-\(l.mirrorsMin)-\(l.mirrorsMax)" }
+
+    /// The count a look starts at: its own while it is the one already wandering, else its base count kept in range.
+    private func startingMirrorCount(for l: Look) -> Int {
+        guard l.dynamicMirrors else { return l.segments }
+        if dynamicKey(l) == mirrorKey, let n = dynamicCount { return n }
+        return min(max(l.segments, l.mirrorsMin), l.mirrorsMax)
+    }
+
+    private func updateDynamicMirrors(_ dt: Double) {
+        guard look.dynamicMirrors else { dynamicCount = nil; morphTo = nil; mirrorKey = nil; return }
+        let key = dynamicKey(look)
+        if key != mirrorKey {
+            dynamicCount = startingMirrorCount(for: look)
+            mirrorKey = key
+            morphTo = nil; morphClock = 0; mirrorTimer = 0
+        }
+        // Paced by the speed control; frozen while a photo cross-fades so the two never fight.
+        let pace = look.motion
+        guard pace > 0, transitionClock == nil, let n = dynamicCount else { return }
+        if let to = morphTo {
+            morphClock += dt * pace / mirrorMorphSeconds
+            if morphClock >= 1 { dynamicCount = to; morphTo = nil; morphClock = 0; mirrorTimer = 0 }
+        } else {
+            mirrorTimer += dt * pace
+            if mirrorTimer >= mirrorChangeInterval {
+                var g = SystemRandomNumberGenerator()
+                morphTo = Look.nextMirrorCount(from: n, min: look.mirrorsMin, max: look.mirrorsMax, using: &g)
+                morphClock = 0
+            }
+        }
     }
 
     func skip() { skipRequested = true }
@@ -304,6 +345,15 @@ final class KaleidoRenderer {
         currentShape = (look.mode, look.segments)
         incomingShape = currentShape
     }
+
+    /// Offscreen snapshots only: freeze a mirror-count cross-fade part way.
+    func forceMorph(to count: Int, progress: Double) {
+        morphTo = count
+        morphClock = progress
+    }
+
+    /// The photo on screen now (nil while the placeholder shows).
+    var currentPhotoID: UUID? { currentID }
 
     /// Show a specific photo next (used by "Show now").
     func show(_ photo: PhotoRef) {
@@ -368,6 +418,11 @@ final class KaleidoRenderer {
         u.mode = currentShape.mode.shaderIndex
         u.segmentsB = u.segments
         u.modeB = u.mode
+        u.segmentsMorph = u.segments
+        if let to = morphTo, transitionClock == nil {
+            u.morph = Float(min(max(morphClock, 0), 1))
+            u.segmentsMorph = Int32(to)
+        }
         if let incoming, let t = transitionClock {
             u.hasB = 1
             u.aspectB = incoming.aspect

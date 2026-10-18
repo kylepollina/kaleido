@@ -75,6 +75,15 @@ struct PreviewPane: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
             .help(showOriginal ? "The photo as it is" : "Drag to move the photo inside the mirrors; flick it to let it glide")
+            if showOriginal {
+                HStack(spacing: 10) {
+                    Button { app.removeCurrentFromRotation() } label: { Label("Remove from selected photos", systemImage: "minus.circle") }
+                        .help("Take this photo out of the rotation and move on to the next one")
+                    Button { app.revealCurrentPhoto() } label: { Label("Show in library", systemImage: "photo") }
+                        .help("Open it in Finder, or in Photos for photos from your Photos library")
+                }
+                .controlSize(.small)
+            }
         }
     }
 }
@@ -85,12 +94,15 @@ struct PreviewView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> KaleidoView {
         let v = KaleidoView(renderer: renderer, fps: 30)
-        v.acceptsDrag = true
-        v.showOriginal = showOriginal
+        updateNSView(v, context: context)
         return v
     }
 
-    func updateNSView(_ nsView: KaleidoView, context: Context) { nsView.showOriginal = showOriginal }
+    func updateNSView(_ nsView: KaleidoView, context: Context) {
+        nsView.showOriginal = showOriginal
+        nsView.acceptsDrag = !showOriginal   // dragging only makes sense through the mirrors
+        nsView.window?.invalidateCursorRects(for: nsView)
+    }
 }
 
 // MARK: Library browser

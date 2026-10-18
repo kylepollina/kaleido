@@ -18,7 +18,9 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 - **Presets.** Edits apply live and are saved. Reset puts a built-in preset back to its original (or a preset you
   made back to how you created it). Hearted presets appear on Home and are the ones Shuffle presets moves between.
 - **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
-  Kaleidoscope / Original switch shows the photo itself.
+  Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
+- **Dynamic mirrors.** A preset can let its mirror count wander slowly between two numbers, cross-fading from one
+  count to the next (a change about every 50 seconds at the middle speed). See the "Shifting Mandala" preset.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
 - **Mixed-up looks.** The slideshow can switch preset looks now and then or with every photo; Next brings a new
   photo and a new look, Surprise me a new photo and a random look. Looks change in step with the cross-fade.

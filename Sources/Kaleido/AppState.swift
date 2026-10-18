@@ -114,6 +114,23 @@ final class AppState: ObservableObject, PhotoProvider {
 
     func previousPhoto() { renderer?.previous() }
 
+    /// "Remove from selected photos" on the Original tab: out of the rotation (it stays in its album), then move on.
+    func removeCurrentFromRotation() {
+        // Only this photo goes; a whole album stays whole, so its new photos still join automatically.
+        guard let id = renderer?.currentPhotoID, library.item(id) != nil else { return }
+        library.setEnabled(false, ids: [id])
+        renderer?.skip()
+    }
+
+    func revealCurrentPhoto() {
+        guard let id = renderer?.currentPhotoID, let item = library.item(id) else { return }
+        if item.isAsset {
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Photos.app"))
+        } else if let url = library.resolveURL(for: id) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+    }
+
     /// Runs as each new photo starts fading in, so look changes ride along with the photo change.
     private func photoWillChange() {
         photosSinceLookChange += 1

@@ -683,3 +683,35 @@ final class PresetLibraryTests: XCTestCase {
         XCTAssertNotNil(lib.randomFavorite(excluding: nil, using: &g), "no hearts falls back to every preset")
     }
 }
+
+final class DynamicMirrorTests: XCTestCase {
+    func testWalkStaysInRangeAndMovesOneStep() {
+        var g = SplitMix64(seed: 2)
+        var n = 8
+        var seen = Set<Int>()
+        for _ in 0..<500 {
+            let next = Look.nextMirrorCount(from: n, min: 6, max: 10, using: &g)
+            XCTAssertEqual(abs(next - n), 1)
+            XCTAssertTrue((6...10).contains(next))
+            n = next
+            seen.insert(n)
+        }
+        XCTAssertEqual(seen, Set(6...10), "the whole range gets visited")
+    }
+
+    func testWalkHeadsBackIntoRangeAndHandlesDegenerateRange() {
+        var g = SplitMix64(seed: 2)
+        XCTAssertEqual(Look.nextMirrorCount(from: 3, min: 6, max: 10, using: &g), 4)
+        XCTAssertEqual(Look.nextMirrorCount(from: 15, min: 6, max: 10, using: &g), 14)
+        XCTAssertEqual(Look.nextMirrorCount(from: 9, min: 7, max: 7, using: &g), 7)
+    }
+
+    func testDecodeDefaultsAndClamp() throws {
+        let old = try JSONDecoder().decode(Look.self, from: Data(#"{"segments": 9}"#.utf8))
+        XCTAssertFalse(old.dynamicMirrors)
+        let swapped = try JSONDecoder().decode(Look.self, from: Data(#"{"dynamicMirrors": true, "mirrorsMin": 30, "mirrorsMax": 1}"#.utf8))
+        XCTAssertEqual(swapped.mirrorsMin, 2)
+        XCTAssertEqual(swapped.mirrorsMax, 24)
+        XCTAssertTrue(Preset.all.contains { $0.look.dynamicMirrors }, "there is a built-in dynamic preset")
+    }
+}

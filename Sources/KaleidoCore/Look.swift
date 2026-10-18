@@ -77,6 +77,11 @@ public struct Look: Codable, Equatable, Sendable {
     public var breathing: Double = 0.4
     /// Master multiplier for every speed above: 0 is perfectly still, 1 is as set, up to 2.
     public var motion: Double = 1.0
+    /// Dynamic mirrors: the mirror count (or tile density) wanders one step at a time between these bounds,
+    /// cross-fading between counts so the pattern never snaps.
+    public var dynamicMirrors = false
+    public var mirrorsMin = 4
+    public var mirrorsMax = 12
 
     public init() {}
 
@@ -97,6 +102,9 @@ public struct Look: Codable, Equatable, Sendable {
         vignette = try c.decodeIfPresent(Double.self, forKey: .vignette) ?? d.vignette
         breathing = try c.decodeIfPresent(Double.self, forKey: .breathing) ?? d.breathing
         motion = try c.decodeIfPresent(Double.self, forKey: .motion) ?? d.motion
+        dynamicMirrors = try c.decodeIfPresent(Bool.self, forKey: .dynamicMirrors) ?? d.dynamicMirrors
+        mirrorsMin = try c.decodeIfPresent(Int.self, forKey: .mirrorsMin) ?? d.mirrorsMin
+        mirrorsMax = try c.decodeIfPresent(Int.self, forKey: .mirrorsMax) ?? d.mirrorsMax
         clamp()
     }
 
@@ -113,6 +121,10 @@ public struct Look: Codable, Equatable, Sendable {
         hueSpeed = min(max(hueSpeed, 0), 0.6)
         breathing = min(max(breathing, 0), 1)
         motion = min(max(motion, 0), 2)
+        let r = Self.segmentRange
+        mirrorsMin = min(max(mirrorsMin, r.lowerBound), r.upperBound)
+        mirrorsMax = min(max(mirrorsMax, r.lowerBound), r.upperBound)
+        if mirrorsMin > mirrorsMax { swap(&mirrorsMin, &mirrorsMax) }
         blur = min(max(blur, 0), 1)
         saturation = min(max(saturation, 0), 2)
         vignette = min(max(vignette, 0), 1)
@@ -158,8 +170,24 @@ public struct Look: Codable, Equatable, Sendable {
         l.saturation = Double.random(in: 0.95...1.4, using: &g)
         l.vignette = Double.random(in: 0.1...0.45, using: &g)
         l.breathing = Double.random(in: 0.2...0.7, using: &g)
+        if l.mode != .hex && Double.random(in: 0..<1, using: &g) < 0.25 {
+            l.dynamicMirrors = true
+            l.mirrorsMin = max(3, l.segments - 3)
+            l.mirrorsMax = min(Self.segmentRange.upperBound, l.segments + 4)
+        }
         l.clamp()
         return l
+    }
+
+    /// The next mirror count for dynamic mirrors: one step up or down, staying inside the range
+    /// (a count outside it heads back in).
+    public static func nextMirrorCount<G: RandomNumberGenerator>(from n: Int, min lo: Int, max hi: Int, using g: inout G) -> Int {
+        if lo >= hi { return lo }
+        if n < lo { return n + 1 }
+        if n > hi { return n - 1 }
+        if n == lo { return n + 1 }
+        if n == hi { return n - 1 }
+        return Bool.random(using: &g) ? n + 1 : n - 1
     }
 
     public static func random() -> Look {
@@ -213,6 +241,10 @@ public struct Preset: Identifiable, Equatable, Sendable {
             },
             make("Whirlpool") {
                 $0.segments = 7; $0.rotationSpeed = -0.1; $0.twist = 0.4; $0.zoom = 1.2; $0.drift = 0.3
+            },
+            make("Shifting Mandala") {
+                $0.segments = 8; $0.dynamicMirrors = true; $0.mirrorsMin = 6; $0.mirrorsMax = 14
+                $0.rotationSpeed = 0.05; $0.zoom = 1.3; $0.vignette = 0.3
             },
             make("Gentle Window") {
                 $0.segments = 3; $0.rotationSpeed = 0.02; $0.zoom = 0.8; $0.drift = 0.6; $0.driftSpeed = 0.05
