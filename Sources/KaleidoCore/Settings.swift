@@ -52,6 +52,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public var allowBlur = true
     public var allowVignette = true
     public var allowSwirl = true
+    public var allowDynamicMirrors = true
 
     public init() {}
 
@@ -65,6 +66,7 @@ public struct Settings: Codable, Equatable, Sendable {
         if !allowBlur { r.blur = 0 }
         if !allowVignette { r.vignette = 0 }
         if !allowSwirl { r.twist = 0 }
+        if !allowDynamicMirrors { r.dynamicMirrors = false }
         r.motion = l.motion * speedMultiplier
         return r
     }
@@ -90,6 +92,7 @@ public struct Settings: Codable, Equatable, Sendable {
         allowBlur = try c.decodeIfPresent(Bool.self, forKey: .allowBlur) ?? true
         allowVignette = try c.decodeIfPresent(Bool.self, forKey: .allowVignette) ?? true
         allowSwirl = try c.decodeIfPresent(Bool.self, forKey: .allowSwirl) ?? true
+        allowDynamicMirrors = try c.decodeIfPresent(Bool.self, forKey: .allowDynamicMirrors) ?? true
         if fileVersion < 4 {
             // Speed moved from each look's "Motion" slider to the global 5-stop control.
             look.motion = 1

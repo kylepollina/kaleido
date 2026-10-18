@@ -197,8 +197,12 @@ final class SettingsTests: XCTestCase {
         var wild = Look()
         wild.hueShift = 120; wild.hueSpeed = 0.5; wild.saturation = 1.8; wild.blur = 0.6; wild.vignette = 0.7; wild.twist = 0.5
         XCTAssertEqual(s.effectiveLook(wild).saturation, 1.8, "allowed by default")
+        wild.dynamicMirrors = true
+        XCTAssertTrue(s.effectiveLook(wild).dynamicMirrors)
         s.allowHueChanges = false; s.allowSaturationChanges = false; s.allowBlur = false; s.allowVignette = false; s.allowSwirl = false
+        s.allowDynamicMirrors = false
         let e = s.effectiveLook(wild)
+        XCTAssertFalse(e.dynamicMirrors)
         XCTAssertEqual(e.hueShift, 0); XCTAssertEqual(e.hueSpeed, 0); XCTAssertEqual(e.saturation, 1)
         XCTAssertEqual(e.blur, 0); XCTAssertEqual(e.vignette, 0); XCTAssertEqual(e.twist, 0)
         XCTAssertEqual(e.segments, wild.segments, "shape is untouched")

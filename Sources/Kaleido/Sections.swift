@@ -275,6 +275,7 @@ struct PresetEditor: View {
                               value: Binding(get: { Double(preset.look.segments) }, set: { v in app.edit(preset.id) { $0.segments = Int(v.rounded()) } }),
                               range: 2...24, step: 1) { "\(Int($0))" }
                     Toggle("Dynamic mirrors (slowly change how many)", isOn: bind(\.dynamicMirrors))
+                        .disabled(!app.settings.allowDynamicMirrors)
                     if preset.look.dynamicMirrors {
                         LabeledContent("Between") {
                             HStack {
@@ -359,6 +360,7 @@ struct SettingsView: View {
                 Toggle("Blur", isOn: $app.settings.allowBlur)
                 Toggle("Vignette", isOn: $app.settings.allowVignette)
                 Toggle("Swirl", isOn: $app.settings.allowSwirl)
+                Toggle("Dynamic mirrors", isOn: $app.settings.allowDynamicMirrors)
             } header: {
                 Text("Effects")
             } footer: {
