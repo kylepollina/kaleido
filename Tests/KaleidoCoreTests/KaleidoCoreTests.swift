@@ -317,3 +317,127 @@ final class SliderScaleTests: XCTestCase {
         XCTAssertEqual(s.value(at: -1), 2); XCTAssertEqual(s.value(at: 9), 4); XCTAssertEqual(s.position(for: 3), 0.5)
     }
 }
+
+final class SyncTests: XCTestCase {
+    private func e(_ k: String, asset: Bool = true) -> SyncEntry { SyncEntry(key: k, name: k, isAsset: asset) }
+    private func st(_ k: String, _ sources: Set<String> = [], manual: Bool = false) -> SyncItemState {
+        SyncItemState(id: UUID(), key: k, sources: sources, isManual: manual)
+    }
+
+    func testAddsNewAndRemovesVanished() {
+        let a = st("a", ["album:1"]), b = st("b", ["album:1"])
+        let plan = SyncPlanner.plan(items: [a, b], activeSources: ["album:1"], listings: ["album:1": [e("b"), e("c")]], dismissed: [])
+        XCTAssertEqual(plan.removals, [a.id])
+        XCTAssertEqual(plan.adds.map(\.entry.key), ["c"])
+        XCTAssertTrue(plan.sourceUpdates.isEmpty)
+    }
+
+    func testManualPhotosSurviveAndDismissedStayGone() {
+        let m = st("m", [], manual: true)
+        let plan = SyncPlanner.plan(items: [m], activeSources: ["album:1"], listings: ["album:1": [e("x"), e("y")]], dismissed: ["x"])
+        XCTAssertTrue(plan.removals.isEmpty)
+        XCTAssertEqual(plan.adds.map(\.entry.key), ["y"])
+    }
+
+    func testDeselectedSourceDropsItsPhotosButKeepsSharedOnes() {
+        let only = st("only", ["album:1"]), both = st("both", ["album:1", "album:2"])
+        let plan = SyncPlanner.plan(items: [only, both], activeSources: ["album:2"], listings: [:], dismissed: [])
+        XCTAssertEqual(plan.removals, [only.id])
+        XCTAssertEqual(plan.sourceUpdates[both.id], ["album:2"])
+    }
+
+    func testFailedScanLeavesSourceUntouched() {
+        let a = st("a", ["album:1"])
+        let plan = SyncPlanner.plan(items: [a], activeSources: ["album:1"], listings: [:], dismissed: [])
+        XCTAssertTrue(plan.isEmpty, "no listing means no change, not an empty album")
+    }
+
+    func testPhotoInTwoAlbumsIsAddedOnceAndExistingGainsSource() {
+        let have = st("h", ["album:1"])
+        let plan = SyncPlanner.plan(items: [have], activeSources: ["album:1", "album:2"],
+                                    listings: ["album:1": [e("h"), e("n")], "album:2": [e("h"), e("n")]], dismissed: [])
+        XCTAssertEqual(plan.adds.count, 1)
+        XCTAssertEqual(plan.adds[0].sources, ["album:1", "album:2"])
+        XCTAssertEqual(plan.sourceUpdates[have.id], ["album:1", "album:2"])
+    }
+
+    func testIsIdempotent() {
+        let items = [st("a", ["album:1"])]
+        let plan = SyncPlanner.plan(items: items, activeSources: ["album:1"], listings: ["album:1": [e("a")]], dismissed: [])
+        XCTAssertTrue(plan.isEmpty)
+    }
+}
+
+final class SourcePersistenceTests: XCTestCase {
+    func testAlbumSelectionAssetsAndFiltersPersist() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = dir.appendingPathComponent("library.json")
+        let lib = PhotoLibrary(fileURL: store)
+        lib.setAlbums([AlbumRef(localID: "A1", title: "Favorites"), AlbumRef(localID: "A2", title: "Trip")])
+        lib.applySync(listings: ["album:A1": [SyncEntry(key: "asset-1", name: "IMG_1", isAsset: true), SyncEntry(key: "asset-2", name: "IMG_2", isAsset: true)],
+                                 "album:A2": [SyncEntry(key: "asset-2", name: "IMG_2", isAsset: true)]], markSynced: true)
+        lib.filters.minLongEdge = 2400
+        lib.filters.excludeScreenshots = false
+
+        let back = PhotoLibrary(fileURL: store)
+        XCTAssertEqual(back.albums.map(\.title), ["Favorites", "Trip"])
+        XCTAssertEqual(back.items.count, 2)
+        XCTAssertTrue(back.items.allSatisfy { $0.isAsset && !$0.isManual })
+        XCTAssertEqual(back.items.first { $0.assetID == "asset-2" }?.sources, ["album:A1", "album:A2"])
+        XCTAssertNotNil(back.lastSync)
+        XCTAssertEqual(back.filters.minLongEdge, 2400)
+        XCTAssertFalse(back.filters.excludeScreenshots)
+
+        back.setAlbums([AlbumRef(localID: "A2", title: "Trip")])
+        XCTAssertEqual(back.items.map { $0.assetID }, ["asset-2"], "photos only in the deselected album go")
+    }
+
+    func testRemovingAnAutoPhotoKeepsItGoneAcrossSyncs() {
+        let lib = PhotoLibrary(fileURL: nil)
+        lib.setAlbums([AlbumRef(localID: "A", title: "A")])
+        let listing = ["album:A": [SyncEntry(key: "x", name: "x", isAsset: true), SyncEntry(key: "y", name: "y", isAsset: true)]]
+        lib.applySync(listings: listing)
+        lib.remove(ids: [lib.items.first { $0.assetID == "x" }!.id])
+        lib.applySync(listings: listing)
+        XCTAssertEqual(lib.items.map { $0.assetID }, ["y"])
+        lib.resetDismissed()
+        lib.applySync(listings: listing)
+        XCTAssertEqual(Set(lib.items.compactMap { $0.assetID }), ["x", "y"])
+    }
+
+    func testWatchedFolderPicksUpNewFilesAndDropsDeletedOnes() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let photos = dir.appendingPathComponent("photos")
+        try FileManager.default.createDirectory(at: photos, withIntermediateDirectories: true)
+        writePNG(photos.appendingPathComponent("1.png"))
+        let lib = PhotoLibrary(fileURL: dir.appendingPathComponent("library.json"))
+        lib.add(urls: [photos])
+        XCTAssertEqual(lib.items.count, 1)
+        XCTAssertEqual(lib.folders.count, 1)
+
+        writePNG(photos.appendingPathComponent("2.png"))
+        try FileManager.default.removeItem(at: photos.appendingPathComponent("1.png"))
+        lib.syncFoldersNow()
+        XCTAssertEqual(lib.items.map(\.name), ["2.png"])
+
+        let handAdded = dir.appendingPathComponent("solo.png")
+        writePNG(handAdded)
+        lib.add(urls: [handAdded])
+        lib.removeFolder(lib.folders[0].id)
+        XCTAssertEqual(lib.items.map(\.name), ["solo.png"], "hand-added photo stays when its folder is unwatched")
+    }
+
+    func testLegacyLibraryFileStillLoads() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("library.json")
+        let legacy = [PhotoItem(path: "/tmp/a.jpg"), PhotoItem(path: "/tmp/b.jpg", isEnabled: false)]
+        try JSONEncoder().encode(legacy).write(to: file)
+        let lib = PhotoLibrary(fileURL: file)
+        XCTAssertEqual(lib.items.map(\.path), ["/tmp/a.jpg", "/tmp/b.jpg"])
+        XCTAssertTrue(lib.items.allSatisfy(\.isManual))
+        XCTAssertEqual(lib.enabledItems.count, 1)
+    }
+}
