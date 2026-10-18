@@ -8,10 +8,13 @@ struct SliderRow: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     var step: Double?
+    /// Marks zero with a clickable tick and snaps to it when the knob comes close (for signed values like swirl).
+    var zeroTick = false
     let format: (Double) -> String
 
-    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double? = nil, format: @escaping (Double) -> String) {
-        self.title = title; self._value = value; self.range = range; self.step = step; self.format = format
+    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double? = nil, zeroTick: Bool = false,
+         format: @escaping (Double) -> String) {
+        self.title = title; self._value = value; self.range = range; self.step = step; self.zeroTick = zeroTick; self.format = format
     }
 
     var body: some View {
@@ -21,7 +24,31 @@ struct SliderRow: View {
                 Spacer()
                 Text(format(value)).monospacedDigit().foregroundStyle(.secondary)
             }
-            if let step { Slider(value: $value, in: range, step: step) } else { Slider(value: $value, in: range) }
+            if let step {
+                Slider(value: $value, in: range, step: step)
+            } else if zeroTick {
+                Slider(value: Binding(get: { value }, set: { v in
+                    value = abs(v) < (range.upperBound - range.lowerBound) * 0.03 ? 0 : v
+                }), in: range)
+                .overlay(alignment: .bottomLeading) { zeroMark }
+            } else {
+                Slider(value: $value, in: range)
+            }
+        }
+    }
+
+    /// A small tick under the slider at zero; clicking it sets the value to zero.
+    private var zeroMark: some View {
+        GeometryReader { g in
+            let knob: CGFloat = 10   // the slider's track starts and ends about half a knob in from its edges
+            let x = knob + (g.size.width - 2 * knob) * (0 - range.lowerBound) / (range.upperBound - range.lowerBound)
+            Button { value = 0 } label: {
+                Rectangle().fill(value == 0 ? Color.accentColor : Color.secondary).frame(width: 2, height: 7)
+                    .padding(.horizontal, 6).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Set to zero")
+            .position(x: x, y: g.size.height + 5)
         }
     }
 }

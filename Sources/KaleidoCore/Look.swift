@@ -83,9 +83,9 @@ public struct Look: Codable, Equatable, Sendable {
     /// Degrees per second the mirror pattern turns. Barely-moving range: +-0.6, default one turn per 100 minutes.
     public var rotationSpeed: Double = 0.06
     /// Magnification of the photo inside the mirrors.
-    public var zoom: Double = 1.4
+    public var zoom: Double = 1.0
     /// 0...1 how far the sampled window wanders across the photo.
-    public var drift: Double = 0.25
+    public var drift: Double = 1.0
     /// How fast it wanders (0.5, the maximum, is a lap in about 5 minutes; the default takes half an hour).
     public var driftSpeed: Double = 0.08
     /// Swirl: bends the mirrors with distance from the center, in radians per screen height.
@@ -97,14 +97,16 @@ public struct Look: Codable, Equatable, Sendable {
     public var saturation: Double = 1.1
     public var vignette: Double = 0.35
     /// 0...1 how far the zoom slowly breathes in and out (about a ten minute cycle).
-    public var breathing: Double = 0.4
+    public var breathing: Double = 1.0
     /// Master multiplier for every speed above: 0 is perfectly still, 1 is as set, up to 2.
     public var motion: Double = 1.0
     /// Dynamic mirrors: the mirror count (or tile density) wanders one step at a time between these bounds,
     /// cross-fading between counts so the pattern never snaps.
-    /// Black lines along every mirror and tile edge: one of `outlineSteps` (0 = off, 0.5 = medium, 1 = large).
+    /// Black lines along every mirror and tile edge: one of `outlineSteps` (0 = off, 0.25 = on).
     public var outline: Double = 0
-    public static let outlineSteps: [Double] = [0, 0.5, 1]
+    public static let outlineSteps: [Double] = [0, 0.25]
+    /// Hue cycling choices in degrees per second: off, slow, medium, fast.
+    public static let hueCycleSteps: [Double] = [0, 0.05, 0.15, 0.4]
     /// Diamonds pattern only: true ("Checker") gives each diamond orientation its own part of the photo and
     /// turning direction; false ("Mirror") makes every diamond the same.
     public var checkerFaces = false
@@ -148,7 +150,8 @@ public struct Look: Codable, Equatable, Sendable {
         drift = min(max(drift, 0), 1)
         driftSpeed = min(max(driftSpeed, 0), 0.5)
         twist = min(max(twist, -1), 1)
-        hueSpeed = min(max(hueSpeed, 0), 0.6)
+        let h = hueSpeed
+        hueSpeed = Self.hueCycleSteps.min { abs($0 - h) < abs($1 - h) }!
         breathing = min(max(breathing, 0), 1)
         motion = min(max(motion, 0), 2)
         let o = outline
@@ -157,7 +160,7 @@ public struct Look: Codable, Equatable, Sendable {
         mirrorsMin = min(max(mirrorsMin, r.lowerBound), r.upperBound)
         mirrorsMax = min(max(mirrorsMax, r.lowerBound), r.upperBound)
         if mirrorsMin > mirrorsMax { swap(&mirrorsMin, &mirrorsMax) }
-        saturation = min(max(saturation, 0), 2)
+        saturation = min(max(saturation, 0.5), 1.5)
         vignette = min(max(vignette, 0), 1)
     }
 
@@ -194,16 +197,13 @@ public struct Look: Codable, Equatable, Sendable {
         case .radial: l.segments = [3, 4, 5, 6, 6, 7, 8, 8, 9, 10, 12, 14, 16].randomElement(using: &g)!
         }
         l.rotationSpeed = Double.random(in: 0.02...0.15, using: &g) * (Bool.random(using: &g) ? 1 : -1)
-        l.zoom = Double.random(in: 0.8...2.0, using: &g)
-        l.drift = Double.random(in: 0.15...0.7, using: &g)
         l.driftSpeed = Double.random(in: 0.03...0.15, using: &g)
         l.twist = Double.random(in: 0..<1, using: &g) < 0.3 ? Double.random(in: -0.4...0.4, using: &g) : 0
         l.hueShift = Double.random(in: 0..<1, using: &g) < 0.4 ? Double.random(in: 0...360, using: &g) : 0
-        l.hueSpeed = Double.random(in: 0..<1, using: &g) < 0.3 ? Double.random(in: 0.05...0.2, using: &g) : 0
+        l.hueSpeed = Double.random(in: 0..<1, using: &g) < 0.3 ? [0.05, 0.15].randomElement(using: &g)! : 0
         l.saturation = Double.random(in: 0.95...1.4, using: &g)
         l.vignette = Double.random(in: 0.1...0.45, using: &g)
-        l.breathing = Double.random(in: 0.2...0.7, using: &g)
-        l.outline = Double.random(in: 0..<1, using: &g) < 0.15 ? 0.5 : 0
+        l.outline = Double.random(in: 0..<1, using: &g) < 0.15 ? 0.25 : 0
         if (l.mode == .radial || l.mode == .fractal) && Double.random(in: 0..<1, using: &g) < 0.25 {
             l.dynamicMirrors = true
             l.mirrorsMin = max(3, l.segments - 3)
@@ -254,51 +254,44 @@ public struct Preset: Identifiable, Equatable, Sendable {
             return Preset(name: name, look: l)
         }
         return [
-            make("Slow Mandala") { _ in },
-            make("Mirror Hall") {
-                $0.segments = 8; $0.zoom = 1.0; $0.rotationSpeed = 0.05; $0.drift = 0.3; $0.vignette = 0.25
+            // One or two per pattern. Zoom, drift and zoom breathing stay at 100% (the defaults) throughout.
+            make("Mandala") { _ in },
+            make("Shifting Mandala") {
+                $0.segments = 8; $0.dynamicMirrors = true; $0.mirrorsMin = 6; $0.mirrorsMax = 14; $0.vignette = 0.3
             },
-            make("Drifting Hex Garden") {
-                $0.mode = .hex; $0.segments = 5; $0.rotationSpeed = 0.04; $0.zoom = 1.1; $0.drift = 0.5
-                $0.driftSpeed = 0.1
-            },
-            make("Fractal Bloom") {
-                $0.mode = .fractal; $0.segments = 5; $0.rotationSpeed = 0.1; $0.zoom = 1.3; $0.drift = 0.45
-                $0.driftSpeed = 0.1; $0.saturation = 1.25
-            },
-            make("Dream") {
-                $0.segments = 6; $0.rotationSpeed = 0.06; $0.zoom = 0.9; $0.drift = 0.5
-                $0.saturation = 1.3; $0.vignette = 0.4
-            },
-            make("Prism") {
-                $0.segments = 16; $0.rotationSpeed = 0.12; $0.zoom = 1.8; $0.hueSpeed = 0.15; $0.saturation = 1.35
+            make("Ink Mandala") {
+                $0.segments = 10; $0.outline = Look.outlineSteps[1]; $0.rotationSpeed = 0.05; $0.vignette = 0.2
             },
             make("Whirlpool") {
-                $0.segments = 7; $0.rotationSpeed = -0.1; $0.twist = 0.4; $0.zoom = 1.2; $0.drift = 0.3
+                $0.segments = 7; $0.twist = 0.45; $0.rotationSpeed = -0.08
             },
-            make("Shifting Mandala") {
-                $0.segments = 8; $0.dynamicMirrors = true; $0.mirrorsMin = 6; $0.mirrorsMax = 14
-                $0.rotationSpeed = 0.05; $0.zoom = 1.3; $0.vignette = 0.3
+            make("Prism") {
+                $0.segments = 16; $0.hueSpeed = Look.hueCycleSteps[1]; $0.saturation = 1.3; $0.rotationSpeed = 0.08
             },
-            make("Square Garden") {
-                $0.mode = .square; $0.segments = 4; $0.rotationSpeed = 0.03; $0.zoom = 1.1; $0.drift = 0.45
-                $0.driftSpeed = 0.08
+            make("Fractal Bloom") {
+                $0.mode = .fractal; $0.segments = 5; $0.saturation = 1.2; $0.rotationSpeed = 0.08
+            },
+            make("Hex Garden") {
+                $0.mode = .hex; $0.segments = 5; $0.rotationSpeed = 0.03
+            },
+            make("Square Tiles") {
+                $0.mode = .square; $0.segments = 4; $0.rotationSpeed = 0.03
+            },
+            make("Hall of Mirrors") {
+                $0.mode = .grid; $0.segments = 4; $0.rotationSpeed = 0.02; $0.vignette = 0.25
+            },
+            make("Triangle Toy") {
+                $0.mode = .triangle; $0.segments = 4; $0.rotationSpeed = 0.04
+            },
+            make("Diamonds") {
+                $0.mode = .cubes; $0.segments = 4; $0.rotationSpeed = 0.02
+            },
+            make("Checker Diamonds") {
+                $0.mode = .cubes; $0.segments = 4; $0.checkerFaces = true; $0.outline = Look.outlineSteps[1]
+                $0.rotationSpeed = 0.02
             },
             make("Spiral Tunnel") {
-                $0.mode = .spiral; $0.segments = 6; $0.rotationSpeed = 0.06; $0.zoom = 1.0; $0.drift = 0.3
-                $0.vignette = 0.45
-            },
-            make("Triangle Kaleidoscope") {
-                $0.mode = .triangle; $0.segments = 4; $0.rotationSpeed = 0.04; $0.zoom = 1.2; $0.drift = 0.4
-                $0.driftSpeed = 0.08
-            },
-            make("Escher Cubes") {
-                $0.mode = .cubes; $0.segments = 4; $0.rotationSpeed = 0.02; $0.zoom = 1.0; $0.drift = 0.35
-                $0.driftSpeed = 0.06; $0.vignette = 0.3
-            },
-            make("Gentle Window") {
-                $0.segments = 3; $0.rotationSpeed = 0.02; $0.zoom = 0.8; $0.drift = 0.6; $0.driftSpeed = 0.05
-                $0.vignette = 0.15; $0.saturation = 1.0
+                $0.mode = .spiral; $0.segments = 6; $0.vignette = 0.45; $0.rotationSpeed = 0.06
             },
         ]
     }()

@@ -30,19 +30,29 @@ public final class PresetLibrary: ObservableObject {
         self.fileURL = fileURL
         if let fileURL, let saved = JSONFile.load([SavedPreset].self, from: fileURL), !saved.isEmpty {
             presets = saved
-            // Built-ins renamed in later versions keep their place (and the user's edits).
-            let renamed = ["Dream Blur": "Dream"]
+            // Built-ins that are no longer shipped: unedited ones go; edited ones stay, as the user's own presets.
+            let shipped = Set(Preset.all.map(\.name))
+            presets.removeAll { $0.isBuiltIn && !shipped.contains($0.originalName) && !$0.isModified }
+            for i in presets.indices where presets[i].isBuiltIn && !shipped.contains(presets[i].originalName) {
+                presets[i].isBuiltIn = false
+            }
+            // Built-ins follow the factory look of this version: an unedited one is updated outright, and Reset
+            // always goes back to the current factory look.
             for i in presets.indices where presets[i].isBuiltIn {
-                guard let new = renamed[presets[i].originalName] else { continue }
-                if presets[i].name == presets[i].originalName { presets[i].name = new }
-                presets[i].originalName = new
-                if let fresh = Preset.all.first(where: { $0.name == new }) { presets[i].originalLook = fresh.look }
+                guard let fresh = Preset.all.first(where: { $0.name == presets[i].originalName })?.look else { continue }
+                if presets[i].look == presets[i].originalLook { presets[i].look = fresh }
+                presets[i].originalLook = fresh
             }
             // Built-ins added in later versions show up for existing users too.
             let have = Set(presets.filter(\.isBuiltIn).map(\.originalName))
             for p in Preset.all where !have.contains(p.name) {
                 presets.append(SavedPreset(name: p.name, look: p.look, isBuiltIn: true))
             }
+            // Built-ins first, in factory order; the user's own presets after them, in their order.
+            let order = Dictionary(uniqueKeysWithValues: Preset.all.enumerated().map { ($1.name, $0) })
+            let builtIns = presets.filter(\.isBuiltIn).sorted { order[$0.originalName, default: 0] < order[$1.originalName, default: 0] }
+            presets = builtIns + presets.filter { !$0.isBuiltIn }
+            if presets != saved { save() }
         } else {
             presets = Preset.all.map { SavedPreset(name: $0.name, look: $0.look, isBuiltIn: true) }
         }

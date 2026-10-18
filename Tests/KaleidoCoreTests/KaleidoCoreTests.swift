@@ -88,7 +88,7 @@ final class SettingsTests: XCTestCase {
         var s = Settings()
         s.look.mode = .hex
         s.look.segments = 11
-        s.look.hueSpeed = 0.3
+        s.look.hueSpeed = 0.15
         s.secondsPerPhoto = 42
         s.shuffle = false
         s.transition = .iris
@@ -145,7 +145,7 @@ final class SettingsTests: XCTestCase {
         var wild = Look()
         wild.rotationSpeed = 500; wild.hueSpeed = 500; wild.driftSpeed = 99; wild.twist = 9; wild.motion = 50
         wild.clamp()
-        XCTAssertEqual(wild.rotationSpeed, 0.6); XCTAssertEqual(wild.hueSpeed, 0.6)
+        XCTAssertEqual(wild.rotationSpeed, 0.6); XCTAssertEqual(wild.hueSpeed, 0.4, "hue cycling snaps to its fastest step")
         XCTAssertEqual(wild.driftSpeed, 0.5); XCTAssertEqual(wild.twist, 1); XCTAssertEqual(wild.motion, 2)
         for p in Preset.all { XCTAssertLessThanOrEqual(abs(p.look.rotationSpeed), 0.15, p.name); XCTAssertLessThanOrEqual(p.look.driftSpeed, 0.15, p.name); XCTAssertLessThanOrEqual(p.look.hueSpeed, 0.2, p.name) }
         var g = SplitMix64(seed: 9)
@@ -203,9 +203,9 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(s.effectiveLook(wild).outline, 0.4)
         s.allowOutlines = false
         XCTAssertEqual(s.effectiveLook(wild).outline, 0, "the Settings switch turns outlines off everywhere")
-        XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 7}"#.utf8)).outline, 1)
+        XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 7}"#.utf8)).outline, 0.25)
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).outline, 0, "older presets have none")
-        XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.3}"#.utf8)).outline, 0.5, "snaps to off / medium / large")
+        XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.3}"#.utf8)).outline, 0.25, "snaps to off or on")
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.1}"#.utf8)).outline, 0)
         XCTAssertFalse(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).checkerFaces, "Diamonds default to mirror faces")
         var on = Look(); on.outline = 1
@@ -731,25 +731,6 @@ final class DynamicMirrorTests: XCTestCase {
     }
 }
 
-final class PresetRenameTests: XCTestCase {
-    func testDreamBlurBecomesDreamAndKeepsEdits() throws {
-        let dir = tempDir()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let file = dir.appendingPathComponent("presets.json")
-        var old = SavedPreset(name: "Dream Blur", look: Look(), isBuiltIn: true)
-        old.isFavorite = false
-        var untouched = SavedPreset(name: "Dream Blur", look: Look(), isBuiltIn: true)
-        untouched.name = "My dreamy one"
-        try JSONEncoder().encode([old, untouched]).write(to: file)
-
-        let lib = PresetLibrary(fileURL: file)
-        XCTAssertFalse(lib.presets.contains { $0.originalName == "Dream Blur" })
-        XCTAssertEqual(lib.preset(old.id)?.name, "Dream")
-        XCTAssertEqual(lib.preset(old.id)?.isFavorite, false, "the user's heart choice is kept")
-        XCTAssertEqual(lib.preset(untouched.id)?.name, "My dreamy one", "a name the user changed is kept")
-        XCTAssertEqual(lib.presets.filter { $0.originalName == "Dream" }.count, 2, "no duplicate Dream is added")
-    }
-}
 
 final class WallpaperSourceTests: XCTestCase {
     func testScanSkipsSolidColorsStubsAndHiddenFiles() throws {
@@ -788,5 +769,44 @@ final class WallpaperSourceTests: XCTestCase {
         back.setWallpapers(false)
         XCTAssertNil(back.wallpapers)
         XCTAssertTrue(back.items.isEmpty)
+    }
+}
+
+final class PresetRefreshTests: XCTestCase {
+    func testRetiredBuiltInsGoUnlessEditedAndNewOnesArrive() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("presets.json")
+        let retiredUntouched = SavedPreset(name: "Dream Blur", look: Look(), isBuiltIn: true)
+        var retiredEdited = SavedPreset(name: "Mirror Hall", look: Look(), isBuiltIn: true)
+        retiredEdited.look.segments = 5
+        var mine = SavedPreset(name: "Mine", look: Look())
+        mine.isFavorite = false
+        try JSONEncoder().encode([retiredUntouched, retiredEdited, mine]).write(to: file)
+
+        let lib = PresetLibrary(fileURL: file)
+        XCTAssertNil(lib.preset(retiredUntouched.id), "an unedited preset that no longer ships is removed")
+        XCTAssertEqual(lib.preset(retiredEdited.id)?.isBuiltIn, false, "an edited one stays, as the user's own")
+        XCTAssertEqual(lib.preset(retiredEdited.id)?.look.segments, 5)
+        XCTAssertEqual(lib.preset(mine.id)?.isFavorite, false)
+        XCTAssertEqual(Array(lib.presets.prefix(Preset.all.count)).map(\.name), Preset.all.map(\.name), "today's built-ins come first, in order")
+        XCTAssertEqual(PresetLibrary(fileURL: file).presets.map(\.id), lib.presets.map(\.id), "the refreshed list is saved")
+    }
+
+    func testUneditedBuiltInsTakeTheNewFactoryLook() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("presets.json")
+        var stale = Look(); stale.zoom = 1.4; stale.drift = 0.25
+        let unedited = SavedPreset(name: "Mandala", look: stale, isBuiltIn: true)
+        var edited = SavedPreset(name: "Spiral Tunnel", look: stale, isBuiltIn: true)
+        edited.look.segments = 9
+        try JSONEncoder().encode([unedited, edited]).write(to: file)
+
+        let lib = PresetLibrary(fileURL: file)
+        XCTAssertEqual(lib.preset(unedited.id)?.look, Preset.all.first { $0.name == "Mandala" }!.look)
+        XCTAssertEqual(lib.preset(edited.id)?.look.segments, 9, "edits are kept")
+        lib.reset(edited.id)
+        XCTAssertEqual(lib.preset(edited.id)?.look, Preset.all.first { $0.name == "Spiral Tunnel" }!.look, "Reset gives today's factory look")
     }
 }

@@ -15,14 +15,18 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 - **Four sections.** Home (preview, Play, previous/next, Surprise me, speed, your hearted presets), Photos (the
   album browser), Presets (edit, create, duplicate, heart and reset presets) and Settings (slideshow, preset
   shuffling, effect switches, performance).
-- **Presets.** Edits apply live and are saved. Reset puts a built-in preset back to its original (or a preset you
+- **Built-in presets.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square
+  Tiles, Hall of Mirrors, Triangle Toy, Diamonds, Checker Diamonds and Spiral Tunnel: at least one per pattern.
+- **Presets.** Pick the pattern from a grid of drawn buttons. Swirl has a zero mark (and snaps to it), Outlines
+  is a switch, Hue cycling is Off / Slow / Medium / Fast, and Saturation runs 50–150% with a boost that lifts dull
+  colours without clipping bright ones. Edits apply live and are saved. Reset puts a built-in preset back to its original (or a preset you
   made back to how you created it). Hearted presets appear on Home and are the ones Shuffle presets moves between.
 - **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
   Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
 - **Eight patterns.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror
   tiles laid out in log-polar space, so they shrink towards the centre and slowly flow inward), Triangle (the
   classic three-mirror toy) and Diamonds (Escher's rhombille tiling, kept flat: each diamond holds its own slowly turning mandala; Checker faces show different parts of the photo, Mirror faces are all alike).
-- **Outlines.** Any preset can draw black lines along its mirrors and tile edges (Outlines: off, medium or large); they bend
+- **Outlines.** Any preset can draw black lines along its mirrors and tile edges (an Outlines switch); they bend
   with swirl and follow dynamic mirrors. Settings > Effects can turn them off everywhere.
 - **Pattern lines.** In the preset editor, a toggle traces every mirror and tile edge in red over the dimmed
   photo, so you can see the shape of the pattern itself. The editor preview has its own previous / play / next.

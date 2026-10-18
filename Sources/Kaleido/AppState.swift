@@ -62,6 +62,12 @@ final class AppState: ObservableObject, PhotoProvider {
         if settings.activePresetID == nil, let match = presets.presets.first(where: { $0.look == settings.look }) {
             settings.activePresetID = match.id
         }
+        // Play the active preset as it is now (presets can change between versions, e.g. new defaults).
+        if let p = presets.preset(settings.activePresetID) {
+            if p.look != settings.look { settings.look = p.look }
+        } else if settings.activePresetID != nil, let first = presets.favorites.first ?? presets.presets.first {
+            apply(first)   // the preset that was playing has been retired
+        }
         photos.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         photos.onLibraryChange = { [weak self] in self?.scheduleSync(after: 20) }
         filterObserver = library.$filters.dropFirst().removeDuplicates().sink { [weak self] _ in self?.scheduleSync(after: 1) }

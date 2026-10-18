@@ -383,7 +383,14 @@ enum Shaders {
         // Grade: hue rotation, saturation, vignette, a hair of dither against banding in soft areas.
         col = hueRotate(col, u.hue);
         float luma = dot(col, float3(0.2126, 0.7152, 0.0722));
-        col = mix(float3(luma), col, u.saturation);
+        if (u.saturation > 1.0) {
+            // Vibrance-style boost: dull colours gain the most, already-vivid ones barely move, so bright
+            // channels don't clip flat and smear away detail.
+            float chroma = max(col.r, max(col.g, col.b)) - min(col.r, min(col.g, col.b));
+            col = mix(float3(luma), col, 1.0 + (u.saturation - 1.0) * 1.6 * (1.0 - chroma));
+        } else {
+            col = mix(float3(luma), col, u.saturation);
+        }
         float vr = length(p) / (0.5 * length(float2(res.x / res.y, 1.0)));
         col *= 1.0 - u.vignette * smoothstep(0.35, 1.05, vr);
         col += (hash21(in.position.xy + fract(u.time)) - 0.5) / 255.0;

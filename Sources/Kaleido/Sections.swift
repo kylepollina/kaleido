@@ -18,7 +18,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.openWindow) private var openWindow
-    @State private var section: AppSection? = .home
+    @State private var section: AppSection? = AppSection.atLaunch
 
     var body: some View {
         NavigationSplitView {
@@ -46,6 +46,17 @@ struct ContentView: View {
             // The action stays valid after this window closes, so the app delegate can reopen it.
             let open = openWindow
             app.openMainWindow = { open(id: "main") }
+            // SwiftUI sometimes opens this window at a tiny size on first launch; never let it be smaller than
+            // the layout needs.
+            DispatchQueue.main.async {
+                for w in NSApp.windows where w.title == "Kaleido" && w.styleMask.contains(.titled) {
+                    w.contentMinSize = NSSize(width: 900, height: 640)
+                    if w.frame.width < 900 || w.frame.height < 640 {
+                        w.setContentSize(NSSize(width: 1100, height: 800))
+                        w.center()
+                    }
+                }
+            }
         }
     }
 }
@@ -270,8 +281,6 @@ struct PresetEditor: View {
                 Section {
                     TextField("Name", text: Binding(get: { preset.name }, set: { app.presets.rename(preset.id, to: $0) }))
                     HStack {
-                        Toggle("Heart (show on Home, use when shuffling)", isOn: Binding(
-                            get: { preset.isFavorite }, set: { _ in app.presets.toggleFavorite(preset.id) }))
                         Spacer()
                         Button("Reset") { app.resetPreset(preset.id) }
                             .disabled(!preset.isModified)
@@ -279,10 +288,7 @@ struct PresetEditor: View {
                     }
                 }
                 Section("Shape") {
-                    Picker("Mirror mode", selection: bind(\.mode)) {
-                        ForEach(MirrorMode.allCases) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
+                    PatternPicker(selection: bind(\.mode))
                     SliderRow(preset.look.mode.countLabel,
                               value: Binding(get: { Double(preset.look.segments) }, set: { v in app.edit(preset.id) { $0.segments = Int(v.rounded()) } }),
                               range: 2...24, step: 1) { "\(Int($0))" }
@@ -313,25 +319,28 @@ struct PresetEditor: View {
                     SliderRow("Zoom", value: bind(\.zoom), range: 0.4...3) { String(format: "%.2f×", $0) }
                     SliderRow("Zoom breathing", value: bind(\.breathing), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                     SliderRow("Drift amount", value: bind(\.drift), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
-                    SliderRow("Swirl", value: bind(\.twist), range: -1...1) { String(format: "%.2f", $0) }
+                    SliderRow("Swirl", value: bind(\.twist), range: -1...1, zeroTick: true) { $0 == 0 ? "none" : String(format: "%+.2f", $0) }
                         .disabled(!app.settings.allowSwirl)
-                    Picker("Outlines", selection: bind(\.outline)) {
-                        Text("Off").tag(0.0)
-                        Text("Medium").tag(0.5)
-                        Text("Large").tag(1.0)
-                    }
-                    .pickerStyle(.segmented)
-                    .disabled(!app.settings.allowOutlines)
-                    .help("Black lines along every mirror and tile edge")
+                    Toggle("Outlines", isOn: Binding(get: { preset.look.outline > 0 },
+                                                     set: { on in app.edit(preset.id) { $0.outline = on ? Look.outlineSteps[1] : 0 } }))
+                        .disabled(!app.settings.allowOutlines)
+                        .help("Thin black lines along every mirror and tile edge")
                 }
                 Section {
-                    SliderRow("Hue shift", value: bind(\.hueShift), range: 0...360, step: 1) { "\(Int($0))°" }
+                    SliderRow("Hue shift", value: bind(\.hueShift), range: 0...360) { "\(Int($0))°" }
                         .disabled(!app.settings.allowHueChanges)
-                    ScaledSliderRow("Hue cycling", value: bind(\.hueSpeed), scale: .zeroLog(min: 0.01, max: 0.6)) {
-                        $0 == 0 ? "off" : String(format: "cycle in %.0f min", 360 / $0 / 60)
+                    Picker("Hue cycling", selection: Binding(
+                        get: { Look.hueCycleSteps.min { abs($0 - preset.look.hueSpeed) < abs($1 - preset.look.hueSpeed) }! },
+                        set: { v in app.edit(preset.id) { $0.hueSpeed = v } })) {
+                        Text("Off").tag(Look.hueCycleSteps[0])
+                        Text("Slow").tag(Look.hueCycleSteps[1])
+                        Text("Medium").tag(Look.hueCycleSteps[2])
+                        Text("Fast").tag(Look.hueCycleSteps[3])
                     }
+                    .pickerStyle(.segmented)
                     .disabled(!app.settings.allowHueChanges)
-                    SliderRow("Saturation", value: bind(\.saturation), range: 0...2) { String(format: "%.0f%%", $0 * 100) }
+                    .help("Slowly cycles the colours around the colour wheel")
+                    SliderRow("Saturation", value: bind(\.saturation), range: 0.5...1.5) { String(format: "%.0f%%", $0 * 100) }
                         .disabled(!app.settings.allowSaturationChanges)
                     SliderRow("Vignette", value: bind(\.vignette), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                         .disabled(!app.settings.allowVignette)
@@ -407,5 +416,14 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+extension AppSection {
+    /// `--section presets` (etc.) opens the window on that section; handy for checking a screen.
+    static var atLaunch: AppSection {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "--section"), i + 1 < args.count else { return .home }
+        return AppSection.allCases.first { $0.rawValue.lowercased() == args[i + 1].lowercased() } ?? .home
     }
 }
