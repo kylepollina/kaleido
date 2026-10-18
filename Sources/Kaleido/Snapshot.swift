@@ -23,7 +23,6 @@ enum Snapshot {
         if let z = value("--zoom").flatMap(Double.init) { look.zoom = z }
         if let t = value("--twist").flatMap(Double.init) { look.twist = t }
         if let o = value("--outline").flatMap(Double.init) { look.outline = o }
-        if args.contains("--mirror-faces") { look.checkerFaces = false }
         if let h = value("--hue").flatMap(Double.init) { look.hueShift = h }
         if let s = value("--sat").flatMap(Double.init) { look.saturation = s }
         look.clamp()

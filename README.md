@@ -16,7 +16,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   album browser), Presets (edit, create, duplicate, heart and reset presets) and Settings (slideshow, preset
   shuffling, effect switches, performance).
 - **Built-in presets.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square
-  Tiles, Hall of Mirrors, Triangle Toy, Diamonds, Checker Diamonds and Spiral Tunnel: at least one per pattern.
+  Tiles, Hall of Mirrors, Triangle Toy, Diamonds and Spiral Tunnel: at least one per pattern.
 - **Presets.** Pick the pattern from a grid of drawn buttons. Swirl has a zero mark (and snaps to it) and can sway back and forth, Hue shift shows a before/after colour strip, Outlines
   is a switch, Hue cycling is Off / Slow / Medium / Fast, and Saturation runs 50–150% with a boost that lifts dull
   colours without clipping bright ones. Edits apply live and are saved. Reset puts a built-in preset back to its original (or a preset you
@@ -25,7 +25,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
 - **Eight patterns.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror
   tiles laid out in log-polar space, so they shrink towards the centre and slowly flow inward), Triangle (the
-  classic three-mirror toy) and Diamonds (Escher's rhombille tiling, kept flat: each diamond holds its own slowly turning mandala; Checker faces show different parts of the photo, Mirror faces are all alike).
+  classic three-mirror toy) and Diamonds (Escher's rhombille tiling, kept flat: each diamond holds its own slowly turning mandala).
 - **Outlines.** Any preset can draw black lines along its mirrors and tile edges (an Outlines switch); they bend
   with swirl and follow dynamic mirrors. Settings > Effects can turn them off everywhere.
 - **Pattern lines.** In the preset editor, a toggle traces every mirror and tile edge in red over the dimmed

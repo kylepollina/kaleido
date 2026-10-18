@@ -292,14 +292,6 @@ struct PresetEditor: View {
                     SliderRow(preset.look.mode.countLabel,
                               value: Binding(get: { Double(preset.look.segments) }, set: { v in app.edit(preset.id) { $0.segments = Int(v.rounded()) } }),
                               range: 2...24, step: 1) { "\(Int($0))" }
-                    if preset.look.mode == .cubes {
-                        Picker("Faces", selection: bind(\.checkerFaces)) {
-                            Text("Checker").tag(true)
-                            Text("Mirror").tag(false)
-                        }
-                        .pickerStyle(.segmented)
-                        .help("Checker: each diamond direction shows a different part of the photo. Mirror: every diamond is the same.")
-                    }
                     Toggle("Dynamic mirrors (slowly change how many)", isOn: bind(\.dynamicMirrors))
                         .disabled(!app.settings.allowDynamicMirrors)
                     if preset.look.dynamicMirrors {

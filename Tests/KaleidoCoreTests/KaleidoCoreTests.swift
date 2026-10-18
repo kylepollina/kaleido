@@ -184,7 +184,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(Settings.speedMultipliers.count, 5)
         XCTAssertEqual(Settings.speedMultipliers, Settings.speedMultipliers.sorted(), "turtle to rabbit")
         s.speedStep = 0
-        XCTAssertEqual(s.effectiveLook(Look()).motion, 4, "slowest is the old fastest")
+        XCTAssertEqual(s.effectiveLook(Look()).motion, 8, "slowest is half the fastest")
         s.speedStep = 4
         XCTAssertEqual(s.effectiveLook(Look()).motion, 16, "fastest is four times the slowest")
         s.speedStep = 99
@@ -207,7 +207,6 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).outline, 0, "older presets have none")
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.3}"#.utf8)).outline, 0.25, "snaps to off or on")
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.1}"#.utf8)).outline, 0)
-        XCTAssertFalse(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).checkerFaces, "Diamonds default to mirror faces")
         XCTAssertFalse(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).swayingSwirl, "swirl holds still unless asked")
         XCTAssertTrue(Preset.all.first { $0.name == "Whirlpool" }!.look.swayingSwirl)
         var on = Look(); on.outline = 1

@@ -19,7 +19,7 @@ struct GPUUniforms {
     var mixAmount: Float = 0, morph: Float = 0, outline: Float = 0
     var segments: Int32 = 8, mode: Int32 = 0, transition: Int32 = 0, hasB: Int32 = 0
     var segmentsB: Int32 = 8, modeB: Int32 = 0, original: Int32 = 0, segmentsMorph: Int32 = 8
-    var outlines: Int32 = 0, checkerFaces: Int32 = 1
+    var outlines: Int32 = 0
 }
 
 struct PhotoTexture {
@@ -434,7 +434,6 @@ final class KaleidoRenderer {
         u.saturation = Float(look.saturation)
         u.vignette = Float(look.vignette)
         u.outline = Float(look.outline)
-        u.checkerFaces = look.checkerFaces ? 1 : 0
         u.time = Float(clock.truncatingRemainder(dividingBy: 1000))
         u.aspectA = current.aspect
         u.segments = Int32(currentShape.segments)

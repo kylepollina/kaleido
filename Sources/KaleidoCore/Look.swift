@@ -109,9 +109,6 @@ public struct Look: Codable, Equatable, Sendable {
     public static let outlineSteps: [Double] = [0, 0.25]
     /// Hue cycling choices in degrees per second: off, slow, medium, fast.
     public static let hueCycleSteps: [Double] = [0, 0.05, 0.15, 0.4]
-    /// Diamonds pattern only: true ("Checker") gives each diamond orientation its own part of the photo and
-    /// turning direction; false ("Mirror") makes every diamond the same.
-    public var checkerFaces = false
     public var dynamicMirrors = false
     public var mirrorsMin = 4
     public var mirrorsMax = 12
@@ -136,7 +133,6 @@ public struct Look: Codable, Equatable, Sendable {
         breathing = try c.decodeIfPresent(Double.self, forKey: .breathing) ?? d.breathing
         motion = try c.decodeIfPresent(Double.self, forKey: .motion) ?? d.motion
         outline = try c.decodeIfPresent(Double.self, forKey: .outline) ?? d.outline
-        checkerFaces = try c.decodeIfPresent(Bool.self, forKey: .checkerFaces) ?? d.checkerFaces
         dynamicMirrors = try c.decodeIfPresent(Bool.self, forKey: .dynamicMirrors) ?? d.dynamicMirrors
         mirrorsMin = try c.decodeIfPresent(Int.self, forKey: .mirrorsMin) ?? d.mirrorsMin
         mirrorsMax = try c.decodeIfPresent(Int.self, forKey: .mirrorsMax) ?? d.mirrorsMax
@@ -288,10 +284,6 @@ public struct Preset: Identifiable, Equatable, Sendable {
             },
             make("Diamonds") {
                 $0.mode = .cubes; $0.segments = 4; $0.rotationSpeed = 0.02
-            },
-            make("Checker Diamonds") {
-                $0.mode = .cubes; $0.segments = 4; $0.checkerFaces = true; $0.outline = Look.outlineSteps[1]
-                $0.rotationSpeed = 0.02
             },
             make("Spiral Tunnel") {
                 $0.mode = .spiral; $0.segments = 6; $0.vignette = 0.45; $0.rotationSpeed = 0.06
