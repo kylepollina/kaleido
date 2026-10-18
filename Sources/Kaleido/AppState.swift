@@ -20,6 +20,7 @@ final class AppState: ObservableObject, PhotoProvider {
     let library: PhotoLibrary
     let photos = PhotosService()
     @Published private(set) var isSyncing = false
+    private var syncAgain = false
     private var syncDebounce: Task<Void, Never>?
     private var filterObserver: AnyCancellable?
     let renderer: KaleidoRenderer?
@@ -123,18 +124,34 @@ final class AppState: ObservableObject, PhotoProvider {
         else if let url = library.resolveURL(for: id) { renderer?.show(PhotoRef(id: id, source: .file(url))) }
     }
 
-    func setAlbum(_ album: AlbumInfo, included: Bool) {
-        var list = library.albums.filter { $0.localID != album.localID }
-        if included { list.append(album.ref) }
-        library.setAlbums(list)
-        if included { syncNow() }
+    /// Card checkbox: put a whole album (or folder, or the hand-added photos) in or out of the rotation.
+    func toggleWhole(_ card: SourceCard) {
+        let on = card.state == .none || { if case .partial = card.state { return true } else { return false } }()
+        if let album = card.album, !library.albums.contains(where: { $0.localID == album.localID }) {
+            library.trackAlbum(album.ref)   // arrives with nothing selected; the sync that follows fills it in
+            library.setAutoInclude(card.id, true)
+            syncNow()
+            return
+        }
+        if on { library.selectAll(in: card.id) } else {
+            library.deselectAll(in: card.id)
+            library.untrackIfUnused(card.id)
+        }
+    }
+
+    /// Opening an album to browse it starts tracking it (nothing selected) and pulls its photos in.
+    func open(_ card: SourceCard) {
+        if let album = card.album, !library.albums.contains(where: { $0.localID == album.localID }) {
+            library.trackAlbum(album.ref)
+            syncNow()
+        }
     }
 
     func connectPhotos() { Task { await photos.requestAccess(); syncNow() } }
 
     /// Rescans chosen albums and watched folders, then adds new photos and drops vanished ones.
     func syncNow() {
-        guard !isSyncing else { return }
+        guard !isSyncing else { syncAgain = true; return }
         isSyncing = true
         let albums = library.albums, folders = library.folders, filters = library.filters
         let authorized = photos.isAuthorized
@@ -150,6 +167,7 @@ final class AppState: ObservableObject, PhotoProvider {
             library.applySync(listings: listings, markSynced: true)
             photos.refreshAlbums()
             isSyncing = false
+            if syncAgain { syncAgain = false; syncNow() }
             log.info("synced: \(self.library.items.count) photos")
         }
     }
@@ -258,7 +276,7 @@ final class AppState: ObservableObject, PhotoProvider {
                 let want = args[i + 1]; i += 1
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(1))
-                    if let a = self.photos.albums.first(where: { $0.title.localizedCaseInsensitiveContains(want) }) { self.setAlbum(a, included: true) }
+                    if let a = self.photos.albums.first(where: { $0.title.localizedCaseInsensitiveContains(want) }) { self.library.trackAlbum(a.ref); self.library.setAutoInclude(a.id, true); self.syncNow() }
                 }
             case "--connect-photos": connectPhotos()
             default: break

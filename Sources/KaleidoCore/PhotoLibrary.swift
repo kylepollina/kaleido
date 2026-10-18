@@ -212,6 +212,9 @@ public final class PhotoLibrary: ObservableObject {
         if let i = folders.firstIndex(where: { $0.id == source }) { folders[i].autoInclude = value }
     }
 
+    /// Flip only the "include new photos automatically" flag, leaving the current selection alone.
+    public func setAutoInclude(_ source: String, _ value: Bool) { setAuto(source, value); save() }
+
     /// Whole-source toggles: everything in, and new photos follow; or everything out.
     public func selectAll(in source: String) {
         setEnabledQuiet(true, itemIDs(in: source)); setAuto(source, true); save()

@@ -12,17 +12,21 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 
 - **Desktop playback.** One borderless window per display, just above the wallpaper and below desktop icons.
   Mouse clicks pass through. Works across Spaces, multiple displays, and display changes.
-- **Your photos, your picks.** Tick albums from your **Photos library** (Favorites, Recents, your own and shared
-  albums), add **watched folders**, or add single files (JPEG, PNG, HEIC and more; drag-and-drop works). Click a
-  thumbnail to include or exclude it. Nothing is selected until you choose. Choices are remembered.
+- **Album browser.** Your Photos albums (smart, yours, shared), watched folders and hand-added photos show up as
+  cards with a cover photo, name, count and a badge (All / N of M). Tick a card's circle to include the whole
+  album, or click the card to open it: click photos to toggle them, Shift-click for a range, plus Select All,
+  Deselect All and Invert. Nothing is selected until you choose. Choices are remembered.
+- **Whole vs partial.** An album you include entirely ("whole album") picks up new photos automatically. If you
+  hand-pick photos in it, new photos are listed but left out until you select them.
 - **Stays up to date.** While Kaleido is running it rescans chosen albums and folders at launch and about once a
   day (and shortly after Photos reports a change). New photos join the rotation, vanished ones leave. "Sync now"
   does it on demand. Options skip screenshots and small photos; videos are always skipped.
 - **Three mirror modes.** Classic radial (2 to 24 mirrors), tiled hex, and a fractal fold. Mirrors are
   reflections of each other, so there are no seams.
-- **Calm by default.** Everything moves slowly: a full turn takes about half an hour, drift laps take minutes,
-  cross-fades last six seconds. Speed sliders are logarithmic, so the slow end has fine control and even the
-  maximum stays gentle. Also zoom, swirl, blur, hue shift, saturation and vignette. Changes glide.
+- **Barely moving by default.** The default look is the "Slow Mandala": a full turn takes well over an hour, the
+  zoom breathes once every ten minutes, cross-fades last 12 seconds. A master **Motion** slider runs from Still
+  to Gentle (and a little livelier), with per-parameter speeds under "Advanced motion". Speed sliders are
+  logarithmic, so the slow end has fine control. Also zoom, swirl, blur, hue shift, saturation and vignette.
 - **Presets and "Surprise me"** for a random, good-looking look.
 - **Shuffle** (every photo once per round, never the same twice in a row) or in order, with a seconds-per-photo
   setting and six transitions (dissolve, iris, swirl wipe, zoom through, segment ripple, spin) or random.
@@ -67,7 +71,13 @@ Right-click a thumbnail for "Show now", "Reveal in Finder" and "Remove from libr
 - `Desktop.swift`: the windows, at `CGWindowLevelForKey(.desktopWindow) + 1`, rebuilt when displays change.
 - Settings live in `~/Library/Application Support/Kaleido/` (set `KALEIDO_DATA_DIR` to use another folder).
 
-**Troubleshooting displays:** Debug > Display Diagnostics… lists every screen, its desktop window, level,
+**How frames reach the screen:** Metal renders into IOSurfaces that are shown through plain Core Animation
+layers. (A CAMetalLayer window showed nothing on the notched built-in display, even though frames were
+presented, so Kaleido avoids CAMetalLayer for the desktop windows.)
+
+**Troubleshooting displays:** `Kaleido --autoplay --dump-windows [file]` writes a report of every display and
+desktop-level window and quits; `scripts/dump-desktop-windows.sh` lists desktop-level windows of all apps.
+ Debug > Display Diagnostics… lists every screen, its desktop window, level,
 visibility and frame counts; Debug > Rebuild Desktop Windows (or the menu bar item) re-creates them.
 
 Developer helpers: `KALEIDO_DEBUG=1` prints frame pacing every 5 s. `Kaleido --snapshot out.png --photo a.jpg

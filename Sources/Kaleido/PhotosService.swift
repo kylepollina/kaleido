@@ -9,6 +9,7 @@ struct AlbumInfo: Identifiable, Hashable {
     let title: String
     let count: Int
     let group: Group
+    var coverAssetID: String?
     var id: String { "album:" + localID }
     var ref: AlbumRef { AlbumRef(localID: localID, title: title) }
 }
@@ -62,8 +63,15 @@ final class PhotosService: NSObject, ObservableObject, PHPhotoLibraryChangeObser
         func collect(_ result: PHFetchResult<PHAssetCollection>, _ group: AlbumInfo.Group, skip: Set<PHAssetCollectionSubtype> = []) {
             result.enumerateObjects { c, _, _ in
                 if skip.contains(c.assetCollectionSubtype) { return }
-                let n = PHAsset.fetchAssets(in: c, options: imageOnly).count
-                if n > 0 { out.append(AlbumInfo(localID: c.localIdentifier, title: c.localizedTitle ?? "Untitled", count: n, group: group)) }
+                let all = PHAsset.fetchAssets(in: c, options: imageOnly)
+                if all.count > 0 {
+                    let o = PHFetchOptions()
+                    o.predicate = imageOnly.predicate
+                    o.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                    o.fetchLimit = 1
+                    let cover = PHAsset.fetchAssets(in: c, options: o).firstObject?.localIdentifier
+                    out.append(AlbumInfo(localID: c.localIdentifier, title: c.localizedTitle ?? "Untitled", count: all.count, group: group, coverAssetID: cover))
+                }
             }
         }
         let skipSmart: Set<PHAssetCollectionSubtype> = [.smartAlbumVideos, .smartAlbumSlomoVideos, .smartAlbumTimelapses, .smartAlbumAllHidden, .smartAlbumScreenshots]
@@ -103,9 +111,9 @@ final class PhotosService: NSObject, ObservableObject, PHPhotoLibraryChangeObser
         return try await request(asset: asset, size: CGSize(width: maxDimension, height: maxDimension), mode: .highQualityFormat, timeout: 90)
     }
 
-    nonisolated static func thumbnail(assetID: String, maxDimension: CGFloat = 360) async -> CGImage? {
+    nonisolated static func thumbnail(assetID: String, maxDimension: CGFloat = 480) async -> CGImage? {
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject else { return nil }
-        return try? await request(asset: asset, size: CGSize(width: maxDimension, height: maxDimension), mode: .opportunistic, timeout: 30)
+        return try? await request(asset: asset, size: CGSize(width: maxDimension, height: maxDimension), mode: .highQualityFormat, timeout: 30)
     }
 
     private nonisolated static func request(asset: PHAsset, size: CGSize, mode: PHImageRequestOptionsDeliveryMode, timeout: Double) async throws -> CGImage {
