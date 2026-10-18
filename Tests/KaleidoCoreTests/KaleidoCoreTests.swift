@@ -88,7 +88,7 @@ final class SettingsTests: XCTestCase {
         var s = Settings()
         s.look.mode = .hex
         s.look.segments = 11
-        s.look.hueSpeed = 7.5
+        s.look.hueSpeed = 1.5
         s.secondsPerPhoto = 42
         s.shuffle = false
         s.transition = .iris
@@ -98,14 +98,59 @@ final class SettingsTests: XCTestCase {
     }
 
     func testMissingKeysUseDefaultsAndValuesAreClamped() throws {
-        let json = #"{"secondsPerPhoto": 0.1, "look": {"segments": 500, "mode": "fractal"}, "frameRate": 45}"#
+        let json = #"{"version": 2, "secondsPerPhoto": 0.1, "look": {"segments": 500, "mode": "fractal"}, "frameRate": 45}"#
         let s = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        XCTAssertEqual(s.secondsPerPhoto, 2)
+        XCTAssertEqual(s.secondsPerPhoto, 5)
         XCTAssertEqual(s.look.segments, 24)
         XCTAssertEqual(s.look.mode, .fractal)
         XCTAssertEqual(s.frameRate, 30)
         XCTAssertEqual(s.look.zoom, Look().zoom)
         XCTAssertTrue(s.shuffle)
+    }
+
+    func testOldSettingsAreMigratedToCalmSpeeds() throws {
+        let old = #"{"secondsPerPhoto": 20, "transitionSeconds": 2.5, "shuffle": false, "look": {"mode": "hex", "segments": 9, "rotationSpeed": 30, "driftSpeed": 3, "hueSpeed": 20, "twist": 1.5, "saturation": 1.3}}"#
+        let s = try JSONDecoder().decode(Settings.self, from: Data(old.utf8))
+        let d = Settings()
+        XCTAssertEqual(s.version, Settings.currentVersion)
+        XCTAssertEqual(s.look.rotationSpeed, d.look.rotationSpeed)
+        XCTAssertEqual(s.look.driftSpeed, d.look.driftSpeed)
+        XCTAssertEqual(s.look.hueSpeed, 0)
+        XCTAssertEqual(s.look.twist, 0)
+        XCTAssertEqual(s.transitionSeconds, d.transitionSeconds)
+        XCTAssertEqual(s.secondsPerPhoto, d.secondsPerPhoto)
+        XCTAssertEqual(s.look.mode, .hex, "non-speed choices survive")
+        XCTAssertEqual(s.look.segments, 9)
+        XCTAssertFalse(s.shuffle)
+        XCTAssertEqual(s.look.saturation, 1.3)
+    }
+
+    func testCurrentSettingsAreNotMigratedAgain() throws {
+        var s = Settings()
+        s.look.rotationSpeed = 2
+        s.secondsPerPhoto = 15
+        let data = try JSONEncoder().encode(s)
+        let back = try JSONDecoder().decode(Settings.self, from: data)
+        XCTAssertEqual(back.look.rotationSpeed, 2)
+        XCTAssertEqual(back.secondsPerPhoto, 15)
+    }
+
+    func testDefaultsAndMaximumsAreCalm() {
+        let s = Settings()
+        XCTAssertLessThanOrEqual(abs(s.look.rotationSpeed), 0.5)
+        XCTAssertLessThanOrEqual(s.look.driftSpeed, 0.5)
+        XCTAssertGreaterThanOrEqual(s.transitionSeconds, 5)
+        var wild = Look()
+        wild.rotationSpeed = 500; wild.hueSpeed = 500; wild.driftSpeed = 99; wild.twist = 9
+        wild.clamp()
+        XCTAssertEqual(wild.rotationSpeed, 3); XCTAssertEqual(wild.hueSpeed, 3)
+        XCTAssertEqual(wild.driftSpeed, 1.5); XCTAssertEqual(wild.twist, 1)
+        for p in Preset.all { XCTAssertLessThanOrEqual(abs(p.look.rotationSpeed), 1.0, p.name); XCTAssertLessThanOrEqual(p.look.driftSpeed, 0.6, p.name) }
+        var g = SplitMix64(seed: 9)
+        for _ in 0..<300 {
+            let l = Look.random(using: &g)
+            XCTAssertLessThanOrEqual(abs(l.rotationSpeed), 1.2); XCTAssertLessThanOrEqual(l.hueSpeed, 1.2); XCTAssertLessThanOrEqual(l.driftSpeed, 0.6)
+        }
     }
 
     func testCorruptFileIsMovedAsideAndReportedAsMissing() {
@@ -243,5 +288,32 @@ final class BookmarkAndLibraryTests: XCTestCase {
         XCTAssertEqual(lib.items.count, 1)
         lib.remove(ids: Set(lib.items.map(\.id)))
         XCTAssertTrue(lib.items.isEmpty)
+    }
+}
+
+final class SliderScaleTests: XCTestCase {
+    func testLogScaleRoundTripsAndIsFineAtTheSlowEnd() {
+        let s = SliderScale.log(0.02, 1.5)
+        XCTAssertEqual(s.value(at: 0), 0.02, accuracy: 1e-12)
+        XCTAssertEqual(s.value(at: 1), 1.5, accuracy: 1e-12)
+        XCTAssertLessThan(s.value(at: 0.5), 0.3, "half the slider is still calm")
+        for v in [0.02, 0.1, 0.3, 1.0, 1.5] { XCTAssertEqual(s.value(at: s.position(for: v)), v, accuracy: 1e-9) }
+    }
+
+    func testSignedLogHasZeroInTheMiddleAndIsSymmetric() {
+        let s = SliderScale.signedLog(min: 0.02, max: 3)
+        XCTAssertEqual(s.value(at: 0.5), 0)
+        XCTAssertEqual(s.value(at: 0), -3, accuracy: 1e-9)
+        XCTAssertEqual(s.value(at: 1), 3, accuracy: 1e-9)
+        XCTAssertEqual(s.value(at: 0.3), -s.value(at: 0.7), accuracy: 1e-9)
+        XCTAssertEqual(s.position(for: 0), 0.5)
+        for v in [-3.0, -0.4, -0.02, 0.02, 0.4, 3.0] { XCTAssertEqual(s.value(at: s.position(for: v)), v, accuracy: 1e-9) }
+        var last = -Double.infinity
+        for i in 0...100 { let v = s.value(at: Double(i) / 100); XCTAssertGreaterThanOrEqual(v, last); last = v }
+    }
+
+    func testLinearClamps() {
+        let s = SliderScale.linear(2, 4)
+        XCTAssertEqual(s.value(at: -1), 2); XCTAssertEqual(s.value(at: 9), 4); XCTAssertEqual(s.position(for: 3), 0.5)
     }
 }

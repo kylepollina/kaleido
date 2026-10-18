@@ -174,10 +174,10 @@ final class KaleidoRenderer {
 
     func advance(_ dt: Double) {
         clock += dt
-        look = look.eased(toward: targetLook, by: 1 - exp(-dt * 4))
+        look = look.eased(toward: targetLook, by: 1 - exp(-dt * 1.5))
         rotation += look.rotationSpeed * .pi / 180 * dt
-        sourceRotation += look.rotationSpeed * .pi / 180 * dt * -0.4 + look.driftSpeed * 0.03 * dt
-        driftPhase += look.driftSpeed * dt
+        sourceRotation += look.rotationSpeed * .pi / 180 * dt * -0.4 + look.driftSpeed * 0.008 * dt
+        driftPhase += look.driftSpeed * dt * 0.25
         huePhase += look.hueSpeed * .pi / 180 * dt
 
         if var t = transitionClock {

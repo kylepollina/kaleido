@@ -53,21 +53,21 @@ public struct Look: Codable, Equatable, Sendable {
     public var mode: MirrorMode = .radial
     /// Mirror segments around the center (radial/fractal) or tile density (hex).
     public var segments: Int = 8
-    /// Degrees per second the mirror pattern turns.
-    public var rotationSpeed: Double = 6
+    /// Degrees per second the mirror pattern turns. Calm range: +-3, default about one turn per 15 minutes.
+    public var rotationSpeed: Double = 0.4
     /// Magnification of the photo inside the mirrors.
     public var zoom: Double = 1.0
     /// 0...1 how far the sampled window wanders across the photo.
-    public var drift: Double = 0.35
-    /// How fast it wanders (1 = a slow lap every minute or so).
-    public var driftSpeed: Double = 1.0
+    public var drift: Double = 0.3
+    /// How fast it wanders (1 = a lap about every 2.5 minutes; the default is a lap every 8).
+    public var driftSpeed: Double = 0.3
     /// Swirl: bends the mirrors with distance from the center, in radians per screen height.
     public var twist: Double = 0
     /// 0...1 softness (samples blurrier mip levels).
     public var blur: Double = 0
     /// Static hue rotation in degrees.
     public var hueShift: Double = 0
-    /// Degrees per second the hue keeps rotating.
+    /// Degrees per second the hue keeps rotating (at most 3, which is a full cycle in two minutes).
     public var hueSpeed: Double = 0
     public var saturation: Double = 1.1
     public var vignette: Double = 0.25
@@ -97,9 +97,12 @@ public struct Look: Codable, Equatable, Sendable {
     /// Keeps hand-edited or old files inside the ranges the shader is written for.
     public mutating func clamp() {
         segments = min(max(segments, Self.segmentRange.lowerBound), Self.segmentRange.upperBound)
-        zoom = min(max(zoom, 0.25), 4)
+        rotationSpeed = min(max(rotationSpeed, -3), 3)
+        zoom = min(max(zoom, 0.4), 3)
         drift = min(max(drift, 0), 1)
-        driftSpeed = min(max(driftSpeed, 0), 5)
+        driftSpeed = min(max(driftSpeed, 0), 1.5)
+        twist = min(max(twist, -1), 1)
+        hueSpeed = min(max(hueSpeed, 0), 3)
         blur = min(max(blur, 0), 1)
         saturation = min(max(saturation, 0), 2)
         vignette = min(max(vignette, 0), 1)
@@ -132,14 +135,14 @@ public struct Look: Codable, Equatable, Sendable {
         case .fractal: l.segments = [3, 4, 5, 6, 8].randomElement(using: &g)!
         case .radial: l.segments = [3, 4, 5, 6, 6, 7, 8, 8, 9, 10, 12, 14, 16].randomElement(using: &g)!
         }
-        l.rotationSpeed = Double.random(in: 2...22, using: &g) * (Bool.random(using: &g) ? 1 : -1)
-        l.zoom = Double.random(in: 0.7...2.2, using: &g)
-        l.drift = Double.random(in: 0.15...0.8, using: &g)
-        l.driftSpeed = Double.random(in: 0.5...2.0, using: &g)
-        l.twist = Double.random(in: 0..<1, using: &g) < 0.3 ? Double.random(in: -1.2...1.2, using: &g) : 0
+        l.rotationSpeed = Double.random(in: 0.15...1.2, using: &g) * (Bool.random(using: &g) ? 1 : -1)
+        l.zoom = Double.random(in: 0.8...2.0, using: &g)
+        l.drift = Double.random(in: 0.15...0.7, using: &g)
+        l.driftSpeed = Double.random(in: 0.1...0.6, using: &g)
+        l.twist = Double.random(in: 0..<1, using: &g) < 0.3 ? Double.random(in: -0.6...0.6, using: &g) : 0
         l.blur = Double.random(in: 0..<1, using: &g) < 0.25 ? Double.random(in: 0.1...0.5, using: &g) : 0
         l.hueShift = Double.random(in: 0..<1, using: &g) < 0.4 ? Double.random(in: 0...360, using: &g) : 0
-        l.hueSpeed = Double.random(in: 0..<1, using: &g) < 0.3 ? Double.random(in: 2...14, using: &g) : 0
+        l.hueSpeed = Double.random(in: 0..<1, using: &g) < 0.3 ? Double.random(in: 0.2...1.2, using: &g) : 0
         l.saturation = Double.random(in: 0.95...1.4, using: &g)
         l.vignette = Double.random(in: 0.1...0.45, using: &g)
         l.clamp()
@@ -167,29 +170,29 @@ public struct Preset: Identifiable, Equatable, Sendable {
         return [
             make("Classic") { _ in },
             make("Slow Mandala") {
-                $0.segments = 12; $0.rotationSpeed = 3; $0.zoom = 1.4; $0.drift = 0.25; $0.driftSpeed = 0.6
+                $0.segments = 12; $0.rotationSpeed = 0.25; $0.zoom = 1.4; $0.drift = 0.25; $0.driftSpeed = 0.2
                 $0.vignette = 0.35
             },
             make("Drifting Hex Garden") {
-                $0.mode = .hex; $0.segments = 5; $0.rotationSpeed = 2.5; $0.zoom = 1.1; $0.drift = 0.5
-                $0.driftSpeed = 0.8
+                $0.mode = .hex; $0.segments = 5; $0.rotationSpeed = 0.2; $0.zoom = 1.1; $0.drift = 0.5
+                $0.driftSpeed = 0.3
             },
             make("Fractal Bloom") {
-                $0.mode = .fractal; $0.segments = 5; $0.rotationSpeed = 7; $0.zoom = 1.3; $0.drift = 0.45
-                $0.saturation = 1.25
+                $0.mode = .fractal; $0.segments = 5; $0.rotationSpeed = 0.5; $0.zoom = 1.3; $0.drift = 0.45
+                $0.driftSpeed = 0.3; $0.saturation = 1.25
             },
             make("Dream Blur") {
-                $0.segments = 6; $0.rotationSpeed = 4; $0.zoom = 0.9; $0.blur = 0.45; $0.drift = 0.5
+                $0.segments = 6; $0.rotationSpeed = 0.3; $0.zoom = 0.9; $0.blur = 0.45; $0.drift = 0.5
                 $0.saturation = 1.3; $0.vignette = 0.4
             },
-            make("Prism Spin") {
-                $0.segments = 16; $0.rotationSpeed = 14; $0.zoom = 1.8; $0.hueSpeed = 10; $0.saturation = 1.35
+            make("Prism") {
+                $0.segments = 16; $0.rotationSpeed = 0.8; $0.zoom = 1.8; $0.hueSpeed = 0.8; $0.saturation = 1.35
             },
             make("Whirlpool") {
-                $0.segments = 7; $0.rotationSpeed = -9; $0.twist = 0.9; $0.zoom = 1.2; $0.drift = 0.3
+                $0.segments = 7; $0.rotationSpeed = -0.7; $0.twist = 0.5; $0.zoom = 1.2; $0.drift = 0.3
             },
             make("Gentle Window") {
-                $0.segments = 3; $0.rotationSpeed = 1.5; $0.zoom = 0.8; $0.drift = 0.6; $0.driftSpeed = 0.5
+                $0.segments = 3; $0.rotationSpeed = 0.1; $0.zoom = 0.8; $0.drift = 0.6; $0.driftSpeed = 0.15
                 $0.vignette = 0.15; $0.saturation = 1.0
             },
         ]

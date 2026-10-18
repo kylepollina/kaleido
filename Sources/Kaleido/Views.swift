@@ -46,11 +46,11 @@ struct ControlsPane: View {
             Form {
                 Section("Photos") {
                     Toggle("Shuffle", isOn: $app.settings.shuffle)
-                    SliderRow("Seconds per photo", value: $app.settings.secondsPerPhoto, range: 3...120, step: 1) { "\(Int($0)) s" }
+                    ScaledSliderRow("Seconds per photo", value: $app.settings.secondsPerPhoto, scale: .log(10, 600)) { $0 < 90 ? "\(Int($0)) s" : String(format: "%.1f min", $0 / 60) }
                     Picker("Transition", selection: $app.settings.transition) {
                         ForEach(TransitionStyle.allCases) { Text($0.label).tag($0) }
                     }
-                    SliderRow("Transition length", value: $app.settings.transitionSeconds, range: 0.5...8, step: 0.1) { String(format: "%.1f s", $0) }
+                    ScaledSliderRow("Transition length", value: $app.settings.transitionSeconds, scale: .log(1, 15)) { String(format: "%.0f s", $0) }
                 }
 
                 Section {
@@ -66,17 +66,17 @@ struct ControlsPane: View {
                     .pickerStyle(.segmented)
                     let isHex = app.settings.look.mode == .hex
                     SliderRow(isHex ? "Tile density" : "Mirrors", value: intBinding(\.segments), range: 2...24, step: 1) { "\(Int($0))" }
-                    SliderRow("Rotation speed", value: $app.settings.look.rotationSpeed, range: -40...40, step: 0.5) { String(format: "%.1f°/s", $0) }
-                    SliderRow("Zoom", value: $app.settings.look.zoom, range: 0.4...3.5) { String(format: "%.2f×", $0) }
+                    ScaledSliderRow("Rotation speed", value: $app.settings.look.rotationSpeed, scale: .signedLog(min: 0.02, max: 3)) { String(format: "%.1f°/min", $0 * 60) }
+                    SliderRow("Zoom", value: $app.settings.look.zoom, range: 0.4...3) { String(format: "%.2f×", $0) }
                     SliderRow("Drift amount", value: $app.settings.look.drift, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
-                    SliderRow("Drift speed", value: $app.settings.look.driftSpeed, range: 0...4) { String(format: "%.1f×", $0) }
-                    SliderRow("Swirl", value: $app.settings.look.twist, range: -2...2) { String(format: "%.2f", $0) }
+                    ScaledSliderRow("Drift speed", value: $app.settings.look.driftSpeed, scale: .log(0.02, 1.5)) { String(format: "%.2f×", $0) }
+                    SliderRow("Swirl", value: $app.settings.look.twist, range: -1...1) { String(format: "%.2f", $0) }
                 } header: { Text("Kaleidoscope") }
 
                 Section("Color") {
                     SliderRow("Blur", value: $app.settings.look.blur, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                     SliderRow("Hue shift", value: $app.settings.look.hueShift, range: 0...360, step: 1) { "\(Int($0))°" }
-                    SliderRow("Hue cycling", value: $app.settings.look.hueSpeed, range: 0...40) { String(format: "%.0f°/s", $0) }
+                    ScaledSliderRow("Hue cycling", value: $app.settings.look.hueSpeed, scale: .log(0.02, 3)) { $0 <= 0.0201 ? "off" : String(format: "%.1f°/min", $0 * 60) }
                     SliderRow("Saturation", value: $app.settings.look.saturation, range: 0...2) { String(format: "%.0f%%", $0 * 100) }
                     SliderRow("Vignette", value: $app.settings.look.vignette, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                 }
@@ -127,6 +127,28 @@ struct SliderRow: View {
                 Text(format(value)).monospacedDigit().foregroundStyle(.secondary)
             }
             if let step { Slider(value: $value, in: range, step: step) } else { Slider(value: $value, in: range) }
+        }
+    }
+}
+
+struct ScaledSliderRow: View {
+    let title: String
+    @Binding var value: Double
+    let scale: SliderScale
+    let format: (Double) -> String
+
+    init(_ title: String, value: Binding<Double>, scale: SliderScale, format: @escaping (Double) -> String) {
+        self.title = title; self._value = value; self.scale = scale; self.format = format
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(format(value)).monospacedDigit().foregroundStyle(.secondary)
+            }
+            Slider(value: Binding(get: { scale.position(for: value) }, set: { value = scale.value(at: $0) }), in: 0...1)
         }
     }
 }

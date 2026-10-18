@@ -1,11 +1,14 @@
 import Foundation
 
 public struct Settings: Codable, Equatable, Sendable {
+    /// 2 = the calm speed ranges. Older files (no version) had much faster ranges and are migrated on load.
+    public static let currentVersion = 2
+    public var version = Settings.currentVersion
     public var look = Look()
-    public var secondsPerPhoto: Double = 20
+    public var secondsPerPhoto: Double = 45
     public var shuffle = true
     public var transition: TransitionStyle = .random
-    public var transitionSeconds: Double = 2.5
+    public var transitionSeconds: Double = 6
     /// 30 or 60.
     public var frameRate: Int = 30
     public var pauseOnBattery = false
@@ -18,6 +21,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = Settings()
+        let fileVersion = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
         look = try c.decodeIfPresent(Look.self, forKey: .look) ?? d.look
         secondsPerPhoto = try c.decodeIfPresent(Double.self, forKey: .secondsPerPhoto) ?? d.secondsPerPhoto
         shuffle = try c.decodeIfPresent(Bool.self, forKey: .shuffle) ?? d.shuffle
@@ -27,12 +31,23 @@ public struct Settings: Codable, Equatable, Sendable {
         pauseOnBattery = try c.decodeIfPresent(Bool.self, forKey: .pauseOnBattery) ?? d.pauseOnBattery
         limitInLowPowerMode = try c.decodeIfPresent(Bool.self, forKey: .limitInLowPowerMode) ?? d.limitInLowPowerMode
         playOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .playOnLaunch) ?? d.playOnLaunch
+        if fileVersion < Settings.currentVersion {
+            // The old ranges were far too lively. Reset every speed-like value to the calm defaults and keep
+            // the rest of the user's choices (mode, mirrors, colors, shuffle, frame rate...).
+            look.rotationSpeed = d.look.rotationSpeed
+            look.driftSpeed = d.look.driftSpeed
+            look.hueSpeed = 0
+            look.twist = 0
+            transitionSeconds = d.transitionSeconds
+            if secondsPerPhoto <= 20 { secondsPerPhoto = d.secondsPerPhoto }
+        }
+        version = Settings.currentVersion
         clamp()
     }
 
     public mutating func clamp() {
-        secondsPerPhoto = min(max(secondsPerPhoto, 2), 3600)
-        transitionSeconds = min(max(transitionSeconds, 0.2), 10)
+        secondsPerPhoto = min(max(secondsPerPhoto, 5), 3600)
+        transitionSeconds = min(max(transitionSeconds, 1), 15)
         frameRate = frameRate >= 60 ? 60 : 30
         look.clamp()
     }
