@@ -29,6 +29,7 @@ enum Shaders {
         int original;        // 1 = show the photo itself, uncut (the preview's "Original" tab)
         int segmentsMorph;   // the mirror count being faded towards
         int outlines;        // 1 = draw the pattern's mirror and tile lines in red (preset editor preview)
+        int checkerFaces;    // Diamonds: 1 = each orientation differs ("Checker"), 0 = all alike ("Mirror")
     };
 
     struct VOut { float4 position [[position]]; };
@@ -171,10 +172,11 @@ enum Shaders {
             float2 st = float2(d.x * e2.y - d.y * e2.x, e1.x * d.y - e1.y * d.x) / det;
             float2 c = st - 0.5;
             // A whole-number multiple of `rotation` keeps its wrap at 2*pi invisible.
-            c = rot2(c, u.rotation * (face == 0 ? 3.0 : -3.0));
+            bool checker = u.checkerFaces == 1;
+            c = rot2(c, u.rotation * ((face == 0 || !checker) ? 3.0 : -3.0));
             c = foldRadial(c, 8.0);
             const float2 faceOffset[3] = { float2(0.0, 0.0), float2(0.38, 0.12), float2(-0.22, 0.34) };
-            f = c * 0.9 + faceOffset[face];
+            f = c * 0.9 + (checker ? faceOffset[face] : float2(0.0));
             scale = density * 0.9 / R;
         } else {
             f = foldRadial(p, segments);

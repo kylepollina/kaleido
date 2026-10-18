@@ -24,6 +24,7 @@ enum Snapshot {
         if let b = value("--blur").flatMap(Double.init) { look.blur = b }
         if let t = value("--twist").flatMap(Double.init) { look.twist = t }
         if let o = value("--outline").flatMap(Double.init) { look.outline = o }
+        if args.contains("--mirror-faces") { look.checkerFaces = false }
         if let h = value("--hue").flatMap(Double.init) { look.hueShift = h }
         look.clamp()
         renderer.targetLook = look

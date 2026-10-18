@@ -107,6 +107,9 @@ public struct Look: Codable, Equatable, Sendable {
     /// Black lines along every mirror and tile edge: one of `outlineSteps` (0 = off, 0.5 = medium, 1 = large).
     public var outline: Double = 0
     public static let outlineSteps: [Double] = [0, 0.5, 1]
+    /// Diamonds pattern only: true ("Checker") gives each diamond orientation its own part of the photo and
+    /// turning direction; false ("Mirror") makes every diamond the same.
+    public var checkerFaces = true
     public var dynamicMirrors = false
     public var mirrorsMin = 4
     public var mirrorsMax = 12
@@ -131,6 +134,7 @@ public struct Look: Codable, Equatable, Sendable {
         breathing = try c.decodeIfPresent(Double.self, forKey: .breathing) ?? d.breathing
         motion = try c.decodeIfPresent(Double.self, forKey: .motion) ?? d.motion
         outline = try c.decodeIfPresent(Double.self, forKey: .outline) ?? d.outline
+        checkerFaces = try c.decodeIfPresent(Bool.self, forKey: .checkerFaces) ?? d.checkerFaces
         dynamicMirrors = try c.decodeIfPresent(Bool.self, forKey: .dynamicMirrors) ?? d.dynamicMirrors
         mirrorsMin = try c.decodeIfPresent(Int.self, forKey: .mirrorsMin) ?? d.mirrorsMin
         mirrorsMax = try c.decodeIfPresent(Int.self, forKey: .mirrorsMax) ?? d.mirrorsMax
