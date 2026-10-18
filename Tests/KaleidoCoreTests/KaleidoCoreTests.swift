@@ -184,7 +184,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(Settings.speedMultipliers.count, 5)
         XCTAssertEqual(Settings.speedMultipliers, Settings.speedMultipliers.sorted(), "turtle to rabbit")
         s.speedStep = 0
-        XCTAssertEqual(s.effectiveLook(Look()).motion, 8, "slowest is half the fastest")
+        XCTAssertEqual(s.effectiveLook(Look()).motion, 2, "slowest is an eighth of the fastest")
         s.speedStep = 4
         XCTAssertEqual(s.effectiveLook(Look()).motion, 16, "fastest is four times the slowest")
         s.speedStep = 99
@@ -809,5 +809,44 @@ final class PresetRefreshTests: XCTestCase {
         XCTAssertEqual(lib.preset(edited.id)?.look.segments, 9, "edits are kept")
         lib.reset(edited.id)
         XCTAssertEqual(lib.preset(edited.id)?.look, Preset.all.first { $0.name == "Spiral Tunnel" }!.look, "Reset gives today's factory look")
+    }
+}
+
+final class SceneTests: XCTestCase {
+    func testScenesKeepTheirOwnLookAndPersist() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let file = dir.appendingPathComponent("scenes.json")
+        let lib = SceneLibrary(fileURL: file)
+        var look = Look(); look.segments = 7
+        let photo = UUID()
+        let id = lib.add(name: "Lake", photoID: photo, look: look, panX: 0.3, panY: -0.2)
+        XCTAssertEqual(lib.add(name: "Lake", photoID: photo, look: look), lib.scenes[1].id)
+        XCTAssertEqual(lib.scenes[1].name, "Lake 2", "names stay unique")
+        XCTAssertTrue(lib.scene(id)!.isFavorite, "new scenes show on Home")
+
+        look.segments = 11
+        lib.update(id, name: "Lake at dusk", look: look, pan: nil)
+        let reloaded = SceneLibrary(fileURL: file)
+        XCTAssertEqual(reloaded.scene(id)?.name, "Lake at dusk")
+        XCTAssertEqual(reloaded.scene(id)?.look.segments, 11)
+        XCTAssertEqual(reloaded.scene(id)?.panX, 0.3, "no new position unless the photo was moved")
+
+        lib.delete(id)
+        XCTAssertNil(SceneLibrary(fileURL: file).scene(id))
+    }
+
+    func testDraftTracksUnsavedChanges() {
+        var d = EditDraft(target: .preset(UUID()), name: "Mandala", look: Look())
+        XCTAssertFalse(d.hasChanges)
+        d.look.segments = 9
+        XCTAssertTrue(d.hasChanges)
+        d.look.segments = Look().segments
+        XCTAssertFalse(d.hasChanges, "changing it back is no change")
+        d.name = "Mine"
+        XCTAssertTrue(d.hasChanges)
+        var s = EditDraft(target: .scene(UUID()), name: "S", look: Look())
+        s.moved = true
+        XCTAssertTrue(s.hasChanges, "moving the photo counts")
     }
 }

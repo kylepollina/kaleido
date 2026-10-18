@@ -3,13 +3,14 @@ import KaleidoCore
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case home = "Home", photos = "Photos", presets = "Presets", settings = "Settings"
+    case home = "Home", photos = "Photos", presets = "Presets", scenes = "Scenes", settings = "Settings"
     var id: String { rawValue }
     var icon: String {
         switch self {
         case .home: return "house"
         case .photos: return "photo.on.rectangle"
         case .presets: return "sparkles.rectangle.stack"
+        case .scenes: return "photo.artframe"
         case .settings: return "gearshape"
         }
     }
@@ -38,6 +39,7 @@ struct ContentView: View {
             case .home: HomeView(go: { section = $0 })
             case .photos: LibraryPane()
             case .presets: PresetsView()
+            case .scenes: ScenesView()
             case .settings: SettingsView()
             }
         }
@@ -129,6 +131,21 @@ struct HomeView: View {
                     }
                 }
                 .frame(maxWidth: 760)
+                let scenes = app.scenes.favorites
+                if !scenes.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Scenes").font(.headline)
+                            Text("A photo frozen with its look").font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Edit scenes…") { go(.scenes) }.buttonStyle(.link)
+                        }
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            ForEach(scenes) { s in SceneCard(scene: s) }
+                        }
+                    }
+                    .frame(maxWidth: 760)
+                }
             }
             .padding(20)
             .frame(maxWidth: .infinity)
@@ -145,6 +162,8 @@ struct HomeView: View {
                     .help("Next photo (and another preset when Shuffle presets is on)")
                 Button { app.surpriseMe() } label: { Label("Surprise me", systemImage: "dice") }
                     .help("A new photo with a random look")
+                Button { app.saveScene() } label: { Label("Save scene", systemImage: "bookmark") }
+                    .help("Keep this photo with this look and position as a scene")
             }
             .controlSize(.large)
             HStack(spacing: 28) {
@@ -226,9 +245,13 @@ struct PresetsView: View {
         .onAppear {
             app.isEditingPresets = true
             if selection == nil { selection = app.settings.activePresetID ?? app.presets.presets.first?.id }
+            if let id = selection { app.beginEditing(preset: id) }
         }
-        .onDisappear { app.isEditingPresets = false }
-        .onChange(of: selection) { _, id in if let p = app.presets.preset(id) { app.apply(p) } }
+        .onDisappear {
+            app.discardDraft()
+            app.isEditingPresets = false
+        }
+        .onChange(of: selection) { _, id in if let id { app.beginEditing(preset: id) } else { app.discardDraft() } }
     }
 
     private var list: some View {
@@ -277,32 +300,74 @@ struct PresetEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             PreviewPane(editor: true).frame(maxWidth: 480).padding(16)
-            Form {
-                Section {
-                    TextField("Name", text: Binding(get: { preset.name }, set: { app.presets.rename(preset.id, to: $0) }))
-                    HStack {
-                        Spacer()
-                        Button("Reset") { app.resetPreset(preset.id) }
-                            .disabled(!preset.isModified)
-                            .help(preset.isBuiltIn ? "Back to the original preset" : "Back to how it was when you created it")
+            if let draft = app.draft, draft.target == .preset(preset.id) {
+                Form {
+                    Section {
+                        DraftHeader(draft: draft) {
+                            Button("Reset") { app.resetDraftToOriginal() }
+                                .disabled(draft.look == preset.originalLook && draft.name == preset.originalName)
+                                .help(preset.isBuiltIn ? "Back to the original preset (then Save to keep it)"
+                                                       : "Back to how it was when you created it (then Save to keep it)")
+                        }
                     }
+                    LookControls()
                 }
+                .formStyle(.grouped)
+            }
+        }
+    }
+}
+
+/// Name, an "unsaved changes" note, and Revert / Save for whatever the editor has open.
+struct DraftHeader<Extra: View>: View {
+    @EnvironmentObject var app: AppState
+    let draft: EditDraft
+    @ViewBuilder var extra: Extra
+
+    var body: some View {
+        TextField("Name", text: Binding(get: { draft.name }, set: { app.renameDraft($0) }))
+        HStack {
+            if draft.hasChanges {
+                Label("Unsaved changes", systemImage: "circle.fill")
+                    .font(.caption).foregroundStyle(.orange)
+                    .help("You see the changes now; they are kept only if you press Save")
+            }
+            Spacer()
+            extra
+            Button("Revert") { app.revertDraft() }
+                .disabled(!draft.hasChanges)
+                .help("Throw away the changes since the last save")
+            Button("Save") { app.saveDraft() }
+                .keyboardShortcut("s", modifiers: .command)
+                .buttonStyle(.borderedProminent)
+                .disabled(!draft.hasChanges)
+        }
+    }
+}
+
+/// The look controls shared by the preset and scene editors. Every change goes into the draft.
+struct LookControls: View {
+    @EnvironmentObject var app: AppState
+    private var look: Look { app.draft?.look ?? Look() }
+
+    var body: some View {
+        Group {
                 Section("Shape") {
                     PatternPicker(selection: bind(\.mode))
-                    SliderRow(preset.look.mode.countLabel,
-                              value: Binding(get: { Double(preset.look.segments) }, set: { v in app.edit(preset.id) { $0.segments = Int(v.rounded()) } }),
+                    SliderRow(look.mode.countLabel,
+                              value: Binding(get: { Double(look.segments) }, set: { v in app.edit { $0.segments = Int(v.rounded()) } }),
                               range: 2...24, step: 1) { "\(Int($0))" }
                     Toggle("Dynamic mirrors (slowly change how many)", isOn: bind(\.dynamicMirrors))
                         .disabled(!app.settings.allowDynamicMirrors)
-                    if preset.look.dynamicMirrors {
+                    if look.dynamicMirrors {
                         LabeledContent("Between") {
                             HStack {
-                                Stepper("\(preset.look.mirrorsMin)", value: Binding(get: { preset.look.mirrorsMin },
-                                                                                   set: { v in app.edit(preset.id) { $0.mirrorsMin = min(v, $0.mirrorsMax) } }),
+                                Stepper("\(look.mirrorsMin)", value: Binding(get: { look.mirrorsMin },
+                                                                                   set: { v in app.edit { $0.mirrorsMin = min(v, $0.mirrorsMax) } }),
                                         in: Look.segmentRange)
                                 Text("and")
-                                Stepper("\(preset.look.mirrorsMax)", value: Binding(get: { preset.look.mirrorsMax },
-                                                                                   set: { v in app.edit(preset.id) { $0.mirrorsMax = max(v, $0.mirrorsMin) } }),
+                                Stepper("\(look.mirrorsMax)", value: Binding(get: { look.mirrorsMax },
+                                                                                   set: { v in app.edit { $0.mirrorsMax = max(v, $0.mirrorsMin) } }),
                                         in: Look.segmentRange)
                             }
                             .monospacedDigit()
@@ -314,22 +379,22 @@ struct PresetEditor: View {
                     SliderRow("Swirl", value: bind(\.twist), range: -1...1, zeroTick: true) { $0 == 0 ? "none" : String(format: "%+.2f", $0) }
                         .disabled(!app.settings.allowSwirl)
                     Toggle("Sway (swing the swirl slowly back and forth)", isOn: bind(\.swayingSwirl))
-                        .disabled(!app.settings.allowSwirl || preset.look.twist == 0)
+                        .disabled(!app.settings.allowSwirl || look.twist == 0)
                         .help("Swings from this much swirl, through straight, to the same amount the other way and back")
-                    Toggle("Outlines", isOn: Binding(get: { preset.look.outline > 0 },
-                                                     set: { on in app.edit(preset.id) { $0.outline = on ? Look.outlineSteps[1] : 0 } }))
+                    Toggle("Outlines", isOn: Binding(get: { look.outline > 0 },
+                                                     set: { on in app.edit { $0.outline = on ? Look.outlineSteps[1] : 0 } }))
                         .disabled(!app.settings.allowOutlines)
                         .help("Thin black lines along every mirror and tile edge")
                 }
                 Section {
                     SliderRow("Hue shift", value: bind(\.hueShift), range: 0...360, zeroTick: true) { $0 < 0.5 ? "none" : "\(Int($0))°" }
                         .disabled(!app.settings.allowHueChanges)
-                    HueShiftStrip(degrees: preset.look.hueShift)
+                    HueShiftStrip(degrees: look.hueShift)
                         .opacity(app.settings.allowHueChanges ? 1 : 0.4)
                         .help("Top: the original colours. Bottom: what each one becomes with this hue shift.")
                     Picker("Hue cycling", selection: Binding(
-                        get: { Look.hueCycleSteps.min { abs($0 - preset.look.hueSpeed) < abs($1 - preset.look.hueSpeed) }! },
-                        set: { v in app.edit(preset.id) { $0.hueSpeed = v } })) {
+                        get: { Look.hueCycleSteps.min { abs($0 - look.hueSpeed) < abs($1 - look.hueSpeed) }! },
+                        set: { v in app.edit { $0.hueSpeed = v } })) {
                         Text("Off").tag(Look.hueCycleSteps[0])
                         Text("Slow").tag(Look.hueCycleSteps[1])
                         Text("Medium").tag(Look.hueCycleSteps[2])
@@ -345,15 +410,13 @@ struct PresetEditor: View {
                 } header: {
                     Text("Color")
                 } footer: {
-                    Text("Effects switched off in Settings stay off for every preset.").font(.caption).foregroundStyle(.secondary)
+                    Text("Effects switched off in Settings stay off for every preset and scene.").font(.caption).foregroundStyle(.secondary)
                 }
-            }
-            .formStyle(.grouped)
         }
     }
 
     private func bind<T>(_ keyPath: WritableKeyPath<Look, T>) -> Binding<T> {
-        Binding(get: { preset.look[keyPath: keyPath] }, set: { v in app.edit(preset.id) { $0[keyPath: keyPath] = v } })
+        Binding(get: { look[keyPath: keyPath] }, set: { v in app.edit { $0[keyPath: keyPath] = v } })
     }
 }
 

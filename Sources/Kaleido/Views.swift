@@ -81,6 +81,8 @@ struct PreviewPane: View {
     @EnvironmentObject var app: AppState
     /// The preset editor's preview adds pattern lines and its own previous / play / next controls.
     var editor = false
+    /// The editor's previous / play / next (a scene keeps its own photo, so its editor leaves them out).
+    var transport = true
     @AppStorage("previewShowsOriginal") private var showOriginal = false
     @AppStorage("previewShowsPatternLines") private var showLines = false
 
@@ -122,7 +124,7 @@ struct PreviewPane: View {
                 }
                 .controlSize(.small)
             }
-            if editor {
+            if editor && transport {
                 HStack(spacing: 12) {
                     Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 26) }
                         .help("Previous photo")

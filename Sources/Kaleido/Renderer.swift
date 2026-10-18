@@ -168,6 +168,12 @@ final class KaleidoRenderer {
     private var panVelocity = SIMD2<Double>(0, 0)
     private var dragging = false
     private var lastDragTime: CFTimeInterval = 0
+    /// Where a scene wants the photo to sit; the pan glides there and then stays.
+    private var panGoal: SIMD2<Double>?
+    /// Called when the user lets go of the preview after dragging the photo.
+    var didDrag: (() -> Void)?
+    /// A scene is showing: keep this photo until asked to move on.
+    var holdPhoto = false
 
     // Frame-pacing stats, printed when KALEIDO_DEBUG is set.
     private var statFrames = 0, statCPU = 0.0, statWorst = 0.0, statSince = CACurrentMediaTime()
@@ -222,7 +228,10 @@ final class KaleidoRenderer {
             huePhase = remainder(huePhase, 2 * .pi) * exp(-dt * 1.2)
             if abs(huePhase) < 1e-4 { huePhase = 0 }
         }
-        if !dragging {
+        if let goal = panGoal, !dragging {
+            userPan += (goal - userPan) * (1 - exp(-dt * 2.5))
+            if simd_length(goal - userPan) < 1e-4 { userPan = goal; panGoal = nil }
+        } else if !dragging {
             userPan += panVelocity * dt
             panVelocity *= exp(-dt * 0.9)   // friction: a flick coasts for a few seconds
             if simd_length(panVelocity) < 1e-4 { panVelocity = .zero }
@@ -250,7 +259,7 @@ final class KaleidoRenderer {
             }
         } else {
             shownFor += dt
-            let due = shownFor >= secondsPerPhoto || skipRequested || currentID == nil
+            let due = (shownFor >= secondsPerPhoto && !holdPhoto) || skipRequested || currentID == nil
             if let (tex, ref) = pending, due {
                 let id: UUID? = ref.id
                 pending = nil
@@ -323,8 +332,18 @@ final class KaleidoRenderer {
 
     // MARK: Dragging
 
+    /// Where the photo has been dragged to (a scene saves this).
+    var pan: SIMD2<Double> { panGoal ?? userPan }
+
+    /// Glides the photo to a scene's position and stops it there.
+    func glidePan(to goal: SIMD2<Double>) {
+        panVelocity = .zero
+        panGoal = goal
+    }
+
     func beginDrag() {
         dragging = true
+        panGoal = nil
         panVelocity = .zero
         lastDragTime = CACurrentMediaTime()
     }
@@ -345,6 +364,7 @@ final class KaleidoRenderer {
         if CACurrentMediaTime() - lastDragTime > 0.08 { panVelocity = .zero }
         let speed = simd_length(panVelocity)
         if speed > 3 { panVelocity *= 3 / speed }
+        didDrag?()
     }
 
     /// Jump straight to the target look (no easing); used for offscreen snapshots.

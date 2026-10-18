@@ -12,8 +12,8 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 
 - **Desktop playback.** One borderless window per display, just above the wallpaper and below desktop icons.
   Mouse clicks pass through. Works across Spaces, multiple displays, and display changes.
-- **Four sections.** Home (preview, Play, previous/next, Surprise me, speed, your hearted presets), Photos (the
-  album browser), Presets (edit, create, duplicate, heart and reset presets) and Settings (slideshow, preset
+- **Five sections.** Home (preview, Play, previous/next, Surprise me, Save scene, speed, your hearted presets and
+  scenes), Photos (the album browser), Presets (edit, create, duplicate, heart and reset presets), Scenes and Settings (slideshow, preset
   shuffling, effect switches, performance).
 - **Built-in presets.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square
   Tiles, Hall of Mirrors, Triangle Toy, Diamonds and Spiral Tunnel: at least one per pattern.
@@ -21,6 +21,11 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   is a switch, Hue cycling is Off / Slow / Medium / Fast, and Saturation runs 50–150% with a boost that lifts dull
   colours without clipping bright ones. Edits apply live and are saved. Reset puts a built-in preset back to its original (or a preset you
   made back to how you created it). Hearted presets appear on Home and are the ones Shuffle presets moves between.
+- **Scenes.** "Save scene" on Home freezes what you see: the photo, its look and where you dragged it. Scenes keep
+  their own copy of the look, so editing a preset never changes them. Click one (on Home or in the Scenes section)
+  and it stays on screen until Next or Previous, then the slideshow carries on with the preset you had before.
+- **Save or throw away.** In the preset and scene editors every change shows at once, on the preview and the
+  desktop, but is kept only when you press Save (⌘S). Revert, or leaving the editor, puts the saved version back.
 - **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
   Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
 - **Eight patterns.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror

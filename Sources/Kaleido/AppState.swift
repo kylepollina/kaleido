@@ -24,7 +24,16 @@ final class AppState: ObservableObject, PhotoProvider {
 
     let library: PhotoLibrary
     let presets = PresetLibrary(fileURL: Paths.presetsFile)
+    let scenes = SceneLibrary(fileURL: Paths.scenesFile)
     let photos = PhotosService()
+    /// The scene on screen, if any. A scene holds its photo until Next, Previous or another preset.
+    @Published private(set) var activeSceneID: UUID?
+    /// Unsaved edits in the preset or scene editor: on screen at once, written only by Save.
+    @Published private(set) var draft: EditDraft?
+    /// Bumped whenever a scene's thumbnail is rewritten, so cards reload it.
+    @Published private(set) var sceneThumbVersion = 0
+    private var sceneArriving: SavedScene?
+    private var presetBeforeScene: UUID?
     @Published private(set) var isSyncing = false
     private var syncAgain = false
     private var sleepAssertion: IOPMAssertionID?
@@ -59,6 +68,13 @@ final class AppState: ObservableObject, PhotoProvider {
         applySettings()
         libraryObserver = library.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
         presets.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        scenes.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        renderer?.didDrag = { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, case .scene = self.draft?.target else { return }
+                self.draft?.moved = true
+            }
+        }
         if settings.activePresetID == nil, let match = presets.presets.first(where: { $0.look == settings.look }) {
             settings.activePresetID = match.id
         }
@@ -168,6 +184,24 @@ final class AppState: ObservableObject, PhotoProvider {
 
     /// Runs as each new photo starts fading in, so look changes ride along with the photo change.
     private func photoWillChange() {
+        if let s = sceneArriving {
+            // A scene's photo is fading in: its look (or the unsaved edits to it) comes with it.
+            sceneArriving = nil
+            settings.activePresetID = nil
+            settings.look = draft?.target == .scene(s.id) ? draft!.look : s.look
+            renderer?.glidePan(to: SIMD2(s.panX, s.panY))
+            return
+        }
+        if activeSceneID != nil {
+            // Moving on from a scene: back to the preset that was playing before it.
+            endScene()
+            if !surprisePending, let p = presets.preset(presetBeforeScene) ?? presets.favorites.first {
+                apply(p)
+                lookChangePending = false
+                photosSinceLookChange = 0
+                return
+            }
+        }
         photosSinceLookChange += 1
         if surprisePending {
             surprisePending = false
@@ -193,24 +227,142 @@ final class AppState: ObservableObject, PhotoProvider {
     }
 
     func apply(_ preset: SavedPreset) {
+        endScene()
         settings.activePresetID = preset.id
         settings.look = preset.look
     }
 
-    // MARK: Preset editing
+    // MARK: Scenes
 
-    /// Edits go straight into the preset and, when it is the one playing, onto the screen.
-    func edit(_ id: UUID, _ change: (inout Look) -> Void) {
-        guard var look = presets.preset(id)?.look else { return }
-        change(&look)
-        look.clamp()
-        presets.update(id, look: look)
-        if settings.activePresetID == id { settings.look = look }
+    private func photoRef(_ id: UUID) -> PhotoRef? {
+        guard let item = library.item(id) else { return nil }
+        if let a = item.assetID { return PhotoRef(id: id, source: .asset(a)) }
+        return library.resolveURL(for: id).map { PhotoRef(id: id, source: .file($0)) }
     }
 
-    func resetPreset(_ id: UUID) {
-        presets.reset(id)
-        if settings.activePresetID == id, let p = presets.preset(id) { settings.look = p.look }
+    func isSceneAvailable(_ s: SavedScene) -> Bool { library.item(s.photoID) != nil }
+
+    /// Shows a scene's photo with its look and position, and keeps it there until you move on.
+    func showScene(_ s: SavedScene) {
+        guard let renderer, let ref = photoRef(s.photoID) else { return }
+        if activeSceneID == nil { presetBeforeScene = settings.activePresetID }
+        activeSceneID = s.id
+        renderer.holdPhoto = true
+        if renderer.currentPhotoID == s.photoID {
+            sceneArriving = nil
+            settings.activePresetID = nil
+            settings.look = draft?.target == .scene(s.id) ? draft!.look : s.look
+            renderer.glidePan(to: SIMD2(s.panX, s.panY))
+        } else {
+            sceneArriving = s
+            renderer.show(ref)
+        }
+    }
+
+    private func endScene() {
+        guard activeSceneID != nil || sceneArriving != nil else { return }
+        activeSceneID = nil
+        sceneArriving = nil
+        renderer?.holdPhoto = false
+    }
+
+    /// Freezes what is on screen (photo, look and where the photo sits) as a new scene.
+    @discardableResult
+    func saveScene() -> UUID? {
+        guard let renderer, let photo = renderer.currentPhotoID else { return nil }
+        let base = presets.preset(settings.activePresetID).map { "\($0.name) scene" } ?? "Scene"
+        let id = scenes.add(name: base, photoID: photo, look: settings.look, panX: renderer.pan.x, panY: renderer.pan.y)
+        writeSceneThumbnail(id)
+        return id
+    }
+
+    func deleteScene(_ id: UUID) {
+        if activeSceneID == id { endScene() }
+        if draft?.target == .scene(id) { draft = nil }
+        scenes.delete(id)
+        try? FileManager.default.removeItem(at: Self.sceneThumbnailURL(id))
+    }
+
+    static func sceneThumbnailURL(_ id: UUID) -> URL {
+        Paths.dataDirectory.appendingPathComponent("scene-thumbnails/\(id.uuidString).png")
+    }
+
+    /// A small picture of the kaleidoscope as it is right now, for the scene's card.
+    private func writeSceneThumbnail(_ id: UUID) {
+        guard let image = renderer?.snapshot(width: 384, height: 216) else { return }
+        let url = Self.sceneThumbnailURL(id)
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else { return }
+        CGImageDestinationAddImage(dest, image, nil)
+        CGImageDestinationFinalize(dest)
+        sceneThumbVersion += 1
+    }
+
+    // MARK: Editing presets and scenes
+
+    /// Opens a preset in the editor: it plays, and edits wait for Save.
+    func beginEditing(preset id: UUID) {
+        guard draft?.target != .preset(id) else { return }
+        discardDraft()
+        guard let p = presets.preset(id) else { return }
+        draft = EditDraft(target: .preset(id), name: p.name, look: p.look)
+        apply(p)
+    }
+
+    func beginEditing(scene id: UUID) {
+        guard draft?.target != .scene(id) else { return }
+        discardDraft()
+        guard let s = scenes.scene(id) else { return }
+        draft = EditDraft(target: .scene(id), name: s.name, look: s.look)
+        showScene(s)
+    }
+
+    /// Changes the draft and shows it right away; nothing is saved.
+    func edit(_ change: (inout Look) -> Void) {
+        guard var d = draft else { return }
+        change(&d.look)
+        d.look.clamp()
+        draft = d
+        settings.look = d.look
+    }
+
+    func renameDraft(_ name: String) { draft?.name = name }
+
+    func saveDraft() {
+        guard let d = draft, d.hasChanges else { return }
+        switch d.target {
+        case .preset(let id):
+            if d.name != d.savedName { presets.rename(id, to: d.name) }
+            presets.update(id, look: d.look)
+            draft = EditDraft(target: d.target, name: d.name, look: d.look)
+        case .scene(let id):
+            let pan = d.moved ? renderer.map { ($0.pan.x, $0.pan.y) } : nil
+            scenes.update(id, name: d.name, look: d.look, pan: pan)
+            draft = EditDraft(target: d.target, name: d.name, look: d.look)
+            if activeSceneID == id, renderer?.currentPhotoID == scenes.scene(id)?.photoID { writeSceneThumbnail(id) }
+        }
+    }
+
+    /// Back to the saved version, on screen too.
+    func revertDraft() {
+        guard let d = draft else { return }
+        draft = EditDraft(target: d.target, name: d.savedName, look: d.savedLook)
+        if d.look != d.savedLook { settings.look = d.savedLook }
+        if case .scene(let id) = d.target, d.moved, let s = scenes.scene(id) { renderer?.glidePan(to: SIMD2(s.panX, s.panY)) }
+    }
+
+    /// Leaving the editor without saving throws the edits away.
+    func discardDraft() {
+        guard draft != nil else { return }
+        revertDraft()
+        draft = nil
+    }
+
+    /// Reset (presets): the factory look, or how you created it. Still needs Save.
+    func resetDraftToOriginal() {
+        guard case .preset(let id) = draft?.target, let p = presets.preset(id) else { return }
+        draft?.name = p.originalName
+        edit { $0 = p.originalLook }
     }
 
     /// Saves whatever is on screen (e.g. a Surprise me look) as a new hearted preset.

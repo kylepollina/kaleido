@@ -27,8 +27,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public static let currentVersion = 4
 
     /// The five stops of the speed slider (turtle to rabbit), as multipliers on every motion speed.
-    /// Rabbit is twice the turtle. Even steps on a log scale in between.
-    public static let speedMultipliers: [Double] = [8, 9.51, 11.3, 13.45, 16]
+    /// Rabbit is eight times the turtle. Even steps on a log scale in between.
+    public static let speedMultipliers: [Double] = [2, 3.36, 5.66, 9.51, 16]
     public static let defaultSpeedStep = 2
     public var version = Settings.currentVersion
     public var look = Look()
@@ -149,6 +149,7 @@ public enum Paths {
     public static var settingsFile: URL { dataDirectory.appendingPathComponent("settings.json") }
     public static var libraryFile: URL { dataDirectory.appendingPathComponent("library.json") }
     public static var presetsFile: URL { dataDirectory.appendingPathComponent("presets.json") }
+    public static var scenesFile: URL { dataDirectory.appendingPathComponent("scenes.json") }
 }
 
 public enum JSONFile {
