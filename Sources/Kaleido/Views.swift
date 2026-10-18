@@ -288,6 +288,7 @@ struct MenuBarContent: View {
         Button(app.isPlaying ? "Stop" : "Play on Desktop") { app.togglePlay() }
         Button("Next Photo") { app.nextPhoto() }.disabled(!app.isPlaying)
         Button("Surprise Me") { app.surpriseMe() }
+        Button("Refresh Desktop Windows") { app.rebuildDesktop() }.disabled(!app.isPlaying)
         Divider()
         Button("Show Kaleido Window") {
             openWindow(id: "main")

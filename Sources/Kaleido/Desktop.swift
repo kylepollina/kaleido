@@ -7,7 +7,7 @@ import KaleidoCore
 final class DesktopController {
     private let renderer: KaleidoRenderer
     private var windows: [CGDirectDisplayID: (window: NSWindow, view: KaleidoView)] = [:]
-    private var screenObserver: NSObjectProtocol?
+    private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     private(set) var isShowing = false
     private var fps = 30
     private var suspended = false
@@ -21,15 +21,26 @@ final class DesktopController {
         isShowing = true
         renderer.resetClock()
         rebuild()
-        screenObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.rebuild() }
+        // Anything that can move, hide or drop a window re-runs the reconcile, which is cheap and idempotent.
+        let ws = NSWorkspace.shared.notificationCenter
+        for (center, name) in [(NotificationCenter.default, NSApplication.didChangeScreenParametersNotification),
+                               (ws, NSWorkspace.activeSpaceDidChangeNotification),
+                               (ws, NSWorkspace.screensDidWakeNotification),
+                               (ws, NSWorkspace.didWakeNotification)] {
+            observers.append((center, center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.rebuild(reassert: true)
+                    // Displays often finish reconfiguring a moment after the notification.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { MainActor.assumeIsolated { self?.rebuild(reassert: true) } }
+                }
+            }))
         }
     }
 
     func hide() {
         isShowing = false
-        if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
-        screenObserver = nil
+        for (center, o) in observers { center.removeObserver(o) }
+        observers = []
         for (_, entry) in windows { close(entry.window) }
         windows = [:]
     }
@@ -48,6 +59,23 @@ final class DesktopController {
     /// Display ids of the screens currently covered (for logging and tests).
     var coveredDisplays: [CGDirectDisplayID] { Array(windows.keys) }
 
+    /// Human-readable status of every screen and its window (Debug menu, and the log when KALEIDO_DEBUG is set).
+    func diagnostics() -> String {
+        var lines = ["Displays: \(NSScreen.screens.count), desktop windows: \(windows.count), showing: \(isShowing), suspended: \(suspended)"]
+        for screen in NSScreen.screens {
+            let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
+            var line = "• \(screen.localizedName) [\(id)] frame \(Int(screen.frame.origin.x)),\(Int(screen.frame.origin.y)) \(Int(screen.frame.width))x\(Int(screen.frame.height)) @\(Int(screen.backingScaleFactor))x"
+            if let e = windows[id] {
+                let w = e.window, v = e.view
+                line += "\n    window #\(w.windowNumber) level \(w.level.rawValue) visible \(w.isVisible) occluded \(v.occluded) paused \(v.isPaused) draws \(v.drawCount) presented \(v.presentCount) center rgb \(v.lastProbe) drawable \(Int(v.drawableSize.width))x\(Int(v.drawableSize.height)) on screen \(w.screen?.localizedName ?? "none")"
+            } else {
+                line += "\n    NO WINDOW"
+            }
+            lines.append(line)
+        }
+        return lines.joined(separator: "\n")
+    }
+
     private func close(_ window: NSWindow) {
         window.contentView = nil
         window.orderOut(nil)
@@ -55,7 +83,7 @@ final class DesktopController {
     }
 
     /// Reconciles windows with the connected displays: adds, removes and re-frames as needed.
-    private func rebuild() {
+    func rebuild(reassert: Bool = false) {
         guard isShowing else { return }
         var live: Set<CGDirectDisplayID> = []
         for screen in NSScreen.screens {
@@ -63,6 +91,10 @@ final class DesktopController {
             live.insert(id)
             if let entry = windows[id] {
                 if entry.window.frame != screen.frame { entry.window.setFrame(screen.frame, display: true) }
+                if reassert {
+                    entry.window.level = Self.windowLevel
+                    entry.window.orderFrontRegardless()
+                }
                 continue
             }
             let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false, screen: screen)

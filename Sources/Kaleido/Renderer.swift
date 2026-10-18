@@ -294,13 +294,27 @@ final class KaleidoRenderer {
         cb.commit()
     }
 
-    func draw(in view: MTKView) {
+    /// Returns true if a frame was actually submitted.
+    @discardableResult
+    func draw(in view: MTKView) -> Bool {
         let start = CACurrentMediaTime()
         tick(now: start)
-        guard let pass = view.currentRenderPassDescriptor, let drawable = view.currentDrawable else { return }
+        guard let pass = view.currentRenderPassDescriptor, let drawable = view.currentDrawable else { return false }
         let size = view.drawableSize
-        encode(into: pass, drawable: drawable, width: size.width, height: size.height)
+        let debug = self.debug
+        let tex = drawable.texture
+        let probe = debug && !view.framebufferOnly
+        encode(into: pass, drawable: drawable, width: size.width, height: size.height) { cb in
+            guard debug else { return }
+            if cb.status == .error { FileHandle.standardError.write(Data("kaleido: GPU error \(String(describing: cb.error))\n".utf8)) }
+            if probe {
+                var px = [UInt8](repeating: 0, count: 4)
+                tex.getBytes(&px, bytesPerRow: 4, from: MTLRegionMake2D(tex.width / 2, tex.height / 2, 1, 1), mipmapLevel: 0)
+                (view as? KaleidoView)?.lastProbe = (px[2], px[1], px[0])
+            }
+        }
         if debug { recordFrame(cpu: CACurrentMediaTime() - start) }
+        return true
     }
 
     private func recordFrame(cpu: Double) {
@@ -352,7 +366,10 @@ final class KaleidoRenderer {
 /// desktop background nearly free when a maximised app sits on top of it.
 final class KaleidoView: MTKView, MTKViewDelegate {
     private let renderer: KaleidoRenderer
-    private var occluded = false
+    private(set) var occluded = false
+    private(set) var drawCount = 0
+    private(set) var presentCount = 0
+    nonisolated(unsafe) var lastProbe: (UInt8, UInt8, UInt8) = (0, 0, 0)
     private var observer: NSObjectProtocol?
 
     /// Set by the owner for sleep, lock and battery rules.
@@ -364,7 +381,7 @@ final class KaleidoView: MTKView, MTKViewDelegate {
         super.init(frame: .zero, device: renderer.device)
         colorPixelFormat = .bgra8Unorm
         colorspace = CGColorSpace(name: CGColorSpace.sRGB)
-        framebufferOnly = true
+        framebufferOnly = ProcessInfo.processInfo.environment["KALEIDO_DEBUG"] == nil
         preferredFramesPerSecond = fps
         enableSetNeedsDisplay = false
         isPaused = false
@@ -393,7 +410,8 @@ final class KaleidoView: MTKView, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     func draw(in view: MTKView) {
-        MainActor.assumeIsolated { renderer.draw(in: view) }
+        drawCount += 1
+        if MainActor.assumeIsolated({ renderer.draw(in: view) }) { presentCount += 1 }
     }
 
     deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }

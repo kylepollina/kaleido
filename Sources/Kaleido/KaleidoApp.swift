@@ -18,6 +18,12 @@ struct KaleidoApp: App {
             ContentView().environmentObject(app)
         }
         .defaultSize(width: 1040, height: 760)
+        .commands {
+            CommandMenu("Debug") {
+                Button("Display Diagnostics…") { DebugTools.showDiagnostics(app) }
+                Button("Rebuild Desktop Windows") { app.rebuildDesktop() }
+            }
+        }
 
         MenuBarExtra {
             MenuBarContent().environmentObject(app)
@@ -34,6 +40,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             AppState.shared.flushSettings()
             AppState.shared.stop()   // closes the desktop windows so nothing lingers
+        }
+    }
+}
+
+enum DebugTools {
+    @MainActor
+    static func showDiagnostics(_ app: AppState) {
+        let text = app.isPlaying ? app.diagnostics() : "Not playing. Press Play first, then run this again.\n\n" + app.diagnostics()
+        let alert = NSAlert()
+        alert.messageText = "Kaleido display diagnostics"
+        alert.informativeText = text
+        alert.addButton(withTitle: "Copy")
+        alert.addButton(withTitle: "Close")
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
         }
     }
 }

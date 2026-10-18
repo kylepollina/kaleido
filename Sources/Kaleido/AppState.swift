@@ -41,6 +41,11 @@ final class AppState: ObservableObject, PhotoProvider {
         libraryObserver = library.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
         observeSystem()
         power.onChange = { [weak self] in Task { @MainActor in self?.refreshSuspension() } }
+        if renderer?.debug == true {
+            Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { if let self, self.isPlaying { FileHandle.standardError.write(Data((self.diagnostics() + "\n").utf8)) } }
+            }
+        }
         handleLaunchArguments()
         if settings.playOnLaunch { play() }
     }
@@ -61,6 +66,10 @@ final class AppState: ObservableObject, PhotoProvider {
         desktop?.hide()
         log.info("stopped")
     }
+
+    func diagnostics() -> String { desktop?.diagnostics() ?? "No Metal device" }
+
+    func rebuildDesktop() { desktop?.rebuild(reassert: true) }
 
     func togglePlay() { isPlaying ? stop() : play() }
     func nextPhoto() { renderer?.skip() }
