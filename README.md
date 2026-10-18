@@ -12,38 +12,41 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 
 - **Desktop playback.** One borderless window per display, just above the wallpaper and below desktop icons.
   Mouse clicks pass through. Works across Spaces, multiple displays, and display changes.
-- **Five sections.** Home (preview, Play, previous/next, Surprise me, Save scene, speed, your hearted presets and
-  scenes), Photos (the album browser), Presets (edit, create, duplicate, heart and reset presets), Scenes and Settings (slideshow, preset
-  shuffling, effect switches, performance).
-- **Built-in presets.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square
-  Tiles, Hall of Mirrors, Triangle Toy, Diamonds and Spiral Tunnel: at least one per pattern.
-- **Presets.** Pick the pattern from a grid of drawn buttons. Swirl has a zero mark (and snaps to it) and can sway back and forth, Hue shift shows a before/after colour strip, Outlines
+- **Scenes and patterns.** A pattern is a kaleidoscope recipe (shape, mirrors, swirl, colour...). A scene is a
+  photo with a pattern. What's on screen is always a scene: a saved one, or a new one Kaleido just put together.
+  "Save scene" keeps it (photo, pattern and where you dragged the photo); "Save pattern" keeps an invented pattern.
+  Saved scenes keep their own copy of the pattern, so editing a pattern never changes them.
+- **Shuffle.** Off (stay on this scene), saved scenes, saved and new, or new only. New scenes take their pattern
+  from your hearted patterns, invented ones, both, or keep the current one. Invented patterns use only the shapes
+  ticked in Settings (untick Diamonds if it isn't for you). Next and Back fade in 3 seconds; Back brings back the
+  scene before, pattern and all, and pressing it mid-fade fades back to the scene that was leaving.
+- **Five sections.** Home (preview, Play, back/next, Surprise me, Save scene, Shuffle, speed, saved scenes and
+  hearted patterns), Photos (the album browser), Patterns (edit, create, duplicate, heart and reset), Scenes and
+  Settings (scenes, invented-pattern shapes, effect switches, performance).
+- **Built-in patterns.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square
+  Tiles, Hall of Mirrors, Triangle Toy, Diamonds and Spiral Tunnel: at least one per shape.
+- **Pattern editor.** Pick the shape from a grid of drawn buttons. Swirl has a zero mark (and snaps to it) and can sway back and forth, Hue shift shows a before/after colour strip, Outlines
   is a switch, Hue cycling is Off / Slow / Medium / Fast, and Saturation runs 50–150% with a boost that lifts dull
-  colours without clipping bright ones. Edits apply live and are saved. Reset puts a built-in preset back to its original (or a preset you
-  made back to how you created it). Hearted presets appear on Home and are the ones Shuffle presets moves between.
-- **Scenes.** "Save scene" on Home freezes what you see: the photo, its look and where you dragged it. Scenes keep
-  their own copy of the look, so editing a preset never changes them. Click one (on Home or in the Scenes section)
-  and it stays on screen until Next or Previous, then the slideshow carries on with the preset you had before.
-- **Save or throw away.** In the preset and scene editors every change shows at once, on the preview and the
+  colours without clipping bright ones. Reset puts a built-in pattern back to its original (or one you
+  made back to how you created it). Hearted patterns appear on Home and are the ones new scenes pick from.
+- **Save or throw away.** In the pattern and scene editors every change shows at once, on the preview and the
   desktop, but is kept only when you press Save (⌘S). Revert, or leaving the editor, puts the saved version back.
 - **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
   Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
-- **Eight patterns.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror
+- **Eight shapes.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror
   tiles laid out in log-polar space, so they shrink towards the centre and slowly flow inward), Triangle (the
   classic three-mirror toy) and Diamonds (Escher's rhombille tiling, kept flat: each diamond holds its own slowly turning mandala).
-- **Outlines.** Any preset can draw black lines along its mirrors and tile edges (an Outlines switch); they bend
+- **Outlines.** Any pattern can draw black lines along its mirrors and tile edges (an Outlines switch); they bend
   with swirl and follow dynamic mirrors. Settings > Effects can turn them off everywhere.
-- **Pattern lines.** In the preset editor, a toggle traces every mirror and tile edge in red over the dimmed
+- **Pattern lines.** In the pattern editor, a toggle traces every mirror and tile edge in red over the dimmed
   photo, so you can see the shape of the pattern itself. The editor preview has its own previous / play / next.
 - **Keep the screen awake** while playing (Settings > Performance), and a flower in the menu bar. Switching back
   to Kaleido (Cmd-Tab or the Dock) reopens its window if you closed it.
-- **Dynamic mirrors.** A preset can let its mirror count wander slowly between two numbers. A new mirror opens up
+- **Dynamic mirrors.** A pattern can let its mirror count wander slowly between two numbers. A new mirror opens up
   (the wedges make room while an extra one grows from nothing), or one closes; tilings grow denser or sparser. A
-  change comes about every 3 minutes, whatever the speed, and takes about 40 seconds to open up. See the "Shifting Mandala" preset.
+  change comes about every 3 minutes, whatever the speed, and takes about 40 seconds to open up. See the "Shifting Mandala" pattern.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
-- **Mixed-up looks.** The slideshow can switch preset looks now and then or with every photo; Next brings a new
-  photo and a new look, Surprise me a new photo and a random look. Looks change in step with the cross-fade.
-- **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every look.
+- **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every pattern.
 - **macOS Wallpapers.** No photos of your own? A built-in card offers Apple's desktop pictures that are on disk
   (skipping the plain solid colours). Scenic ones like Big Sur or The Lake are only downloaded when you pick them in
   System Settings > Wallpaper; once downloaded they join automatically on the next sync.
@@ -56,15 +59,8 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 - **Stays up to date.** While Kaleido is running it rescans chosen albums and folders at launch and about once a
   day (and shortly after Photos reports a change). New photos join the rotation, vanished ones leave. "Sync now"
   does it on demand. Options skip screenshots and small photos; videos are always skipped.
-- **Three mirror modes.** Classic radial (2 to 24 mirrors), tiled hex, and a fractal fold. Mirrors are
-  reflections of each other, so there are no seams.
-- **Barely moving by default.** The default look is the "Slow Mandala": a full turn takes well over an hour, the
-  zoom breathes once every ten minutes, cross-fades last 12 seconds. A master **Motion** slider runs from Still
-  to Gentle (and a little livelier), with per-parameter speeds under "Advanced motion". Speed sliders are
-  logarithmic, so the slow end has fine control. Also zoom, swirl, hue shift, saturation and vignette.
-- **Presets and "Surprise me"** for a random, good-looking look.
-- **Shuffle** (every photo once per round, never the same twice in a row) or in order, with a seconds-per-photo
-  setting and six transitions (dissolve, iris, swirl wipe, zoom through, segment ripple, spin) or random.
+- **Slow by default.** Scenes last 90 seconds and cross-fade over 12, with dissolve, iris, zoom-through and
+  segment transitions (or random). Photos come in shuffled order (each once per round) or in order.
 - **Good citizen.** 30 or 60 fps cap, 30 fps in Low Power Mode, optional pause on battery, pauses while the
   display is asleep or the screen is locked, and stops drawing when a window fully covers the desktop.
 - **Menu bar item** with Play/Stop, Next photo and Surprise me. Closing the window keeps playback running.
@@ -87,14 +83,14 @@ Run the tests with `swift test`.
 
 1. Click **Add Folder…** or **Add Photos…** (or drop files on the window).
 2. Press **Play on Desktop** (⌘P). Move to an empty desktop, or use Mission Control's show-desktop, to see it.
-3. Tune the look in the sidebar, or try a preset or Surprise me.
+3. Tune the look in the sidebar, or try a pattern or Surprise me.
 4. **Stop** or quit to get your wallpaper back.
 
 Right-click a thumbnail for "Show now", "Reveal in Finder" and "Remove from library".
 
 ## How it works
 
-- `Sources/KaleidoCore`: settings, looks and presets, the photo library (bookmarks plus path fallback), the shuffle
+- `Sources/KaleidoCore`: settings, patterns, scenes, the photo library (bookmarks plus path fallback), the shuffle
   queue. No UI, fully unit tested.
 - `Sources/Kaleido/Shaders.swift`: one fragment shader. It rotates and twists the screen, folds it into a mirrored
   wedge (radial), a hex-lattice cell (tiled) or iterated abs-folds (fractal), then samples the photo with a mirrored

@@ -182,13 +182,16 @@ public struct Look: Codable, Equatable, Sendable {
     }
 
     /// A random but good-looking look: weighted toward values that tend to read as a kaleidoscope.
-    public static func random<G: RandomNumberGenerator>(using g: inout G) -> Look {
+    /// `shapes` limits which mirror shapes it may use (all of them when nil or empty).
+    public static func random<G: RandomNumberGenerator>(shapes: Set<MirrorMode>? = nil, using g: inout G) -> Look {
         var l = Look()
         // Classic is still the most likely; the tilings and the spiral show up for variety.
-        let modes: [(MirrorMode, Double)] = [(.radial, 0.40), (.hex, 0.10), (.fractal, 0.10), (.square, 0.10), (.grid, 0.05),
-                                             (.spiral, 0.09), (.triangle, 0.09), (.cubes, 0.07)]
-        var roll = Double.random(in: 0..<1, using: &g)
-        l.mode = modes.first { roll -= $0.1; return roll < 0 }?.0 ?? .radial
+        let all: [(MirrorMode, Double)] = [(.radial, 0.40), (.hex, 0.10), (.fractal, 0.10), (.square, 0.10), (.grid, 0.05),
+                                           (.spiral, 0.09), (.triangle, 0.09), (.cubes, 0.07)]
+        let allowed = all.filter { shapes?.isEmpty != false || shapes!.contains($0.0) }
+        let modes = allowed.isEmpty ? all : allowed
+        var roll = Double.random(in: 0..<modes.map(\.1).reduce(0, +), using: &g)
+        l.mode = modes.first { roll -= $0.1; return roll < 0 }?.0 ?? modes[0].0
         switch l.mode {
         case .hex, .square, .grid, .triangle, .cubes: l.segments = Int.random(in: 3...9, using: &g)
         case .fractal: l.segments = [3, 4, 5, 6, 8].randomElement(using: &g)!

@@ -159,10 +159,14 @@ final class KaleidoRenderer {
     private var fadeSeconds = 2.5
     private let manualFadeSeconds = 3.0
     private var reversing = false
+    private var refadeRequested = false
     /// Bumped by every load, so a slower, older load can never replace the photo asked for last.
     private var loadGeneration = 0
     /// Called just before a new photo starts fading in, so the app can switch looks in step with it.
-    var willStartTransition: (() -> Void)?
+    /// Gets the incoming photo's id and whether it came from Back.
+    var willStartTransition: ((UUID?, Bool) -> Void)?
+    /// Back during a fade: the fade runs in reverse, so the app can put the old pattern back too.
+    var didReverseTransition: (() -> Void)?
     // Mirror mode and count belong to each photo: during a cross-fade the outgoing photo keeps its shape and
     // the incoming one already has the new look, so a look change never snaps mid-fade.
     private var dynamicCount: Int?, morphTo: Int?, mirrorKey: String?
@@ -235,8 +239,13 @@ final class KaleidoRenderer {
             if abs(huePhase) < 1e-4 { huePhase = 0 }
         }
         if let goal = panGoal, !dragging {
-            userPan += (goal - userPan) * (1 - exp(-dt * 2.5))
-            if simd_length(goal - userPan) < 1e-4 { userPan = goal; panGoal = nil }
+            // The mirrored photo repeats every 2 heights (and 2 widths), so head for the nearest copy of the
+            // goal: a short, gentle move instead of sweeping across many tiles.
+            let aspect = Double((incoming ?? current).aspect)
+            let period = SIMD2<Double>(2 * max(aspect, 0.1), 2)
+            let near = goal + ((userPan - goal) / period).rounded(.toNearestOrAwayFromZero) * period
+            userPan += (near - userPan) * (1 - exp(-dt * 1.2))
+            if simd_length(near - userPan) < 1e-4 { userPan = near; panGoal = nil }
         } else if !dragging {
             userPan += panVelocity * dt
             panVelocity *= exp(-dt * 0.9)   // friction: a flick coasts for a few seconds
@@ -283,10 +292,12 @@ final class KaleidoRenderer {
                 // Next and Back answer quickly; the slideshow's own changes take the full, slow fade.
                 fadeSeconds = skipRequested && currentID != nil ? min(transitionSeconds, manualFadeSeconds) : transitionSeconds
                 skipRequested = false
-                if id == currentID && id != nil {
+                let refade = refadeRequested
+                refadeRequested = false
+                if id == currentID && id != nil && !refade {
                     shownFor = 0
                 } else {
-                    willStartTransition?()   // may change targetLook (look shuffle)
+                    willStartTransition?(id, goingBack)   // may change targetLook (the scene's pattern)
                     if targetLook.mode != look.mode || targetLook.segments != look.segments { look = look.eased(toward: targetLook, by: 0) }
                     incomingShape = (targetLook.mode, startingMirrorCount(for: targetLook))
                     incoming = tex; incomingID = id; incomingRef = ref
@@ -345,6 +356,7 @@ final class KaleidoRenderer {
             // Mid-fade, "back" means the photo that is fading out.
             reversing = true
             pending = nil
+            didReverseTransition?()
             return
         }
         guard let last = history.popLast() else { return }
@@ -422,7 +434,10 @@ final class KaleidoRenderer {
     var currentPhotoID: UUID? { currentID }
 
     /// Show a specific photo next (used by "Show now").
-    func show(_ photo: PhotoRef) {
+    /// `refade`: fade even when it is the photo already showing (a scene putting a new pattern on it), so the
+    /// pattern never jumps.
+    func show(_ photo: PhotoRef, refade: Bool = false) {
+        refadeRequested = refade
         loadAsync(photo, force: true)
     }
 

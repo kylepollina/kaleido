@@ -1,30 +1,68 @@
 import Foundation
 
-/// Whether the slideshow switches between hearted presets, and how often.
-public enum LookShuffle: String, Codable, CaseIterable, Identifiable, Sendable {
-    case off, sometimes, everyPhoto
+/// What comes on screen next. A scene is a photo with a pattern; saved scenes are ones you kept, new scenes are
+/// a fresh photo with a pattern picked by `PatternSource`.
+public enum SceneShuffle: String, Codable, CaseIterable, Identifiable, Sendable {
+    case off, saved, mixed, new
     public var id: String { rawValue }
     public var label: String {
         switch self {
-        case .off: return "Off"
-        case .sometimes: return "Every 4 photos"
-        case .everyPhoto: return "Every photo"
+        case .off: return "Off (stay on this scene)"
+        case .saved: return "Saved scenes"
+        case .mixed: return "Saved and new scenes"
+        case .new: return "New scenes only"
         }
     }
-    /// Photos between look changes during automatic playback (nil = never).
-    public var interval: Int? {
+
+    /// How often a saved scene comes up when saved and new scenes are mixed.
+    public static let savedShareWhenMixed = 0.4
+
+    /// Whether the next scene is one of the saved (hearted) ones.
+    public func nextIsSaved(savedCount: Int, roll: Double) -> Bool {
+        guard savedCount > 0 else { return false }
         switch self {
-        case .off: return nil
-        case .sometimes: return 4
-        case .everyPhoto: return 1
+        case .saved: return true
+        case .mixed: return roll < Self.savedShareWhenMixed
+        case .off, .new: return false
+        }
+    }
+}
+
+/// Where a new scene's pattern comes from.
+public enum PatternSource: String, Codable, CaseIterable, Identifiable, Sendable {
+    case current, mine, invented, both
+    public var id: String { rawValue }
+    public var label: String {
+        switch self {
+        case .current: return "Keep the current pattern"
+        case .mine: return "My hearted patterns"
+        case .invented: return "Invented patterns"
+        case .both: return "Hearted and invented"
+        }
+    }
+
+    /// The pattern for a new scene: a look and, when it is a saved pattern, its id.
+    public func pick<G: RandomNumberGenerator>(current: Look, currentID: UUID?, patterns: PresetLibrary,
+                                              inventedShapes: Set<MirrorMode>, using g: inout G) -> (Look, UUID?) {
+        func mine() -> (Look, UUID?)? {
+            patterns.randomFavorite(excluding: currentID, using: &g).map { ($0.look, $0.id) }
+        }
+        switch self {
+        case .current: return (current, currentID)
+        case .mine: return mine() ?? (Look.random(shapes: inventedShapes, using: &g), nil)
+        case .invented: return (Look.random(shapes: inventedShapes, using: &g), nil)
+        case .both:
+            if Bool.random(using: &g), let m = mine() { return m }
+            return (Look.random(shapes: inventedShapes, using: &g), nil)
         }
     }
 }
 
 public struct Settings: Codable, Equatable, Sendable {
-    /// 4 = speed is a 5-stop global control and looks carry no speed of their own. 3 = barely-moving ranges,
-    /// 2 = calm ranges. Older files (no version) had much faster ranges and are migrated on load.
-    public static let currentVersion = 4
+    /// 5 = scene shuffling. 4 = speed is a 5-stop global control and looks carry no speed of their own.
+    /// 3 = barely-moving ranges, 2 = calm ranges. Older files (no version) had much faster ranges and are
+    /// migrated on load.
+    public static let currentVersion = 5
 
     /// The five stops of the speed slider (turtle to rabbit), as multipliers on every motion speed.
     /// Rabbit is eight times the turtle. Even steps on a log scale in between.
@@ -46,8 +84,12 @@ public struct Settings: Codable, Equatable, Sendable {
     public var keepScreenAwake = false
     /// 0...4, an index into `speedMultipliers`.
     public var speedStep = Settings.defaultSpeedStep
-    public var lookShuffle: LookShuffle = .sometimes
-    /// The preset `look` came from (nil after Surprise me, which makes an unsaved look).
+    public var sceneShuffle: SceneShuffle = .mixed
+    public var patternSource: PatternSource = .both
+    /// Shapes invented patterns may not use (e.g. Diamonds, if you don't like it).
+    public var excludedShapes: [MirrorMode] = []
+    public var inventedShapes: Set<MirrorMode> { Set(MirrorMode.allCases).subtracting(excludedShapes) }
+    /// The pattern `look` came from (nil for an invented one, which is unsaved).
     public var activePresetID: UUID?
     // Global switches that win over any look, preset or Surprise me.
     public var allowHueChanges = true
@@ -94,7 +136,9 @@ public struct Settings: Codable, Equatable, Sendable {
         playOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .playOnLaunch) ?? d.playOnLaunch
         keepScreenAwake = try c.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? d.keepScreenAwake
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
-        lookShuffle = (try? c.decodeIfPresent(LookShuffle.self, forKey: .lookShuffle)) ?? d.lookShuffle
+        sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
+        patternSource = (try? c.decodeIfPresent(PatternSource.self, forKey: .patternSource)) ?? d.patternSource
+        excludedShapes = (try? c.decodeIfPresent([MirrorMode].self, forKey: .excludedShapes)) ?? []
         activePresetID = try? c.decodeIfPresent(UUID.self, forKey: .activePresetID)
         allowHueChanges = try c.decodeIfPresent(Bool.self, forKey: .allowHueChanges) ?? true
         allowSaturationChanges = try c.decodeIfPresent(Bool.self, forKey: .allowSaturationChanges) ?? true
@@ -102,6 +146,14 @@ public struct Settings: Codable, Equatable, Sendable {
         allowSwirl = try c.decodeIfPresent(Bool.self, forKey: .allowSwirl) ?? true
         allowDynamicMirrors = try c.decodeIfPresent(Bool.self, forKey: .allowDynamicMirrors) ?? true
         allowOutlines = try c.decodeIfPresent(Bool.self, forKey: .allowOutlines) ?? true
+        if fileVersion < 5 {
+            // Preset shuffling became scene shuffling: keep doing what it did (new photos, with the same
+            // pattern when shuffling was off, or with hearted patterns when it was on).
+            let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+            let was = (try? legacy.decodeIfPresent(String.self, forKey: .lookShuffle)) ?? "sometimes"
+            sceneShuffle = .new
+            patternSource = was == "off" ? .current : .mine
+        }
         if fileVersion < 4 {
             // Speed moved from each look's "Motion" slider to the global 5-stop control.
             look.motion = 1
@@ -122,6 +174,8 @@ public struct Settings: Codable, Equatable, Sendable {
         version = Settings.currentVersion
         clamp()
     }
+
+    private enum LegacyKeys: String, CodingKey { case lookShuffle }
 
     public mutating func clamp() {
         secondsPerPhoto = min(max(secondsPerPhoto, 10), 3600)

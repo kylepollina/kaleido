@@ -3,7 +3,7 @@ import KaleidoCore
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case home = "Home", photos = "Photos", presets = "Presets", scenes = "Scenes", settings = "Settings"
+    case home = "Home", photos = "Photos", presets = "Patterns", scenes = "Scenes", settings = "Settings"
     var id: String { rawValue }
     var icon: String {
         switch self {
@@ -116,14 +116,31 @@ struct HomeView: View {
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Presets").font(.headline)
-                        Text("Your hearted presets").font(.caption).foregroundStyle(.secondary)
+                        Text("Saved scenes").font(.headline)
+                        Text("A photo with its pattern").font(.caption).foregroundStyle(.secondary)
                         Spacer()
-                        Button("Edit presets…") { go(.presets) }.buttonStyle(.link)
+                        Button("Edit scenes…") { go(.scenes) }.buttonStyle(.link)
+                    }
+                    let scenes = app.scenes.favorites
+                    if scenes.isEmpty {
+                        Text("When you like what you see, press Save scene to keep it.").foregroundStyle(.secondary)
+                    } else {
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            ForEach(scenes) { s in SceneCard(scene: s) }
+                        }
+                    }
+                }
+                .frame(maxWidth: 760)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Patterns").font(.headline)
+                        Text("Put one on this photo").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Edit patterns…") { go(.presets) }.buttonStyle(.link)
                     }
                     let favorites = app.presets.favorites
                     if favorites.isEmpty {
-                        Text("Heart some presets in the Presets section to see them here.").foregroundStyle(.secondary)
+                        Text("Heart some patterns in the Patterns section to see them here.").foregroundStyle(.secondary)
                     } else {
                         LazyVGrid(columns: columns, spacing: 10) {
                             ForEach(favorites) { p in PresetCard(preset: p) }
@@ -131,21 +148,6 @@ struct HomeView: View {
                     }
                 }
                 .frame(maxWidth: 760)
-                let scenes = app.scenes.favorites
-                if !scenes.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Scenes").font(.headline)
-                            Text("A photo frozen with its look").font(.caption).foregroundStyle(.secondary)
-                            Spacer()
-                            Button("Edit scenes…") { go(.scenes) }.buttonStyle(.link)
-                        }
-                        LazyVGrid(columns: columns, spacing: 10) {
-                            ForEach(scenes) { s in SceneCard(scene: s) }
-                        }
-                    }
-                    .frame(maxWidth: 760)
-                }
             }
             .padding(20)
             .frame(maxWidth: .infinity)
@@ -156,26 +158,43 @@ struct HomeView: View {
         VStack(spacing: 14) {
             HStack(spacing: 14) {
                 Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 30) }
-                    .help("Previous photo")
+                    .help("The scene before")
                 PlayButton().frame(width: 200)
                 Button { app.nextPhoto() } label: { Image(systemName: "forward.fill").frame(width: 30) }
-                    .help("Next photo (and another preset when Shuffle presets is on)")
+                    .help("Next scene")
                 Button { app.surpriseMe() } label: { Label("Surprise me", systemImage: "dice") }
-                    .help("A new photo with a random look")
-                Button { app.saveScene() } label: { Label("Save scene", systemImage: "bookmark") }
-                    .help("Keep this photo with this look and position as a scene")
+                    .help("A new photo with an invented pattern")
             }
             .controlSize(.large)
+            nowShowing
             HStack(spacing: 28) {
                 HStack(spacing: 8) {
                     Text("Speed").foregroundStyle(.secondary)
                     SpeedControl().frame(width: 220)
                 }
-                Toggle("Shuffle presets", isOn: Binding(
-                    get: { app.settings.lookShuffle != .off },
-                    set: { app.settings.lookShuffle = $0 ? .sometimes : .off }))
-                    .toggleStyle(.switch)
-                    .help("Switch between your hearted presets as the photos change. How often is in Settings.")
+                Picker("Shuffle", selection: $app.settings.sceneShuffle) {
+                    ForEach(SceneShuffle.allCases) { Text($0.label).tag($0) }
+                }
+                .fixedSize()
+                .help("What comes next as time passes. New scenes' patterns are set in Settings.")
+            }
+        }
+    }
+
+    /// What the scene on screen is, and buttons to keep it.
+    private var nowShowing: some View {
+        HStack(spacing: 10) {
+            if let s = app.scenes.scene(app.activeSceneID) {
+                Label(s.name, systemImage: "bookmark.fill").foregroundStyle(.secondary)
+            } else {
+                let pattern = app.presets.preset(app.settings.activePresetID)?.name ?? "an invented pattern"
+                Text("New scene with \(pattern)").foregroundStyle(.secondary)
+                Button { app.saveScene() } label: { Label("Save scene", systemImage: "bookmark") }
+                    .help("Keep this photo with this pattern and position")
+                if app.settings.activePresetID == nil {
+                    Button { app.saveCurrentPattern() } label: { Label("Save pattern", systemImage: "sparkles") }
+                        .help("Keep this invented pattern to use on other photos")
+                }
             }
         }
     }
@@ -234,9 +253,9 @@ struct PresetsView: View {
                 PresetEditor(preset: preset)
             } else {
                 VStack(spacing: 10) {
-                    Text("Pick a preset to edit it.").foregroundStyle(.secondary)
+                    Text("Pick a pattern to edit it.").foregroundStyle(.secondary)
                     if app.settings.activePresetID == nil {
-                        Button("Save the current look as a preset") { selection = app.saveCurrentAsPreset() }
+                        Button("Save the pattern on screen") { selection = app.saveCurrentPattern() }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -275,15 +294,15 @@ struct PresetsView: View {
             }
             Divider()
             HStack(spacing: 4) {
-                Button { selection = app.saveCurrentAsPreset() } label: { Image(systemName: "plus") }
-                    .help("New preset from what's playing")
+                Button { selection = app.saveCurrentPattern() } label: { Image(systemName: "plus") }
+                    .help("New pattern from what's on screen")
                 Button { if let s = selection, let id = app.presets.duplicate(s) { selection = id } } label: { Image(systemName: "plus.square.on.square") }
                     .help("Duplicate")
                     .disabled(selection == nil)
                 Button {
                     if let s = selection { app.presets.delete(s); selection = app.presets.presets.first?.id }
                 } label: { Image(systemName: "minus") }
-                    .help("Delete (built-in presets can only be un-hearted)")
+                    .help("Delete (built-in patterns can only be un-hearted)")
                     .disabled(app.presets.preset(selection)?.isBuiltIn ?? true)
                 Spacer()
             }
@@ -306,7 +325,7 @@ struct PresetEditor: View {
                         DraftHeader(draft: draft) {
                             Button("Reset") { app.resetDraftToOriginal() }
                                 .disabled(draft.look == preset.originalLook && draft.name == preset.originalName)
-                                .help(preset.isBuiltIn ? "Back to the original preset (then Save to keep it)"
+                                .help(preset.isBuiltIn ? "Back to the original pattern (then Save to keep it)"
                                                        : "Back to how it was when you created it (then Save to keep it)")
                         }
                     }
@@ -410,7 +429,7 @@ struct LookControls: View {
                 } header: {
                     Text("Color")
                 } footer: {
-                    Text("Effects switched off in Settings stay off for every preset and scene.").font(.caption).foregroundStyle(.secondary)
+                    Text("Effects switched off in Settings stay off for every pattern and scene.").font(.caption).foregroundStyle(.secondary)
                 }
         }
     }
@@ -427,9 +446,15 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Slideshow") {
-                Toggle("Shuffle photos", isOn: $app.settings.shuffle)
-                ScaledSliderRow("Time per photo", value: $app.settings.secondsPerPhoto, scale: .log(15, 900)) {
+            Section("Scenes") {
+                Picker("Shuffle", selection: $app.settings.sceneShuffle) {
+                    ForEach(SceneShuffle.allCases) { Text($0.label).tag($0) }
+                }
+                Picker("New scenes use", selection: $app.settings.patternSource) {
+                    ForEach(PatternSource.allCases) { Text($0.label).tag($0) }
+                }
+                Toggle("Shuffle photo order", isOn: $app.settings.shuffle)
+                ScaledSliderRow("Time per scene", value: $app.settings.secondsPerPhoto, scale: .log(15, 900)) {
                     $0 < 90 ? "\(Int($0)) s" : String(format: "%.1f min", $0 / 60)
                 }
                 Picker("Transition", selection: $app.settings.transition) {
@@ -440,13 +465,23 @@ struct SettingsView: View {
             }
 
             Section {
-                Picker("Switch to another hearted preset", selection: $app.settings.lookShuffle) {
-                    ForEach(LookShuffle.allCases) { Text($0.label).tag($0) }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), alignment: .leading)], alignment: .leading, spacing: 8) {
+                    ForEach(MirrorMode.allCases) { mode in
+                        Toggle(mode.label, isOn: Binding(
+                            get: { !app.settings.excludedShapes.contains(mode) },
+                            set: { on in
+                                app.settings.excludedShapes.removeAll { $0 == mode }
+                                if !on { app.settings.excludedShapes.append(mode) }
+                            }))
+                            .toggleStyle(.checkbox)
+                            // Keep at least one shape.
+                            .disabled(app.settings.inventedShapes == [mode])
+                    }
                 }
             } header: {
-                Text("Shuffle presets")
+                Text("Invented patterns")
             } footer: {
-                Text("While playing, Kaleido moves between your hearted presets as photos change. The Next button also brings a new preset unless this is Off.")
+                Text("Surprise me and new scenes with invented patterns only use the shapes ticked here.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -460,7 +495,7 @@ struct SettingsView: View {
             } header: {
                 Text("Effects")
             } footer: {
-                Text("Switch an effect off and no preset or Surprise me will use it; your photos keep their own colors.")
+                Text("Switch an effect off and no pattern, scene or Surprise me will use it; your photos keep their own colors.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 

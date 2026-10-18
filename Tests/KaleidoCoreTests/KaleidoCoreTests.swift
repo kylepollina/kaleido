@@ -222,10 +222,42 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(back.allowHueChanges); XCTAssertFalse(back.allowSwirl)
     }
 
-    func testLookShuffleIntervalsAndRandomPresetDiffers() {
-        XCTAssertNil(LookShuffle.off.interval)
-        XCTAssertEqual(LookShuffle.everyPhoto.interval, 1)
-        XCTAssertGreaterThan(LookShuffle.sometimes.interval!, 1)
+    func testSceneShuffleAndPatternSources() {
+        XCTAssertFalse(SceneShuffle.off.nextIsSaved(savedCount: 3, roll: 0))
+        XCTAssertFalse(SceneShuffle.new.nextIsSaved(savedCount: 3, roll: 0))
+        XCTAssertTrue(SceneShuffle.saved.nextIsSaved(savedCount: 3, roll: 0.99))
+        XCTAssertFalse(SceneShuffle.saved.nextIsSaved(savedCount: 0, roll: 0), "no saved scenes: a new one")
+        XCTAssertTrue(SceneShuffle.mixed.nextIsSaved(savedCount: 1, roll: 0.1))
+        XCTAssertFalse(SceneShuffle.mixed.nextIsSaved(savedCount: 1, roll: 0.9))
+
+        let lib = PresetLibrary(fileURL: nil)
+        var g = SplitMix64(seed: 9)
+        var current = Look(); current.segments = 13
+        let kept = PatternSource.current.pick(current: current, currentID: nil, patterns: lib, inventedShapes: [], using: &g)
+        XCTAssertEqual(kept.0, current)
+        for _ in 0..<50 {
+            let (look, id) = PatternSource.invented.pick(current: current, currentID: nil, patterns: lib,
+                                                         inventedShapes: [.hex, .spiral], using: &g)
+            XCTAssertNil(id, "invented patterns are unsaved")
+            XCTAssertTrue([.hex, .spiral].contains(look.mode), "only the allowed shapes")
+            let mine = PatternSource.mine.pick(current: current, currentID: nil, patterns: lib, inventedShapes: [], using: &g)
+            XCTAssertNotNil(mine.1)
+        }
+    }
+
+    func testOldPresetShuffleBecomesSceneShuffle() throws {
+        let on = try JSONDecoder().decode(Settings.self, from: Data(#"{"version": 4, "lookShuffle": "sometimes"}"#.utf8))
+        XCTAssertEqual(on.sceneShuffle, .new); XCTAssertEqual(on.patternSource, .mine)
+        let off = try JSONDecoder().decode(Settings.self, from: Data(#"{"version": 4, "lookShuffle": "off"}"#.utf8))
+        XCTAssertEqual(off.patternSource, .current, "same pattern, new photos, as before")
+        XCTAssertEqual(Settings().sceneShuffle, .mixed)
+        XCTAssertEqual(Settings().inventedShapes, Set(MirrorMode.allCases))
+        var s = Settings(); s.excludedShapes = [.cubes]
+        let back = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s))
+        XCTAssertFalse(back.inventedShapes.contains(.cubes))
+    }
+
+    func testRandomPresetDiffers() {
         var g = SplitMix64(seed: 5)
         for p in Preset.all {
             for _ in 0..<20 { XCTAssertNotEqual(Preset.random(excluding: p.look, using: &g).look, p.look) }

@@ -130,7 +130,7 @@ struct PreviewPane: View {
                         .help("Previous photo")
                     PlayButton(compact: true).frame(width: 120)
                     Button { app.nextPhotoKeepingPreset() } label: { Image(systemName: "forward.fill").frame(width: 26) }
-                        .help("Next photo (keeps this preset)")
+                        .help("Next photo (keeps this pattern)")
                 }
             }
         }

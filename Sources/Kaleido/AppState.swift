@@ -29,19 +29,23 @@ final class AppState: ObservableObject, PhotoProvider {
     /// The scene on screen, if any. A scene holds its photo until Next, Previous or another preset.
     @Published private(set) var activeSceneID: UUID?
     /// Unsaved edits in the preset or scene editor: on screen at once, written only by Save.
-    @Published private(set) var draft: EditDraft?
+    @Published private(set) var draft: EditDraft? {
+        didSet { if draft?.target != oldValue?.target { updateHold() } }
+    }
     /// Bumped whenever a scene's thumbnail is rewritten, so cards reload it.
     @Published private(set) var sceneThumbVersion = 0
     private var sceneArriving: SavedScene?
-    private var presetBeforeScene: UUID?
     @Published private(set) var isSyncing = false
     private var syncAgain = false
     private var sleepAssertion: IOPMAssertionID?
     /// Set by the main window while it exists; reopens it later (e.g. on Cmd-Tab after it was closed).
     var openMainWindow: (() -> Void)?
-    private var lookChangePending = false
     private var surprisePending = false
-    private var photosSinceLookChange = 0
+    /// A scene as it was on screen, so Back can bring back its pattern along with its photo.
+    private struct ShownScene { var photoID: UUID?; var look: Look; var patternID: UUID?; var savedID: UUID? }
+    private var sceneHistory: [ShownScene] = []
+    /// The saved scene Shuffle picked for the photo it handed the renderer.
+    private var plannedScene: SavedScene?
     private var syncDebounce: Task<Void, Never>?
     private var filterObserver: AnyCancellable?
     let renderer: KaleidoRenderer?
@@ -63,7 +67,8 @@ final class AppState: ObservableObject, PhotoProvider {
         queue = PhotoQueue(shuffle: loaded.shuffle)
         renderer = KaleidoRenderer()
         renderer?.provider = self
-        renderer?.willStartTransition = { [weak self] in self?.photoWillChange() }
+        renderer?.willStartTransition = { [weak self] id, back in self?.sceneWillStart(photoID: id, back: back) }
+        renderer?.didReverseTransition = { [weak self] in self?.sceneCancelled() }
         if let renderer { desktop = DesktopController(renderer: renderer) }
         applySettings()
         libraryObserver = library.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
@@ -151,19 +156,29 @@ final class AppState: ObservableObject, PhotoProvider {
     func rebuildDesktop() { desktop?.rebuild(reassert: true) }
 
     func togglePlay() { isPlaying ? stop() : play() }
-    /// Next photo; with look shuffling on, it also brings a different preset look.
+    /// The next scene (saved or new, as Shuffle says; a new one even when Shuffle is off).
     func nextPhoto() {
-        if settings.lookShuffle != .off { lookChangePending = true }
-        if library.enabledItems.count <= 1 { photoWillChange() }   // no fade will come; change the look now
+        if library.enabledItems.count <= 1 && scenes.favorites.isEmpty {
+            // No fade will come: keep the photo, change the pattern.
+            sceneWillStart(photoID: renderer?.currentPhotoID, back: false)
+        }
         renderer?.skip()
     }
 
+    /// Back to the scene before: its photo and its pattern.
     func previousPhoto() { renderer?.previous() }
 
-    /// While the preset editor is open, shuffling never swaps out the preset being edited.
-    var isEditingPresets = false
+    /// While a pattern or scene editor is open, shuffling never swaps out what is being edited.
+    var isEditingPresets = false { didSet { updateHold() } }
 
     func nextPhotoKeepingPreset() { renderer?.skip() }
+
+    /// Shuffle off, or a scene open in the editor: the scene stays until you move on.
+    private func updateHold() {
+        var editingScene = false
+        if case .scene = draft?.target { editingScene = true }
+        renderer?.holdPhoto = settings.sceneShuffle == .off || editingScene
+    }
 
     /// "Remove from selected photos" on the Original tab: out of the rotation (it stays in its album), then move on.
     func removeCurrentFromRotation() {
@@ -182,54 +197,77 @@ final class AppState: ObservableObject, PhotoProvider {
         }
     }
 
-    /// Runs as each new photo starts fading in, so look changes ride along with the photo change.
-    private func photoWillChange() {
-        if let s = sceneArriving {
-            // A scene's photo is fading in: its look (or the unsaved edits to it) comes with it.
+    /// Runs as each new photo starts fading in, so the scene's pattern rides along with its photo.
+    private func sceneWillStart(photoID: UUID?, back: Bool) {
+        if back, let last = sceneHistory.last, last.photoID == photoID {
+            sceneHistory.removeLast()
+            restore(last)
+            return
+        }
+        sceneHistory.append(ShownScene(photoID: renderer?.currentPhotoID, look: settings.look,
+                                       patternID: settings.activePresetID, savedID: activeSceneID))
+        if sceneHistory.count > 40 { sceneHistory.removeFirst() }
+        if let s = sceneArriving ?? plannedScene, s.photoID == photoID {
             sceneArriving = nil
-            settings.activePresetID = nil
-            settings.look = draft?.target == .scene(s.id) ? draft!.look : s.look
-            renderer?.glidePan(to: SIMD2(s.panX, s.panY))
+            plannedScene = nil
+            show(saved: s)
             return
         }
-        if activeSceneID != nil {
-            // Moving on from a scene: back to the preset that was playing before it.
-            endScene()
-            if !surprisePending, let p = presets.preset(presetBeforeScene) ?? presets.favorites.first {
-                apply(p)
-                lookChangePending = false
-                photosSinceLookChange = 0
-                return
-            }
-        }
-        photosSinceLookChange += 1
+        plannedScene = nil
+        // A new scene: this photo with a pattern from where Settings says (or the one being edited).
+        var look = settings.look, id = settings.activePresetID
+        var g = SystemRandomNumberGenerator()
         if surprisePending {
-            surprisePending = false
-            lookChangePending = false
-            photosSinceLookChange = 0
-            settings.look = Look.random()
-            settings.activePresetID = nil
-            return
+            look = Look.random(shapes: settings.inventedShapes, using: &g); id = nil
+        } else if !isEditingPresets {
+            (look, id) = settings.patternSource.pick(current: settings.look, currentID: settings.activePresetID,
+                                                     patterns: presets, inventedShapes: settings.inventedShapes, using: &g)
         }
-        let due = settings.lookShuffle.interval.map { photosSinceLookChange >= $0 } ?? false
-        if (lookChangePending || due) && !isEditingPresets, let next = presets.randomFavorite(excluding: settings.activePresetID) {
-            apply(next)
-            photosSinceLookChange = 0
-        }
-        lookChangePending = false
+        surprisePending = false
+        activeSceneID = nil
+        settings.activePresetID = id
+        settings.look = look
     }
 
-    /// A random, unsaved look and a fresh photo (save it from the Presets section if you like it).
+    /// The fade to a new scene was turned back: the scene before it returns.
+    private func sceneCancelled() {
+        if let last = sceneHistory.popLast() { restore(last) }
+    }
+
+    private func restore(_ s: ShownScene) {
+        activeSceneID = scenes.scene(s.savedID) != nil ? s.savedID : nil
+        settings.activePresetID = s.patternID
+        settings.look = s.look
+    }
+
+    private func show(saved s: SavedScene) {
+        activeSceneID = s.id
+        settings.activePresetID = nil
+        settings.look = draft?.target == .scene(s.id) ? draft!.look : s.look
+        renderer?.glidePan(to: SIMD2(s.panX, s.panY))
+    }
+
+    /// A new photo with an invented pattern.
     func surpriseMe() {
         surprisePending = true
-        if library.enabledItems.count <= 1 { photoWillChange() }
+        if library.enabledItems.count <= 1 { sceneWillStart(photoID: renderer?.currentPhotoID, back: false) }
         renderer?.skip()
     }
 
+    /// Puts a pattern on the photo that is showing (a new, unsaved scene).
     func apply(_ preset: SavedPreset) {
-        endScene()
+        activeSceneID = nil
+        sceneArriving = nil
         settings.activePresetID = preset.id
         settings.look = preset.look
+    }
+
+    /// Keeps an invented pattern that is showing.
+    @discardableResult
+    func saveCurrentPattern() -> UUID {
+        let id = presets.add(name: "My pattern", look: settings.look)
+        settings.activePresetID = id
+        return id
     }
 
     // MARK: Scenes
@@ -242,29 +280,21 @@ final class AppState: ObservableObject, PhotoProvider {
 
     func isSceneAvailable(_ s: SavedScene) -> Bool { library.item(s.photoID) != nil }
 
-    /// Shows a scene's photo with its look and position, and keeps it there until you move on.
+    /// Shows a saved scene: its photo with its pattern and position.
     func showScene(_ s: SavedScene) {
         guard let renderer, let ref = photoRef(s.photoID) else { return }
-        if activeSceneID == nil { presetBeforeScene = settings.activePresetID }
-        activeSceneID = s.id
-        renderer.holdPhoto = true
-        if renderer.currentPhotoID == s.photoID {
+        if renderer.currentPhotoID == s.photoID && activeSceneID == s.id {
             sceneArriving = nil
-            settings.activePresetID = nil
-            settings.look = draft?.target == .scene(s.id) ? draft!.look : s.look
-            renderer.glidePan(to: SIMD2(s.panX, s.panY))
+            show(saved: s)
         } else {
+            // Always through a fade, even on the same photo, so a different pattern never jumps into place.
             sceneArriving = s
-            renderer.show(ref)
+            renderer.show(ref, refade: true)
         }
     }
 
-    private func endScene() {
-        guard activeSceneID != nil || sceneArriving != nil else { return }
-        activeSceneID = nil
-        sceneArriving = nil
-        renderer?.holdPhoto = false
-    }
+    /// Saved scenes Shuffle can pick: hearted, with their photo still in the library.
+    private var shuffleScenes: [SavedScene] { scenes.favorites.filter(isSceneAvailable) }
 
     /// Freezes what is on screen (photo, look and where the photo sits) as a new scene.
     @discardableResult
@@ -273,11 +303,12 @@ final class AppState: ObservableObject, PhotoProvider {
         let base = presets.preset(settings.activePresetID).map { "\($0.name) scene" } ?? "Scene"
         let id = scenes.add(name: base, photoID: photo, look: settings.look, panX: renderer.pan.x, panY: renderer.pan.y)
         writeSceneThumbnail(id)
+        activeSceneID = id
         return id
     }
 
     func deleteScene(_ id: UUID) {
-        if activeSceneID == id { endScene() }
+        if activeSceneID == id { activeSceneID = nil }
         if draft?.target == .scene(id) { draft = nil }
         scenes.delete(id)
         try? FileManager.default.removeItem(at: Self.sceneThumbnailURL(id))
@@ -376,6 +407,13 @@ final class AppState: ObservableObject, PhotoProvider {
     // MARK: PhotoProvider
 
     func nextPhoto(after current: UUID?) -> PhotoRef? {
+        plannedScene = nil
+        let saved = shuffleScenes.filter { $0.id != activeSceneID }
+        if !isEditingPresets, settings.sceneShuffle.nextIsSaved(savedCount: saved.count, roll: Double.random(in: 0..<1)),
+           let s = saved.randomElement(), let ref = photoRef(s.photoID) {
+            plannedScene = s
+            return ref
+        }
         queue.shuffle = settings.shuffle
         let items = library.enabledItems
         let ids = items.map(\.id)
@@ -485,6 +523,7 @@ final class AppState: ObservableObject, PhotoProvider {
         renderer.transitionSeconds = settings.transitionSeconds
         renderer.transitionStyle = settings.transition
         queue.shuffle = settings.shuffle
+        updateHold()
         desktop?.setFrameRate(currentFrameRate)
         refreshSuspension()
         updateKeepAwake()
