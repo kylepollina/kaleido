@@ -155,6 +155,12 @@ final class KaleidoRenderer {
     private var activeStyle: TransitionStyle = .dissolve
     private var rotation = 0.0, sourceRotation = 0.0, driftPhase = 0.0, huePhase = 0.0, breathPhase = 0.0, swirlPhase = 0.0, clock = 0.0
     private var skipRequested = false
+    /// Length of the fade in progress, and of fades started by Next or Back.
+    private var fadeSeconds = 2.5
+    private let manualFadeSeconds = 3.0
+    private var reversing = false
+    /// Bumped by every load, so a slower, older load can never replace the photo asked for last.
+    private var loadGeneration = 0
     /// Called just before a new photo starts fading in, so the app can switch looks in step with it.
     var willStartTransition: (() -> Void)?
     // Mirror mode and count belong to each photo: during a cross-fade the outgoing photo keeps its shape and
@@ -242,9 +248,20 @@ final class KaleidoRenderer {
         updateDynamicMirrors(dt)
         if transitionClock == nil { currentShape = (look.mode, dynamicCount ?? look.segments) }
 
-        if var t = transitionClock {
+        if var t = transitionClock, reversing {
+            // Back during a fade: fade back out to the photo that was showing.
+            t -= dt * 3
+            if t <= 0 {
+                incoming = nil; incomingID = nil; incomingRef = nil
+                transitionClock = nil
+                reversing = false
+                shownFor = 0
+            } else {
+                transitionClock = t
+            }
+        } else if var t = transitionClock {
             t += dt
-            if t >= transitionSeconds {
+            if t >= fadeSeconds {
                 if let incoming {
                     if let cur = currentRef, !goingBack { history.append(cur); if history.count > 40 { history.removeFirst() } }
                     goingBack = false
@@ -263,6 +280,8 @@ final class KaleidoRenderer {
             if let (tex, ref) = pending, due {
                 let id: UUID? = ref.id
                 pending = nil
+                // Next and Back answer quickly; the slideshow's own changes take the full, slow fade.
+                fadeSeconds = skipRequested && currentID != nil ? min(transitionSeconds, manualFadeSeconds) : transitionSeconds
                 skipRequested = false
                 if id == currentID && id != nil {
                     shownFor = 0
@@ -322,6 +341,12 @@ final class KaleidoRenderer {
 
     /// Goes back to the photo shown before the current one, if any.
     func previous() {
+        if transitionClock != nil, incoming != nil, !reversing {
+            // Mid-fade, "back" means the photo that is fading out.
+            reversing = true
+            pending = nil
+            return
+        }
         guard let last = history.popLast() else { return }
         goingBack = true
         pending = nil
@@ -410,15 +435,18 @@ final class KaleidoRenderer {
 
     private func loadAsync(_ ref: PhotoRef, force: Bool) {
         loading = true
+        loadGeneration += 1
+        let generation = loadGeneration
         let queue = self.queue
         Task.detached(priority: .utility) { [weak self] in
             let result: Result<PhotoTexture, Error>
             do { result = .success(try await PhotoLoader.texture(for: ref, queue: queue)) } catch { result = .failure(error) }
-            await self?.finishLoad(result, ref: ref, force: force)
+            await self?.finishLoad(result, ref: ref, force: force, generation: generation)
         }
     }
 
-    private func finishLoad(_ result: Result<PhotoTexture, Error>, ref: PhotoRef, force: Bool) {
+    private func finishLoad(_ result: Result<PhotoTexture, Error>, ref: PhotoRef, force: Bool, generation: Int) {
+        guard generation == loadGeneration else { return }   // superseded by a later request
         loading = false
         switch result {
         case .success(let tex):
@@ -468,7 +496,7 @@ final class KaleidoRenderer {
         if let incoming, let t = transitionClock {
             u.hasB = 1
             u.aspectB = incoming.aspect
-            u.mixAmount = Float(min(max(t / transitionSeconds, 0), 1))
+            u.mixAmount = Float(min(max(t / fadeSeconds, 0), 1))
             u.transition = activeStyle.shaderIndex
             u.segmentsB = Int32(incomingShape.segments)
             u.modeB = incomingShape.mode.shaderIndex
@@ -512,6 +540,7 @@ final class KaleidoRenderer {
             incoming = try TextureFactory.load(url: b, queue: queue)
             activeStyle = style
             transitionSeconds = 1
+            fadeSeconds = 1
             transitionClock = progress
         }
     }
