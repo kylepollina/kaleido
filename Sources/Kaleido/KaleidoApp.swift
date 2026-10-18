@@ -22,6 +22,7 @@ struct KaleidoApp: App {
             CommandMenu("Debug") {
                 Button("Display Diagnostics…") { DebugTools.showDiagnostics(app) }
                 Button("Rebuild Desktop Windows") { app.rebuildDesktop() }
+                Button("Save Window Report") { app.writeWindowReport(nil) }
             }
         }
 
@@ -45,6 +46,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 enum DebugTools {
+    /// App diagnostics plus every desktop-level window the window server knows about.
+    @MainActor
+    static func fullReport(_ app: AppState) -> String {
+        var out = app.diagnostics() + "\n\nWindow server, windows at or below the desktop-icon level:\n"
+        let icons = Int(CGWindowLevelForKey(.desktopIconWindow))
+        var order = 0
+        for w in (CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]]) ?? [] {
+            order += 1
+            let layer = w["kCGWindowLayer"] as? Int ?? 0
+            guard layer <= icons else { continue }
+            let b = w["kCGWindowBounds"] as? [String: Any] ?? [:]
+            out += "#\(order) layer \(layer) owner \(w["kCGWindowOwnerName"] ?? "?") name '\(w["kCGWindowName"] ?? "")' id \(w["kCGWindowNumber"] ?? 0) frame \(b["X"] ?? 0),\(b["Y"] ?? 0) \(b["Width"] ?? 0)x\(b["Height"] ?? 0) alpha \(w["kCGWindowAlpha"] ?? 1) sharing \(w["kCGWindowSharingState"] ?? "?") onscreen \(w["kCGWindowIsOnscreen"] ?? false)\n"
+        }
+        return out
+    }
+
     @MainActor
     static func showDiagnostics(_ app: AppState) {
         let text = app.isPlaying ? app.diagnostics() : "Not playing. Press Play first, then run this again.\n\n" + app.diagnostics()

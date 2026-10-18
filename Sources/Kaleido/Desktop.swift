@@ -1,7 +1,7 @@
 import AppKit
 import KaleidoCore
 
-/// One borderless window per display, sitting just above the wallpaper and below the desktop icons.
+/// One full-screen window per display, sitting just above the wallpaper and below the desktop icons.
 /// Windows exist only while playing; hiding closes them, so the normal wallpaper is simply back.
 @MainActor
 final class DesktopController {
@@ -67,7 +67,7 @@ final class DesktopController {
             var line = "• \(screen.localizedName) [\(id)] frame \(Int(screen.frame.origin.x)),\(Int(screen.frame.origin.y)) \(Int(screen.frame.width))x\(Int(screen.frame.height)) @\(Int(screen.backingScaleFactor))x"
             if let e = windows[id] {
                 let w = e.window, v = e.view
-                line += "\n    window #\(w.windowNumber) level \(w.level.rawValue) visible \(w.isVisible) occluded \(v.occluded) paused \(v.isPaused) draws \(v.drawCount) presented \(v.presentCount) center rgb \(v.lastProbe) drawable \(Int(v.drawableSize.width))x\(Int(v.drawableSize.height)) on screen \(w.screen?.localizedName ?? "none")"
+                line += "\n    window #\(w.windowNumber) level \(w.level.rawValue) visible \(w.isVisible) occluded \(v.occluded) paused \(v.isPaused) draws \(v.drawCount) presented \(v.presentCount) center rgb \(v.lastProbe) surface \(v.pixelWidth)x\(v.pixelHeight) on screen \(w.screen?.localizedName ?? "none")"
             } else {
                 line += "\n    NO WINDOW"
             }

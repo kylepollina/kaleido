@@ -82,6 +82,15 @@ final class AppState: ObservableObject, PhotoProvider {
 
     func diagnostics() -> String { desktop?.diagnostics() ?? "No Metal device" }
 
+    /// Writes the diagnostics report (default: Application Support/Kaleido/window-report.txt) and returns its path.
+    @discardableResult
+    func writeWindowReport(_ path: String?) -> String {
+        let url = path.map { URL(fileURLWithPath: $0) } ?? Paths.dataDirectory.appendingPathComponent("window-report.txt")
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? DebugTools.fullReport(self).write(to: url, atomically: true, encoding: .utf8)
+        return url.path
+    }
+
     func rebuildDesktop() { desktop?.rebuild(reassert: true) }
 
     func togglePlay() { isPlaying ? stop() : play() }
@@ -236,7 +245,15 @@ final class AppState: ObservableObject, PhotoProvider {
             switch args[i] {
             case "--add" where i + 1 < args.count:
                 library.add(urls: [URL(fileURLWithPath: args[i + 1])]); i += 1
-            case "--play": play = true
+            case "--play", "--autoplay": play = true
+            case "--dump-windows":
+                let path = (i + 1 < args.count && !args[i + 1].hasPrefix("--")) ? args[i + 1] : nil
+                if path != nil { i += 1 }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(6))
+                    self.writeWindowReport(path)
+                    NSApp.terminate(nil)
+                }
             case "--album" where i + 1 < args.count:
                 let want = args[i + 1]; i += 1
                 Task { @MainActor in

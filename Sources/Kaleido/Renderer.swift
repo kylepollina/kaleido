@@ -315,28 +315,7 @@ final class KaleidoRenderer {
         cb.commit()
     }
 
-    /// Returns true if a frame was actually submitted.
-    @discardableResult
-    func draw(in view: MTKView) -> Bool {
-        let start = CACurrentMediaTime()
-        tick(now: start)
-        guard let pass = view.currentRenderPassDescriptor, let drawable = view.currentDrawable else { return false }
-        let size = view.drawableSize
-        let debug = self.debug
-        let tex = drawable.texture
-        let probe = debug && !view.framebufferOnly
-        encode(into: pass, drawable: drawable, width: size.width, height: size.height) { cb in
-            guard debug else { return }
-            if cb.status == .error { FileHandle.standardError.write(Data("kaleido: GPU error \(String(describing: cb.error))\n".utf8)) }
-            if probe {
-                var px = [UInt8](repeating: 0, count: 4)
-                tex.getBytes(&px, bytesPerRow: 4, from: MTLRegionMake2D(tex.width / 2, tex.height / 2, 1, 1), mipmapLevel: 0)
-                (view as? KaleidoView)?.lastProbe = (px[2], px[1], px[0])
-            }
-        }
-        if debug { recordFrame(cpu: CACurrentMediaTime() - start) }
-        return true
-    }
+    func noteFrame() { recordFrame(cpu: 0) }
 
     private func recordFrame(cpu: Double) {
         statFrames += 1; statCPU += cpu; statWorst = max(statWorst, cpu)
@@ -382,40 +361,51 @@ final class KaleidoRenderer {
     }
 }
 
-/// An MTKView that draws through the shared renderer. Used for the desktop windows and the preview.
-/// It stops drawing on its own while its window is fully covered or minimised, which is what keeps the
-/// desktop background nearly free when a maximised app sits on top of it.
-final class KaleidoView: MTKView, MTKViewDelegate {
+/// Draws the shared renderer into IOSurfaces and shows them through a plain CALayer.
+/// (A CAMetalLayer window never showed any content on the built-in notched display, even though every
+/// frame was presented; ordinary layers do show there, so Metal renders offscreen and the surface is
+/// handed to Core Animation instead.) Stops drawing while its window is covered or minimised.
+final class KaleidoView: NSView {
     private let renderer: KaleidoRenderer
+    private var link: CADisplayLink?
+    private var surfaces: [(surface: IOSurface, texture: MTLTexture)] = []
+    private var nextSurface = 0
+    private var inFlight = 0
+    private var observer: NSObjectProtocol?
     private(set) var occluded = false
     private(set) var drawCount = 0
     private(set) var presentCount = 0
     nonisolated(unsafe) var lastProbe: (UInt8, UInt8, UInt8) = (0, 0, 0)
-    private var observer: NSObjectProtocol?
-
-    /// Set by the owner for sleep, lock and battery rules.
+    private(set) var pixelWidth = 0, pixelHeight = 0
+    private let maxInFlight = 2
+    var preferredFramesPerSecond: Int { didSet { applyRate() } }
     var suspended = false { didSet { refreshPause() } }
+    var isPaused: Bool { link?.isPaused ?? true }
 
     @MainActor
     init(renderer: KaleidoRenderer, fps: Int) {
         self.renderer = renderer
-        super.init(frame: .zero, device: renderer.device)
-        colorPixelFormat = .bgra8Unorm
-        colorspace = CGColorSpace(name: CGColorSpace.sRGB)
-        framebufferOnly = ProcessInfo.processInfo.environment["KALEIDO_DEBUG"] == nil
-        preferredFramesPerSecond = fps
-        enableSetNeedsDisplay = false
-        isPaused = false
-        autoResizeDrawable = true
-        delegate = self
+        self.preferredFramesPerSecond = fps
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.contentsGravity = .resize
+        layer?.backgroundColor = NSColor.black.cgColor
+        layer?.isOpaque = true
     }
 
-    required init(coder: NSCoder) { fatalError() }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var wantsUpdateLayer: Bool { true }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        link?.invalidate(); link = nil
         if let observer { NotificationCenter.default.removeObserver(observer); self.observer = nil }
         guard let window else { return }
+        let l = displayLink(target: self, selector: #selector(tick(_:)))
+        l.add(to: .main, forMode: .common)
+        link = l
+        applyRate()
         occluded = !window.occlusionState.contains(.visible) && window.isVisible
         observer = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) { [weak self, weak window] _ in
             guard let self, let window else { return }
@@ -426,14 +416,68 @@ final class KaleidoView: MTKView, MTKViewDelegate {
         refreshPause()
     }
 
-    private func refreshPause() { isPaused = suspended || occluded }
-
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
-
-    func draw(in view: MTKView) {
-        drawCount += 1
-        if MainActor.assumeIsolated({ renderer.draw(in: view) }) { presentCount += 1 }
+    private func applyRate() {
+        let f = Float(preferredFramesPerSecond)
+        link?.preferredFrameRateRange = CAFrameRateRange(minimum: f, maximum: f, preferred: f)
     }
 
-    deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }
+    private func refreshPause() { link?.isPaused = suspended || occluded }
+
+    private func ensureSurfaces() -> Bool {
+        let scale = window?.backingScaleFactor ?? 2
+        let w = max(Int(bounds.width * scale), 2), h = max(Int(bounds.height * scale), 2)
+        if w == pixelWidth && h == pixelHeight && !surfaces.isEmpty { return true }
+        surfaces = []
+        for _ in 0..<3 {
+            guard let surface = IOSurface(properties: [
+                .width: w, .height: h, .bytesPerElement: 4, .pixelFormat: 0x4247_5241 /* 'BGRA' */,
+            ]) else { return false }
+            surface.setAttachment(CGColorSpace(name: CGColorSpace.sRGB)!.copyPropertyList() as Any, forKey: "IOSurfaceColorSpace")
+            let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: h, mipmapped: false)
+            d.usage = [.renderTarget, .shaderRead]
+            guard let tex = renderer.device.makeTexture(descriptor: d, iosurface: surface, plane: 0) else { return false }
+            surfaces.append((surface, tex))
+        }
+        pixelWidth = w; pixelHeight = h
+        return true
+    }
+
+    @objc private func tick(_ link: CADisplayLink) {
+        drawCount += 1
+        guard inFlight < maxInFlight, ensureSurfaces() else { return }
+        MainActor.assumeIsolated { renderer.tick(now: CACurrentMediaTime()) }
+        let entry = surfaces[nextSurface]
+        nextSurface = (nextSurface + 1) % surfaces.count
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = entry.texture
+        pass.colorAttachments[0].loadAction = .dontCare
+        pass.colorAttachments[0].storeAction = .store
+        inFlight += 1
+        let debug = renderer.debug
+        MainActor.assumeIsolated {
+            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight)) { [weak self] cb in
+                if debug, cb.status == .error { FileHandle.standardError.write(Data("kaleido: GPU error \(String(describing: cb.error))\n".utf8)) }
+                if debug {
+                    var px = [UInt8](repeating: 0, count: 4)
+                    entry.texture.getBytes(&px, bytesPerRow: 4, from: MTLRegionMake2D(entry.texture.width / 2, entry.texture.height / 2, 1, 1), mipmapLevel: 0)
+                    self?.lastProbe = (px[2], px[1], px[0])
+                }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.inFlight -= 1
+                    CATransaction.begin()
+                    CATransaction.setDisableActions(true)
+                    self.layer?.contents = entry.surface
+                    CATransaction.commit()
+                    self.presentCount += 1
+                }
+            }
+        }
+        if debug { MainActor.assumeIsolated { renderer.noteFrame() } }
+    }
+
+    deinit {
+        link?.invalidate()
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+    }
 }
