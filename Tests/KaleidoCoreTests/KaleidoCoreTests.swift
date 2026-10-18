@@ -88,7 +88,7 @@ final class SettingsTests: XCTestCase {
         var s = Settings()
         s.look.mode = .hex
         s.look.segments = 11
-        s.look.hueSpeed = 1.5
+        s.look.hueSpeed = 0.3
         s.secondsPerPhoto = 42
         s.shuffle = false
         s.transition = .iris
@@ -98,9 +98,9 @@ final class SettingsTests: XCTestCase {
     }
 
     func testMissingKeysUseDefaultsAndValuesAreClamped() throws {
-        let json = #"{"version": 2, "secondsPerPhoto": 0.1, "look": {"segments": 500, "mode": "fractal"}, "frameRate": 45}"#
+        let json = #"{"version": 3, "secondsPerPhoto": 0.1, "look": {"segments": 500, "mode": "fractal"}, "frameRate": 45}"#
         let s = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        XCTAssertEqual(s.secondsPerPhoto, 5)
+        XCTAssertEqual(s.secondsPerPhoto, 10)
         XCTAssertEqual(s.look.segments, 24)
         XCTAssertEqual(s.look.mode, .fractal)
         XCTAssertEqual(s.frameRate, 30)
@@ -127,30 +127,44 @@ final class SettingsTests: XCTestCase {
 
     func testCurrentSettingsAreNotMigratedAgain() throws {
         var s = Settings()
-        s.look.rotationSpeed = 2
+        s.look.rotationSpeed = 0.4
         s.secondsPerPhoto = 15
         let data = try JSONEncoder().encode(s)
         let back = try JSONDecoder().decode(Settings.self, from: data)
-        XCTAssertEqual(back.look.rotationSpeed, 2)
+        XCTAssertEqual(back.look.rotationSpeed, 0.4)
         XCTAssertEqual(back.secondsPerPhoto, 15)
     }
 
-    func testDefaultsAndMaximumsAreCalm() {
+    func testDefaultsAndMaximumsAreBarelyMoving() {
         let s = Settings()
-        XCTAssertLessThanOrEqual(abs(s.look.rotationSpeed), 0.5)
-        XCTAssertLessThanOrEqual(s.look.driftSpeed, 0.5)
-        XCTAssertGreaterThanOrEqual(s.transitionSeconds, 5)
+        XCTAssertLessThanOrEqual(abs(s.look.rotationSpeed), 0.1, "slower than a turn per hour")
+        XCTAssertLessThanOrEqual(s.look.driftSpeed, 0.1)
+        XCTAssertEqual(s.look.hueSpeed, 0)
+        XCTAssertGreaterThanOrEqual(s.transitionSeconds, 10)
+        XCTAssertEqual(s.look.segments, 12, "defaults follow the slow mandala look")
         var wild = Look()
-        wild.rotationSpeed = 500; wild.hueSpeed = 500; wild.driftSpeed = 99; wild.twist = 9
+        wild.rotationSpeed = 500; wild.hueSpeed = 500; wild.driftSpeed = 99; wild.twist = 9; wild.motion = 50
         wild.clamp()
-        XCTAssertEqual(wild.rotationSpeed, 3); XCTAssertEqual(wild.hueSpeed, 3)
-        XCTAssertEqual(wild.driftSpeed, 1.5); XCTAssertEqual(wild.twist, 1)
-        for p in Preset.all { XCTAssertLessThanOrEqual(abs(p.look.rotationSpeed), 1.0, p.name); XCTAssertLessThanOrEqual(p.look.driftSpeed, 0.6, p.name) }
+        XCTAssertEqual(wild.rotationSpeed, 0.6); XCTAssertEqual(wild.hueSpeed, 0.6)
+        XCTAssertEqual(wild.driftSpeed, 0.5); XCTAssertEqual(wild.twist, 1); XCTAssertEqual(wild.motion, 2)
+        for p in Preset.all { XCTAssertLessThanOrEqual(abs(p.look.rotationSpeed), 0.15, p.name); XCTAssertLessThanOrEqual(p.look.driftSpeed, 0.15, p.name); XCTAssertLessThanOrEqual(p.look.hueSpeed, 0.2, p.name) }
         var g = SplitMix64(seed: 9)
         for _ in 0..<300 {
             let l = Look.random(using: &g)
-            XCTAssertLessThanOrEqual(abs(l.rotationSpeed), 1.2); XCTAssertLessThanOrEqual(l.hueSpeed, 1.2); XCTAssertLessThanOrEqual(l.driftSpeed, 0.6)
+            XCTAssertLessThanOrEqual(abs(l.rotationSpeed), 0.15); XCTAssertLessThanOrEqual(l.hueSpeed, 0.2); XCTAssertLessThanOrEqual(l.driftSpeed, 0.15)
         }
+    }
+
+    func testVersionTwoSettingsAreMigratedAgain() throws {
+        let v2 = #"{"version": 2, "secondsPerPhoto": 45, "transitionSeconds": 6, "look": {"rotationSpeed": 0.4, "driftSpeed": 0.3, "hueSpeed": 1, "segments": 7}}"#
+        let s = try JSONDecoder().decode(Settings.self, from: Data(v2.utf8))
+        XCTAssertEqual(s.version, 3)
+        XCTAssertEqual(s.look.rotationSpeed, Look().rotationSpeed)
+        XCTAssertEqual(s.look.driftSpeed, Look().driftSpeed)
+        XCTAssertEqual(s.look.hueSpeed, 0)
+        XCTAssertEqual(s.transitionSeconds, 12)
+        XCTAssertEqual(s.secondsPerPhoto, 90)
+        XCTAssertEqual(s.look.segments, 7)
     }
 
     func testCorruptFileIsMovedAsideAndReportedAsMissing() {
@@ -310,6 +324,16 @@ final class SliderScaleTests: XCTestCase {
         for v in [-3.0, -0.4, -0.02, 0.02, 0.4, 3.0] { XCTAssertEqual(s.value(at: s.position(for: v)), v, accuracy: 1e-9) }
         var last = -Double.infinity
         for i in 0...100 { let v = s.value(at: Double(i) / 100); XCTAssertGreaterThanOrEqual(v, last); last = v }
+    }
+
+    func testZeroLogIsStillAtZeroAndFineNearTheSlowEnd() {
+        let s = SliderScale.zeroLog(min: 0.05, max: 2)
+        XCTAssertEqual(s.value(at: 0), 0)
+        XCTAssertEqual(s.value(at: 0.03), 0)
+        XCTAssertEqual(s.value(at: 1), 2, accuracy: 1e-9)
+        XCTAssertLessThan(s.value(at: 0.5), 0.4)
+        XCTAssertEqual(s.position(for: 0), 0)
+        for v in [0.05, 0.3, 1.0, 2.0] { XCTAssertEqual(s.value(at: s.position(for: v)), v, accuracy: 1e-9) }
     }
 
     func testLinearClamps() {

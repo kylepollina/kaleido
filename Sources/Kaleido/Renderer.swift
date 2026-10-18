@@ -147,7 +147,7 @@ final class KaleidoRenderer {
     private var shownFor: Double = 0
     private var transitionClock: Double?
     private var activeStyle: TransitionStyle = .dissolve
-    private var rotation = 0.0, sourceRotation = 0.0, driftPhase = 0.0, huePhase = 0.0, clock = 0.0
+    private var rotation = 0.0, sourceRotation = 0.0, driftPhase = 0.0, huePhase = 0.0, breathPhase = 0.0, clock = 0.0
     private var skipRequested = false
     private var frameLoopEpoch = 0
 
@@ -191,11 +191,13 @@ final class KaleidoRenderer {
 
     func advance(_ dt: Double) {
         clock += dt
-        look = look.eased(toward: targetLook, by: 1 - exp(-dt * 1.5))
-        rotation += look.rotationSpeed * .pi / 180 * dt
-        sourceRotation += look.rotationSpeed * .pi / 180 * dt * -0.4 + look.driftSpeed * 0.008 * dt
-        driftPhase += look.driftSpeed * dt * 0.25
-        huePhase += look.hueSpeed * .pi / 180 * dt
+        look = look.eased(toward: targetLook, by: 1 - exp(-dt * 0.6))
+        let m = look.motion   // master multiplier: 0 is perfectly still
+        rotation += look.rotationSpeed * m * .pi / 180 * dt
+        sourceRotation += (look.rotationSpeed * .pi / 180 * -0.4 + look.driftSpeed * 0.008) * m * dt
+        driftPhase += look.driftSpeed * m * dt * 0.25
+        huePhase += look.hueSpeed * m * .pi / 180 * dt
+        breathPhase += m * dt * (2 * .pi / 600)   // one breath per ten minutes at full motion
 
         if var t = transitionClock {
             t += dt
@@ -280,7 +282,7 @@ final class KaleidoRenderer {
         let amp = look.drift * 0.45
         u.panX = Float(amp * (sin(driftPhase * 0.173) + 0.5 * sin(driftPhase * 0.311 + 1.3)))
         u.panY = Float(amp * (cos(driftPhase * 0.137) + 0.5 * cos(driftPhase * 0.263 + 0.4)))
-        u.zoom = Float(look.zoom)
+        u.zoom = Float(look.zoom * exp(0.12 * look.breathing * sin(breathPhase)))
         u.twist = Float(look.twist)
         u.hue = Float((look.hueShift * .pi / 180 + huePhase).truncatingRemainder(dividingBy: 2 * .pi))
         u.saturation = Float(look.saturation)

@@ -46,11 +46,11 @@ struct ControlsPane: View {
             Form {
                 Section("Photos") {
                     Toggle("Shuffle", isOn: $app.settings.shuffle)
-                    ScaledSliderRow("Seconds per photo", value: $app.settings.secondsPerPhoto, scale: .log(10, 600)) { $0 < 90 ? "\(Int($0)) s" : String(format: "%.1f min", $0 / 60) }
+                    ScaledSliderRow("Seconds per photo", value: $app.settings.secondsPerPhoto, scale: .log(15, 900)) { $0 < 90 ? "\(Int($0)) s" : String(format: "%.1f min", $0 / 60) }
                     Picker("Transition", selection: $app.settings.transition) {
                         ForEach(TransitionStyle.allCases) { Text($0.label).tag($0) }
                     }
-                    ScaledSliderRow("Transition length", value: $app.settings.transitionSeconds, scale: .log(1, 15)) { String(format: "%.0f s", $0) }
+                    ScaledSliderRow("Transition length", value: $app.settings.transitionSeconds, scale: .log(2, 30)) { String(format: "%.0f s", $0) }
                 }
 
                 Section {
@@ -66,17 +66,23 @@ struct ControlsPane: View {
                     .pickerStyle(.segmented)
                     let isHex = app.settings.look.mode == .hex
                     SliderRow(isHex ? "Tile density" : "Mirrors", value: intBinding(\.segments), range: 2...24, step: 1) { "\(Int($0))" }
-                    ScaledSliderRow("Rotation speed", value: $app.settings.look.rotationSpeed, scale: .signedLog(min: 0.02, max: 3)) { String(format: "%.1f°/min", $0 * 60) }
+                    ScaledSliderRow("Motion", value: $app.settings.look.motion, scale: .zeroLog(min: 0.05, max: 2)) {
+                        $0 == 0 ? "Still" : ($0 < 0.5 ? "Barely moving" : ($0 <= 1.05 ? "Gentle" : "Livelier"))
+                    }
                     SliderRow("Zoom", value: $app.settings.look.zoom, range: 0.4...3) { String(format: "%.2f×", $0) }
                     SliderRow("Drift amount", value: $app.settings.look.drift, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
-                    ScaledSliderRow("Drift speed", value: $app.settings.look.driftSpeed, scale: .log(0.02, 1.5)) { String(format: "%.2f×", $0) }
                     SliderRow("Swirl", value: $app.settings.look.twist, range: -1...1) { String(format: "%.2f", $0) }
+                    DisclosureGroup("Advanced motion") {
+                        ScaledSliderRow("Rotation", value: $app.settings.look.rotationSpeed, scale: .signedLog(min: 0.005, max: 0.6)) { Self.turnText($0) }
+                        ScaledSliderRow("Drift speed", value: $app.settings.look.driftSpeed, scale: .zeroLog(min: 0.01, max: 0.5)) { $0 == 0 ? "off" : String(format: "lap in %.0f min", 1 / ($0 * 0.173 * 0.25) * 2 * .pi / 60) }
+                        SliderRow("Zoom breathing", value: $app.settings.look.breathing, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
+                    }
                 } header: { Text("Kaleidoscope") }
 
                 Section("Color") {
                     SliderRow("Blur", value: $app.settings.look.blur, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                     SliderRow("Hue shift", value: $app.settings.look.hueShift, range: 0...360, step: 1) { "\(Int($0))°" }
-                    ScaledSliderRow("Hue cycling", value: $app.settings.look.hueSpeed, scale: .log(0.02, 3)) { $0 <= 0.0201 ? "off" : String(format: "%.1f°/min", $0 * 60) }
+                    ScaledSliderRow("Hue cycling", value: $app.settings.look.hueSpeed, scale: .zeroLog(min: 0.01, max: 0.6)) { $0 == 0 ? "off" : String(format: "cycle in %.0f min", 360 / $0 / 60) }
                     SliderRow("Saturation", value: $app.settings.look.saturation, range: 0...2) { String(format: "%.0f%%", $0 * 100) }
                     SliderRow("Vignette", value: $app.settings.look.vignette, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                 }
@@ -100,6 +106,12 @@ struct ControlsPane: View {
         if let r = app.suspensionReason, app.isPlaying { return "Paused: \(r.lowercased())" }
         if app.isPlaying { return "Playing. Stop or quit Kaleido to get your wallpaper back." }
         return "Your normal wallpaper is showing."
+    }
+
+    static func turnText(_ v: Double) -> String {
+        if abs(v) < 0.0005 { return "still" }
+        let mins = 360 / abs(v) / 60
+        return (v < 0 ? "← " : "") + (mins >= 120 ? String(format: "turn in %.1f h", mins / 60) : String(format: "turn in %.0f min", mins))
     }
 
     private func intBinding(_ keyPath: WritableKeyPath<Look, Int>) -> Binding<Double> {

@@ -1,14 +1,14 @@
 import Foundation
 
 public struct Settings: Codable, Equatable, Sendable {
-    /// 2 = the calm speed ranges. Older files (no version) had much faster ranges and are migrated on load.
-    public static let currentVersion = 2
+    /// 3 = the barely-moving speed ranges (2 was merely calm). Older files (no version) had much faster ranges and are migrated on load.
+    public static let currentVersion = 3
     public var version = Settings.currentVersion
     public var look = Look()
-    public var secondsPerPhoto: Double = 45
+    public var secondsPerPhoto: Double = 90
     public var shuffle = true
     public var transition: TransitionStyle = .random
-    public var transitionSeconds: Double = 6
+    public var transitionSeconds: Double = 12
     /// 30 or 60.
     public var frameRate: Int = 30
     public var pauseOnBattery = false
@@ -38,16 +38,18 @@ public struct Settings: Codable, Equatable, Sendable {
             look.driftSpeed = d.look.driftSpeed
             look.hueSpeed = 0
             look.twist = 0
+            look.motion = 1
+            look.breathing = d.look.breathing
             transitionSeconds = d.transitionSeconds
-            if secondsPerPhoto <= 20 { secondsPerPhoto = d.secondsPerPhoto }
+            if secondsPerPhoto <= 45 { secondsPerPhoto = d.secondsPerPhoto }
         }
         version = Settings.currentVersion
         clamp()
     }
 
     public mutating func clamp() {
-        secondsPerPhoto = min(max(secondsPerPhoto, 5), 3600)
-        transitionSeconds = min(max(transitionSeconds, 1), 15)
+        secondsPerPhoto = min(max(secondsPerPhoto, 10), 3600)
+        transitionSeconds = min(max(transitionSeconds, 2), 30)
         frameRate = frameRate >= 60 ? 60 : 30
         look.clamp()
     }
