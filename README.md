@@ -14,6 +14,12 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   Mouse clicks pass through. Works across Spaces, multiple displays, and display changes.
 - **Three sections.** Home (preview, Play, previous/next, Surprise me, one-click looks), Photos (the album
   browser) and Playground (all the sliders, slideshow and performance settings).
+- **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
+  Kaleidoscope / Original switch shows the photo itself.
+- **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
+- **Mixed-up looks.** The slideshow can switch preset looks now and then or with every photo; Next brings a new
+  photo and a new look, Surprise me a new photo and a random look. Looks change in step with the cross-fade.
+- **Global switches.** Turn off hue shifts, saturation changes, blur, vignette or swirl for every look.
 - **Album browser.** Your Photos albums (smart, yours, shared), watched folders and hand-added photos show up as
   cards with a cover photo, name, count and a badge (All / N of M). Tick a card's circle to include the whole
   album, or click the card to open it: click photos to toggle them, Shift-click for a range, plus Select All,

@@ -7,7 +7,7 @@ import MetalKit
 import UniformTypeIdentifiers
 import os
 
-/// Must match `Uniforms` in the shader: 17 floats, then 4 int32s.
+/// Must match `Uniforms` in the shader: 16 floats, then 7 int32s.
 struct GPUUniforms {
     var width: Float = 0, height: Float = 0
     var rotation: Float = 0, sourceRotation: Float = 0
@@ -16,8 +16,9 @@ struct GPUUniforms {
     var hue: Float = 0, saturation: Float = 1, vignette: Float = 0
     var blurLod: Float = 0, time: Float = 0
     var aspectA: Float = 1, aspectB: Float = 1
-    var mixAmount: Float = 0, spinBoost: Float = 0
+    var mixAmount: Float = 0
     var segments: Int32 = 8, mode: Int32 = 0, transition: Int32 = 0, hasB: Int32 = 0
+    var segmentsB: Int32 = 8, modeB: Int32 = 0, original: Int32 = 0
 }
 
 struct PhotoTexture {
@@ -153,7 +154,17 @@ final class KaleidoRenderer {
     private var activeStyle: TransitionStyle = .dissolve
     private var rotation = 0.0, sourceRotation = 0.0, driftPhase = 0.0, huePhase = 0.0, breathPhase = 0.0, clock = 0.0
     private var skipRequested = false
-    private var frameLoopEpoch = 0
+    /// Called just before a new photo starts fading in, so the app can switch looks in step with it.
+    var willStartTransition: (() -> Void)?
+    // Mirror mode and count belong to each photo: during a cross-fade the outgoing photo keeps its shape and
+    // the incoming one already has the new look, so a look change never snaps mid-fade.
+    private var currentShape = (mode: MirrorMode.radial, segments: 12)
+    private var incomingShape = (mode: MirrorMode.radial, segments: 12)
+    // Dragging the preview: an extra pan in photo space that keeps gliding after release, like a globe.
+    private var userPan = SIMD2<Double>(0, 0)
+    private var panVelocity = SIMD2<Double>(0, 0)
+    private var dragging = false
+    private var lastDragTime: CFTimeInterval = 0
 
     // Frame-pacing stats, printed when KALEIDO_DEBUG is set.
     private var statFrames = 0, statCPU = 0.0, statWorst = 0.0, statSince = CACurrentMediaTime()
@@ -202,6 +213,15 @@ final class KaleidoRenderer {
         driftPhase += look.driftSpeed * m * dt * 0.25
         huePhase += look.hueSpeed * m * .pi / 180 * dt
         breathPhase += m * dt * (2 * .pi / 600)   // one breath per ten minutes at full motion
+        if !dragging {
+            userPan += panVelocity * dt
+            panVelocity *= exp(-dt * 0.9)   // friction: a flick coasts for a few seconds
+            if simd_length(panVelocity) < 1e-4 { panVelocity = .zero }
+        }
+        // Mirrored-repeat sampling makes any pan valid; keep the number small so float precision holds.
+        userPan.x = userPan.x.truncatingRemainder(dividingBy: 40)
+        userPan.y = userPan.y.truncatingRemainder(dividingBy: 40)
+        if transitionClock == nil { currentShape = (look.mode, look.segments) }
 
         if var t = transitionClock {
             t += dt
@@ -210,6 +230,7 @@ final class KaleidoRenderer {
                     if let cur = currentRef, !goingBack { history.append(cur); if history.count > 40 { history.removeFirst() } }
                     goingBack = false
                     current = incoming; currentID = incomingID; currentRef = incomingRef
+                    currentShape = incomingShape
                 }
                 incoming = nil; incomingID = nil; incomingRef = nil
                 transitionClock = nil
@@ -227,6 +248,9 @@ final class KaleidoRenderer {
                 if id == currentID && id != nil {
                     shownFor = 0
                 } else {
+                    willStartTransition?()   // may change targetLook (look shuffle)
+                    if targetLook.mode != look.mode || targetLook.segments != look.segments { look = look.eased(toward: targetLook, by: 0) }
+                    incomingShape = (targetLook.mode, targetLook.segments)
                     incoming = tex; incomingID = id; incomingRef = ref
                     activeStyle = transitionStyle == .random ? TransitionStyle.concrete.randomElement()! : transitionStyle
                     transitionClock = 0
@@ -248,8 +272,38 @@ final class KaleidoRenderer {
 
     var canGoBack: Bool { !history.isEmpty }
 
+    // MARK: Dragging
+
+    func beginDrag() {
+        dragging = true
+        panVelocity = .zero
+        lastDragTime = CACurrentMediaTime()
+    }
+
+    /// `delta` is the pointer movement in screen heights (y up).
+    func drag(by delta: SIMD2<Double>) {
+        let now = CACurrentMediaTime()
+        let dt = max(now - lastDragTime, 1.0 / 240)
+        lastDragTime = now
+        let move = -delta / max(look.zoom, 0.1)
+        userPan += move
+        panVelocity = panVelocity * 0.6 + (move / dt) * 0.4
+    }
+
+    func endDrag() {
+        dragging = false
+        // A pause before letting go means "put it down here", not a flick.
+        if CACurrentMediaTime() - lastDragTime > 0.08 { panVelocity = .zero }
+        let speed = simd_length(panVelocity)
+        if speed > 3 { panVelocity *= 3 / speed }
+    }
+
     /// Jump straight to the target look (no easing); used for offscreen snapshots.
-    func snapLook() { look = targetLook }
+    func snapLook() {
+        look = targetLook
+        currentShape = (look.mode, look.segments)
+        incomingShape = currentShape
+    }
 
     /// Show a specific photo next (used by "Show now").
     func show(_ photo: PhotoRef) {
@@ -293,14 +347,15 @@ final class KaleidoRenderer {
 
     // MARK: Drawing
 
-    func makeUniforms(width: Double, height: Double) -> GPUUniforms {
+    func makeUniforms(width: Double, height: Double, original: Bool = false) -> GPUUniforms {
         var u = GPUUniforms()
         u.width = Float(width); u.height = Float(height)
+        u.original = original ? 1 : 0
         u.rotation = Float(rotation.truncatingRemainder(dividingBy: 2 * .pi))
         u.sourceRotation = Float(sourceRotation.truncatingRemainder(dividingBy: 2 * .pi))
         let amp = look.drift * 0.45
-        u.panX = Float(amp * (sin(driftPhase * 0.173) + 0.5 * sin(driftPhase * 0.311 + 1.3)))
-        u.panY = Float(amp * (cos(driftPhase * 0.137) + 0.5 * cos(driftPhase * 0.263 + 0.4)))
+        u.panX = Float(amp * (sin(driftPhase * 0.173) + 0.5 * sin(driftPhase * 0.311 + 1.3)) + userPan.x)
+        u.panY = Float(amp * (cos(driftPhase * 0.137) + 0.5 * cos(driftPhase * 0.263 + 0.4)) + userPan.y)
         u.zoom = Float(look.zoom * exp(0.12 * look.breathing * sin(breathPhase)))
         u.twist = Float(look.twist)
         u.hue = Float((look.hueShift * .pi / 180 + huePhase).truncatingRemainder(dividingBy: 2 * .pi))
@@ -309,22 +364,25 @@ final class KaleidoRenderer {
         u.blurLod = Float(look.blur * 5)
         u.time = Float(clock.truncatingRemainder(dividingBy: 1000))
         u.aspectA = current.aspect
-        u.segments = Int32(look.segments)
-        u.mode = look.mode.shaderIndex
+        u.segments = Int32(currentShape.segments)
+        u.mode = currentShape.mode.shaderIndex
+        u.segmentsB = u.segments
+        u.modeB = u.mode
         if let incoming, let t = transitionClock {
             u.hasB = 1
             u.aspectB = incoming.aspect
-            let p = Float(min(max(t / transitionSeconds, 0), 1))
-            u.mixAmount = p
+            u.mixAmount = Float(min(max(t / transitionSeconds, 0), 1))
             u.transition = activeStyle.shaderIndex
-            u.spinBoost = sin(p * .pi) * 1.4
+            u.segmentsB = Int32(incomingShape.segments)
+            u.modeB = incomingShape.mode.shaderIndex
         }
         return u
     }
 
-    func encode(into pass: MTLRenderPassDescriptor, drawable: MTLDrawable?, width: Double, height: Double, completion: ((MTLCommandBuffer) -> Void)? = nil) {
+    func encode(into pass: MTLRenderPassDescriptor, drawable: MTLDrawable?, width: Double, height: Double, original: Bool = false,
+                completion: ((MTLCommandBuffer) -> Void)? = nil) {
         guard let cb = queue.makeCommandBuffer(), let enc = cb.makeRenderCommandEncoder(descriptor: pass) else { return }
-        var u = makeUniforms(width: width, height: height)
+        var u = makeUniforms(width: width, height: height, original: original)
         enc.setRenderPipelineState(pipeline)
         enc.setFragmentBytes(&u, length: MemoryLayout<GPUUniforms>.stride, index: 0)
         enc.setFragmentTexture(current.texture, index: 0)
@@ -402,6 +460,33 @@ final class KaleidoView: NSView {
     var preferredFramesPerSecond: Int { didSet { applyRate() } }
     var suspended = false { didSet { refreshPause() } }
     var isPaused: Bool { link?.isPaused ?? true }
+    /// Preview only: show the photo itself instead of the kaleidoscope.
+    var showOriginal = false
+    /// Preview only: dragging moves the photo inside the mirrors (and keeps gliding after release).
+    var acceptsDrag = false
+
+    override func mouseDown(with event: NSEvent) {
+        guard acceptsDrag else { return super.mouseDown(with: event) }
+        MainActor.assumeIsolated { renderer.beginDrag() }
+        NSCursor.closedHand.push()
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard acceptsDrag, bounds.height > 0 else { return super.mouseDragged(with: event) }
+        // Points to screen heights; AppKit's y already points up, like the shader's.
+        let d = SIMD2<Double>(event.deltaX, -event.deltaY) / Double(bounds.height)
+        MainActor.assumeIsolated { renderer.drag(by: d) }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard acceptsDrag else { return super.mouseUp(with: event) }
+        MainActor.assumeIsolated { renderer.endDrag() }
+        NSCursor.pop()
+    }
+
+    override func resetCursorRects() {
+        if acceptsDrag { addCursorRect(bounds, cursor: .openHand) }
+    }
 
     @MainActor
     init(renderer: KaleidoRenderer, fps: Int) {
@@ -476,7 +561,7 @@ final class KaleidoView: NSView {
         inFlight += 1
         let debug = renderer.debug
         MainActor.assumeIsolated {
-            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight)) { [weak self] cb in
+            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight), original: showOriginal) { [weak self] cb in
                 if debug, cb.status == .error { FileHandle.standardError.write(Data("kaleido: GPU error \(String(describing: cb.error))\n".utf8)) }
                 if debug {
                     var px = [UInt8](repeating: 0, count: 4)

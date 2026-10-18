@@ -20,17 +20,16 @@ public enum MirrorMode: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 public enum TransitionStyle: String, Codable, CaseIterable, Identifiable, Sendable {
-    case random, dissolve, iris, swirl, zoom, segments, spin
+    // The angular "swirl wipe" and the dizzying "spin" were removed; old settings that name them load as random.
+    case random, dissolve, iris, zoom, segments
     public var id: String { rawValue }
     public var label: String {
         switch self {
         case .random: return "Random"
         case .dissolve: return "Dissolve"
         case .iris: return "Iris"
-        case .swirl: return "Swirl wipe"
         case .zoom: return "Zoom through"
         case .segments: return "Segment ripple"
-        case .spin: return "Spin"
         }
     }
     /// Index used by the shader. `.random` has none; the renderer picks a concrete style per transition.
@@ -38,11 +37,14 @@ public enum TransitionStyle: String, Codable, CaseIterable, Identifiable, Sendab
         switch self {
         case .random, .dissolve: return 0
         case .iris: return 1
-        case .swirl: return 2
         case .zoom: return 3
         case .segments: return 4
-        case .spin: return 5
         }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = TransitionStyle(rawValue: raw) ?? .random
     }
     public static var concrete: [TransitionStyle] { allCases.filter { $0 != .random } }
 }
@@ -170,6 +172,17 @@ public struct Preset: Identifiable, Equatable, Sendable {
     public let name: String
     public let look: Look
     public var id: String { name }
+
+    /// A preset other than the one currently showing (when there is a choice).
+    public static func random<G: RandomNumberGenerator>(excluding current: Look?, using g: inout G) -> Preset {
+        let choices = all.filter { $0.look != current }
+        return (choices.isEmpty ? all : choices).randomElement(using: &g)!
+    }
+
+    public static func random(excluding current: Look?) -> Preset {
+        var g = SystemRandomNumberGenerator()
+        return random(excluding: current, using: &g)
+    }
 
     public static let all: [Preset] = {
         func make(_ name: String, _ edit: (inout Look) -> Void) -> Preset {

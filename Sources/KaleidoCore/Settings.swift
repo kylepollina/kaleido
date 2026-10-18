@@ -1,8 +1,34 @@
 import Foundation
 
+/// How often the slideshow moves on to a different preset look.
+public enum LookShuffle: String, Codable, CaseIterable, Identifiable, Sendable {
+    case off, sometimes, everyPhoto
+    public var id: String { rawValue }
+    public var label: String {
+        switch self {
+        case .off: return "Keep one look"
+        case .sometimes: return "Now and then"
+        case .everyPhoto: return "With every photo"
+        }
+    }
+    /// Photos between look changes during automatic playback (nil = never).
+    public var interval: Int? {
+        switch self {
+        case .off: return nil
+        case .sometimes: return 4
+        case .everyPhoto: return 1
+        }
+    }
+}
+
 public struct Settings: Codable, Equatable, Sendable {
-    /// 3 = the barely-moving speed ranges (2 was merely calm). Older files (no version) had much faster ranges and are migrated on load.
-    public static let currentVersion = 3
+    /// 4 = speed is a 5-stop global control and looks carry no speed of their own. 3 = barely-moving ranges,
+    /// 2 = calm ranges. Older files (no version) had much faster ranges and are migrated on load.
+    public static let currentVersion = 4
+
+    /// The five stops of the speed slider (turtle to rabbit), as multipliers on every motion speed.
+    public static let speedMultipliers: [Double] = [0.25, 0.5, 1, 2, 4]
+    public static let defaultSpeedStep = 2
     public var version = Settings.currentVersion
     public var look = Look()
     public var secondsPerPhoto: Double = 90
@@ -15,8 +41,31 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Drops to 30 fps and stops the 60 fps option while macOS Low Power Mode is on.
     public var limitInLowPowerMode = true
     public var playOnLaunch = false
+    /// 0...4, an index into `speedMultipliers`.
+    public var speedStep = Settings.defaultSpeedStep
+    public var lookShuffle: LookShuffle = .sometimes
+    // Global switches that win over any look, preset or Surprise me.
+    public var allowHueChanges = true
+    public var allowSaturationChanges = true
+    public var allowBlur = true
+    public var allowVignette = true
+    public var allowSwirl = true
 
     public init() {}
+
+    public var speedMultiplier: Double { Settings.speedMultipliers[min(max(speedStep, 0), Settings.speedMultipliers.count - 1)] }
+
+    /// The look the renderer should actually use: the chosen look with the global switches and speed applied.
+    public func effectiveLook(_ l: Look) -> Look {
+        var r = l
+        if !allowHueChanges { r.hueShift = 0; r.hueSpeed = 0 }
+        if !allowSaturationChanges { r.saturation = 1 }
+        if !allowBlur { r.blur = 0 }
+        if !allowVignette { r.vignette = 0 }
+        if !allowSwirl { r.twist = 0 }
+        r.motion = l.motion * speedMultiplier
+        return r
+    }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -31,7 +80,19 @@ public struct Settings: Codable, Equatable, Sendable {
         pauseOnBattery = try c.decodeIfPresent(Bool.self, forKey: .pauseOnBattery) ?? d.pauseOnBattery
         limitInLowPowerMode = try c.decodeIfPresent(Bool.self, forKey: .limitInLowPowerMode) ?? d.limitInLowPowerMode
         playOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .playOnLaunch) ?? d.playOnLaunch
-        if fileVersion < Settings.currentVersion {
+        speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
+        lookShuffle = (try? c.decodeIfPresent(LookShuffle.self, forKey: .lookShuffle)) ?? d.lookShuffle
+        allowHueChanges = try c.decodeIfPresent(Bool.self, forKey: .allowHueChanges) ?? true
+        allowSaturationChanges = try c.decodeIfPresent(Bool.self, forKey: .allowSaturationChanges) ?? true
+        allowBlur = try c.decodeIfPresent(Bool.self, forKey: .allowBlur) ?? true
+        allowVignette = try c.decodeIfPresent(Bool.self, forKey: .allowVignette) ?? true
+        allowSwirl = try c.decodeIfPresent(Bool.self, forKey: .allowSwirl) ?? true
+        if fileVersion < 4 {
+            // Speed moved from each look's "Motion" slider to the global 5-stop control.
+            look.motion = 1
+            speedStep = d.speedStep
+        }
+        if fileVersion < 3 {
             // The old ranges were far too lively. Reset every speed-like value to the calm defaults and keep
             // the rest of the user's choices (mode, mirrors, colors, shuffle, frame rate...).
             look.rotationSpeed = d.look.rotationSpeed
@@ -51,6 +112,7 @@ public struct Settings: Codable, Equatable, Sendable {
         secondsPerPhoto = min(max(secondsPerPhoto, 10), 3600)
         transitionSeconds = min(max(transitionSeconds, 2), 30)
         frameRate = frameRate >= 60 ? 60 : 30
+        speedStep = min(max(speedStep, 0), Settings.speedMultipliers.count - 1)
         look.clamp()
     }
 

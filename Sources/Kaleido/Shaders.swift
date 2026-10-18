@@ -8,7 +8,7 @@ enum Shaders {
         float width, height;
         float rotation;      // radians, mirror pattern angle
         float sourceRotation;// radians, turns the photo inside the mirrors
-        float panX, panY;    // photo-space drift (units of photo height)
+        float panX, panY;    // photo-space drift plus the user's drag (units of photo height)
         float zoom;
         float twist;
         float hue;           // radians
@@ -18,11 +18,13 @@ enum Shaders {
         float time;
         float aspectA, aspectB;
         float mixAmount;     // 0...1 transition progress (raw)
-        float spinBoost;     // extra rotation during the "spin" transition
-        int segments;
-        int mode;            // 0 radial, 1 hex, 2 fractal
-        int transition;      // 0 dissolve 1 iris 2 swirl 3 zoom 4 segments 5 spin
+        int segments;        // mirrors of the outgoing photo (A)
+        int mode;            // 0 radial, 1 hex, 2 fractal (A)
+        int transition;      // 0 dissolve 1 iris 3 zoom 4 segments
         int hasB;
+        int segmentsB;       // the incoming photo (B) can arrive with a different look
+        int modeB;
+        int original;        // 1 = show the photo itself, uncut (the preview's "Original" tab)
     };
 
     struct VOut { float4 position [[position]]; };
@@ -67,19 +69,19 @@ enum Shaders {
 
     // Maps a screen point (centred, units of screen height) to a point in photo space.
     // `scale` is how many photo-space units one screen unit covers at this point (for the mip level).
-    float2 kaleidoPoint(float2 p, constant Uniforms &u, float zoomMul, float extraRot, thread float &scale) {
+    float2 kaleidoPoint(float2 p, constant Uniforms &u, float zoomMul, int mode, int segments, thread float &scale) {
         float zoom = u.zoom * zoomMul;
-        p = rot2(p, u.rotation + extraRot);
+        p = rot2(p, u.rotation);
         p = rot2(p, u.twist * length(p));
         scale = 1.0;
         float2 f;
-        if (u.mode == 1) {
+        if (mode == 1) {
             // Tiled: the lattice is rotated as a whole so the cell fold keeps lining up with cell edges.
-            float density = 0.9 + 0.3 * float(u.segments);
+            float density = 0.9 + 0.3 * float(segments);
             f = foldRadial(hexLocal(p * density), 6);
             scale = density;   // photo units covered by one screen unit
-        } else if (u.mode == 2) {
-            f = foldRadial(p, u.segments);
+        } else if (mode == 2) {
+            f = foldRadial(p, segments);
             float k = 1.0;
             for (int i = 0; i < 3; i++) {
                 float fi = float(i);
@@ -90,7 +92,7 @@ enum Shaders {
             }
             scale = k;
         } else {
-            f = foldRadial(p, u.segments);
+            f = foldRadial(p, segments);
         }
         float2 q = rot2(f, u.sourceRotation) / zoom + float2(u.panX, u.panY);
         scale /= zoom;
@@ -103,6 +105,15 @@ enum Shaders {
         float texels = (scale / u.height) * float(tex.get_height());
         float lod = max(log2(max(texels, 1.0)), 0.0) + u.blurLod;
         return tex.sample(smp, uv, level(lod)).rgb;
+    }
+
+    // The photo as it is: fitted inside the view, upright, black around it.
+    float3 samplePlain(texture2d<float> tex, sampler smp, float2 p, float aspect, float viewAspect) {
+        float s = min(viewAspect / aspect, 1.0);          // photo height on screen, in screen heights
+        float2 q = p / s;                                  // photo space: height 1, width aspect
+        if (abs(q.x) > 0.5 * aspect || abs(q.y) > 0.5) return float3(0.0);
+        float2 uv = float2(q.x / aspect + 0.5, 0.5 - q.y);
+        return tex.sample(smp, uv, level(0.0)).rgb;
     }
 
     float3 hueRotate(float3 c, float a) {
@@ -119,19 +130,27 @@ enum Shaders {
         float2 res = float2(u.width, u.height);
         float2 p = (in.position.xy - 0.5 * res) / u.height;   // centred, y down; screen height = 1
         p.y = -p.y;
-
         float t = u.mixAmount;
+
+        if (u.original == 1) {
+            float3 a = samplePlain(texA, smp, p, u.aspectA, res.x / res.y);
+            if (u.hasB == 1) {
+                float3 b = samplePlain(texB, smp, p, u.aspectB, res.x / res.y);
+                a = mix(a, b, smoothstep(0.0, 1.0, t));
+            }
+            return float4(a, 1.0);
+        }
+
         float sA, sB;
         float3 col;
         if (u.hasB == 0) {
-            float2 q = kaleidoPoint(p, u, 1.0, 0.0, sA);
+            float2 q = kaleidoPoint(p, u, 1.0, u.mode, u.segments, sA);
             col = samplePhoto(texA, smp, q, u.aspectA, sA, u);
         } else {
-            float zoomA = 1.0, zoomB = 1.0, extra = 0.0;
+            float zoomA = 1.0, zoomB = 1.0;
             if (u.transition == 3) { zoomA = 1.0 + 1.6 * t; zoomB = 1.0 / (1.0 + 1.6 * (1.0 - t)); }
-            if (u.transition == 5) { extra = u.spinBoost; }
-            float2 qa = kaleidoPoint(p, u, zoomA, extra, sA);
-            float2 qb = kaleidoPoint(p, u, zoomB, extra, sB);
+            float2 qa = kaleidoPoint(p, u, zoomA, u.mode, u.segments, sA);
+            float2 qb = kaleidoPoint(p, u, zoomB, u.modeB, u.segmentsB, sB);
             float3 a = samplePhoto(texA, smp, qa, u.aspectA, sA, u);
             float3 b = samplePhoto(texB, smp, qb, u.aspectB, sB, u);
 
@@ -141,16 +160,12 @@ enum Shaders {
             float r = length(p) / halfDiag;
             if (u.transition == 1) {
                 m = 1.0 - smoothstep(t * (1.0 + w) - w, t * (1.0 + w), r);
-            } else if (u.transition == 2) {
-                float ang = (atan2(p.y, p.x) / (2.0 * PI) + 0.5);
-                float x = 0.75 * ang + 0.25 * r;
-                m = 1.0 - smoothstep(t * (1.0 + w) - w, t * (1.0 + w), x);
             } else if (u.transition == 4) {
-                int n = max(u.segments, 3);
+                int n = max(u.segmentsB, 3);
                 float seg = 2.0 * PI / float(n);
                 float idx = floor((atan2(p.y, p.x) + PI) / seg);
-                float h = hash11(idx + 1.0 + u.time * 0.0);
-                float local = clamp((t * 1.6 - h * 0.6) / 1.0, 0.0, 1.0);
+                float h = hash11(idx + 1.0);
+                float local = clamp(t * 1.6 - h * 0.6, 0.0, 1.0);
                 m = smoothstep(0.0, 1.0, local);
             } else if (u.transition == 3) {
                 m = smoothstep(0.15, 0.85, t);

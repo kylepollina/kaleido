@@ -158,13 +158,62 @@ final class SettingsTests: XCTestCase {
     func testVersionTwoSettingsAreMigratedAgain() throws {
         let v2 = #"{"version": 2, "secondsPerPhoto": 45, "transitionSeconds": 6, "look": {"rotationSpeed": 0.4, "driftSpeed": 0.3, "hueSpeed": 1, "segments": 7}}"#
         let s = try JSONDecoder().decode(Settings.self, from: Data(v2.utf8))
-        XCTAssertEqual(s.version, 3)
+        XCTAssertEqual(s.version, Settings.currentVersion)
         XCTAssertEqual(s.look.rotationSpeed, Look().rotationSpeed)
         XCTAssertEqual(s.look.driftSpeed, Look().driftSpeed)
         XCTAssertEqual(s.look.hueSpeed, 0)
         XCTAssertEqual(s.transitionSeconds, 12)
         XCTAssertEqual(s.secondsPerPhoto, 90)
         XCTAssertEqual(s.look.segments, 7)
+    }
+
+    func testVersionThreeMovesSpeedToTheGlobalControl() throws {
+        let v3 = #"{"version": 3, "look": {"motion": 1.8, "segments": 9}, "transition": "spin"}"#
+        let s = try JSONDecoder().decode(Settings.self, from: Data(v3.utf8))
+        XCTAssertEqual(s.look.motion, 1)
+        XCTAssertEqual(s.speedStep, Settings.defaultSpeedStep)
+        XCTAssertEqual(s.look.segments, 9)
+        XCTAssertEqual(s.transition, .random, "removed transitions load as random instead of breaking the file")
+        XCTAssertEqual(try JSONDecoder().decode(TransitionStyle.self, from: Data(#""swirl""#.utf8)), .random)
+        XCTAssertFalse(TransitionStyle.concrete.map(\.rawValue).contains("spin"))
+    }
+
+    func testSpeedStepsScaleMotionAndClamp() {
+        var s = Settings()
+        XCTAssertEqual(s.speedMultiplier, 1)
+        XCTAssertEqual(Settings.speedMultipliers.count, 5)
+        XCTAssertEqual(Settings.speedMultipliers, Settings.speedMultipliers.sorted(), "turtle to rabbit")
+        s.speedStep = 0
+        XCTAssertEqual(s.effectiveLook(Look()).motion, 0.25)
+        s.speedStep = 4
+        XCTAssertEqual(s.effectiveLook(Look()).motion, 4)
+        s.speedStep = 99
+        s.clamp()
+        XCTAssertEqual(s.speedStep, 4)
+    }
+
+    func testGlobalSwitchesOverrideAnyLook() {
+        var s = Settings()
+        var wild = Look()
+        wild.hueShift = 120; wild.hueSpeed = 0.5; wild.saturation = 1.8; wild.blur = 0.6; wild.vignette = 0.7; wild.twist = 0.5
+        XCTAssertEqual(s.effectiveLook(wild).saturation, 1.8, "allowed by default")
+        s.allowHueChanges = false; s.allowSaturationChanges = false; s.allowBlur = false; s.allowVignette = false; s.allowSwirl = false
+        let e = s.effectiveLook(wild)
+        XCTAssertEqual(e.hueShift, 0); XCTAssertEqual(e.hueSpeed, 0); XCTAssertEqual(e.saturation, 1)
+        XCTAssertEqual(e.blur, 0); XCTAssertEqual(e.vignette, 0); XCTAssertEqual(e.twist, 0)
+        XCTAssertEqual(e.segments, wild.segments, "shape is untouched")
+        let back = try! JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s))
+        XCTAssertFalse(back.allowHueChanges); XCTAssertFalse(back.allowSwirl)
+    }
+
+    func testLookShuffleIntervalsAndRandomPresetDiffers() {
+        XCTAssertNil(LookShuffle.off.interval)
+        XCTAssertEqual(LookShuffle.everyPhoto.interval, 1)
+        XCTAssertGreaterThan(LookShuffle.sometimes.interval!, 1)
+        var g = SplitMix64(seed: 5)
+        for p in Preset.all {
+            for _ in 0..<20 { XCTAssertNotEqual(Preset.random(excluding: p.look, using: &g).look, p.look) }
+        }
     }
 
     func testCorruptFileIsMovedAsideAndReportedAsMissing() {

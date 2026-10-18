@@ -107,16 +107,48 @@ struct HomeView: View {
     }
 
     private var transport: some View {
+        VStack(spacing: 14) {
+            buttons
+            HStack(spacing: 28) {
+                HStack(spacing: 8) {
+                    Text("Speed").foregroundStyle(.secondary)
+                    SpeedControl().frame(width: 220)
+                }
+                Picker("Looks", selection: $app.settings.lookShuffle) {
+                    ForEach(LookShuffle.allCases) { Text($0.label).tag($0) }
+                }
+                .fixedSize()
+                .help("How often the slideshow switches to another look. Next always brings a new one unless this is off.")
+            }
+        }
+    }
+
+    private var buttons: some View {
         HStack(spacing: 14) {
             Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 30) }
                 .help("Previous photo")
             PlayButton().frame(width: 200)
             Button { app.nextPhoto() } label: { Image(systemName: "forward.fill").frame(width: 30) }
-                .help("Next photo")
+                .help("Next photo (and a new look, if looks are mixed)")
             Button { app.surpriseMe() } label: { Label("Surprise me", systemImage: "dice") }
                 .help("A random look and a new photo")
         }
         .controlSize(.large)
+    }
+}
+
+/// The one speed control: five stops from turtle to rabbit, like the trackpad speed setting.
+struct SpeedControl: View {
+    @EnvironmentObject var app: AppState
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "tortoise.fill").foregroundStyle(.secondary).help("Slowest")
+            Slider(value: Binding(get: { Double(app.settings.speedStep) },
+                                  set: { app.settings.speedStep = Int($0.rounded()) }),
+                   in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
+            Image(systemName: "hare.fill").foregroundStyle(.secondary).help("Fastest")
+        }
     }
 }
 
@@ -165,29 +197,43 @@ struct PlaygroundView: View {
                     .pickerStyle(.segmented)
                     let isHex = app.settings.look.mode == .hex
                     SliderRow(isHex ? "Tile density" : "Mirrors", value: intBinding(\.segments), range: 2...24, step: 1) { "\(Int($0))" }
-                    ScaledSliderRow("Motion", value: $app.settings.look.motion, scale: .zeroLog(min: 0.05, max: 2)) {
-                        $0 == 0 ? "Still" : ($0 < 0.5 ? "Barely moving" : ($0 <= 1.05 ? "Gentle" : "Livelier"))
-                    }
+                    LabeledContent("Speed") { SpeedControl().frame(maxWidth: 260) }
                     SliderRow("Zoom", value: $app.settings.look.zoom, range: 0.4...3) { String(format: "%.2f×", $0) }
                     SliderRow("Drift amount", value: $app.settings.look.drift, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                     SliderRow("Swirl", value: $app.settings.look.twist, range: -1...1) { String(format: "%.2f", $0) }
-                    DisclosureGroup("Advanced motion") {
-                        ScaledSliderRow("Rotation", value: $app.settings.look.rotationSpeed, scale: .signedLog(min: 0.005, max: 0.6)) { Self.turnText($0) }
-                        ScaledSliderRow("Drift speed", value: $app.settings.look.driftSpeed, scale: .zeroLog(min: 0.01, max: 0.5)) { $0 == 0 ? "off" : String(format: "lap in %.0f min", 1 / ($0 * 0.173 * 0.25) * 2 * .pi / 60) }
-                        SliderRow("Zoom breathing", value: $app.settings.look.breathing, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
-                    }
+                    SliderRow("Zoom breathing", value: $app.settings.look.breathing, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                 } header: { Text("Kaleidoscope") }
+
+                Section {
+                    Toggle("Hue shifts and color cycling", isOn: $app.settings.allowHueChanges)
+                    Toggle("Saturation changes", isOn: $app.settings.allowSaturationChanges)
+                    Toggle("Blur", isOn: $app.settings.allowBlur)
+                    Toggle("Vignette", isOn: $app.settings.allowVignette)
+                    Toggle("Swirl", isOn: $app.settings.allowSwirl)
+                } header: {
+                    Text("Allow in any look")
+                } footer: {
+                    Text("Turn an effect off here and no look, preset or Surprise me will use it.").font(.caption).foregroundStyle(.secondary)
+                }
 
                 Section("Color") {
                     SliderRow("Blur", value: $app.settings.look.blur, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
+                        .disabled(!app.settings.allowBlur)
                     SliderRow("Hue shift", value: $app.settings.look.hueShift, range: 0...360, step: 1) { "\(Int($0))°" }
+                        .disabled(!app.settings.allowHueChanges)
                     ScaledSliderRow("Hue cycling", value: $app.settings.look.hueSpeed, scale: .zeroLog(min: 0.01, max: 0.6)) { $0 == 0 ? "off" : String(format: "cycle in %.0f min", 360 / $0 / 60) }
+                        .disabled(!app.settings.allowHueChanges)
                     SliderRow("Saturation", value: $app.settings.look.saturation, range: 0...2) { String(format: "%.0f%%", $0 * 100) }
+                        .disabled(!app.settings.allowSaturationChanges)
                     SliderRow("Vignette", value: $app.settings.look.vignette, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
+                        .disabled(!app.settings.allowVignette)
                 }
 
                 Section("Slideshow") {
-                    Toggle("Shuffle", isOn: $app.settings.shuffle)
+                    Toggle("Shuffle photos", isOn: $app.settings.shuffle)
+                    Picker("Change looks", selection: $app.settings.lookShuffle) {
+                        ForEach(LookShuffle.allCases) { Text($0.label).tag($0) }
+                    }
                     ScaledSliderRow("Seconds per photo", value: $app.settings.secondsPerPhoto, scale: .log(15, 900)) { $0 < 90 ? "\(Int($0)) s" : String(format: "%.1f min", $0 / 60) }
                     Picker("Transition", selection: $app.settings.transition) {
                         ForEach(TransitionStyle.allCases) { Text($0.label).tag($0) }
@@ -208,12 +254,6 @@ struct PlaygroundView: View {
             }
             .formStyle(.grouped)
         }
-    }
-
-    static func turnText(_ v: Double) -> String {
-        if abs(v) < 0.0005 { return "still" }
-        let mins = 360 / abs(v) / 60
-        return (v < 0 ? "← " : "") + (mins >= 120 ? String(format: "turn in %.1f h", mins / 60) : String(format: "turn in %.0f min", mins))
     }
 
     private func intBinding(_ keyPath: WritableKeyPath<Look, Int>) -> Binding<Double> {
@@ -271,26 +311,45 @@ struct ScaledSliderRow: View {
 
 struct PreviewPane: View {
     @EnvironmentObject var app: AppState
+    @AppStorage("previewShowsOriginal") private var showOriginal = false
 
     var body: some View {
-        Group {
-            if let renderer = app.renderer {
-                PreviewView(renderer: renderer)
-            } else {
-                Text("Metal is not available on this Mac.").foregroundStyle(.secondary)
+        VStack(spacing: 8) {
+            Picker("Preview", selection: $showOriginal) {
+                Text("Kaleidoscope").tag(false)
+                Text("Original").tag(true)
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            Group {
+                if let renderer = app.renderer {
+                    PreviewView(renderer: renderer, showOriginal: showOriginal)
+                } else {
+                    Text("Metal is not available on this Mac.").foregroundStyle(.secondary)
+                }
+            }
+            .aspectRatio(16.0 / 9.0, contentMode: .fit)
+            .background(.black)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
+            .help(showOriginal ? "The photo as it is" : "Drag to move the photo inside the mirrors; flick it to let it glide")
         }
-        .aspectRatio(16.0 / 9.0, contentMode: .fit)
-        .background(.black)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
     }
 }
 
 struct PreviewView: NSViewRepresentable {
     let renderer: KaleidoRenderer
-    func makeNSView(context: Context) -> KaleidoView { KaleidoView(renderer: renderer, fps: 30) }
-    func updateNSView(_ nsView: KaleidoView, context: Context) {}
+    var showOriginal = false
+
+    func makeNSView(context: Context) -> KaleidoView {
+        let v = KaleidoView(renderer: renderer, fps: 30)
+        v.acceptsDrag = true
+        v.showOriginal = showOriginal
+        return v
+    }
+
+    func updateNSView(_ nsView: KaleidoView, context: Context) { nsView.showOriginal = showOriginal }
 }
 
 // MARK: Library browser

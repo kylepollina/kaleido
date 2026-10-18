@@ -22,6 +22,9 @@ final class AppState: ObservableObject, PhotoProvider {
     let photos = PhotosService()
     @Published private(set) var isSyncing = false
     private var syncAgain = false
+    private var lookChangePending = false
+    private var surprisePending = false
+    private var photosSinceLookChange = 0
     private var syncDebounce: Task<Void, Never>?
     private var filterObserver: AnyCancellable?
     let renderer: KaleidoRenderer?
@@ -43,6 +46,7 @@ final class AppState: ObservableObject, PhotoProvider {
         queue = PhotoQueue(shuffle: loaded.shuffle)
         renderer = KaleidoRenderer()
         renderer?.provider = self
+        renderer?.willStartTransition = { [weak self] in self?.photoWillChange() }
         if let renderer { desktop = DesktopController(renderer: renderer) }
         applySettings()
         libraryObserver = library.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
@@ -96,10 +100,38 @@ final class AppState: ObservableObject, PhotoProvider {
     func rebuildDesktop() { desktop?.rebuild(reassert: true) }
 
     func togglePlay() { isPlaying ? stop() : play() }
-    func nextPhoto() { renderer?.skip() }
+    /// Next photo; with look shuffling on, it also brings a different preset look.
+    func nextPhoto() {
+        if settings.lookShuffle != .off { lookChangePending = true }
+        if library.enabledItems.count <= 1 { photoWillChange() }   // no fade will come; change the look now
+        renderer?.skip()
+    }
+
     func previousPhoto() { renderer?.previous() }
+
+    /// Runs as each new photo starts fading in, so look changes ride along with the photo change.
+    private func photoWillChange() {
+        photosSinceLookChange += 1
+        if surprisePending {
+            surprisePending = false
+            lookChangePending = false
+            photosSinceLookChange = 0
+            settings.look = Look.random()
+            return
+        }
+        let due = settings.lookShuffle.interval.map { photosSinceLookChange >= $0 } ?? false
+        if lookChangePending || due {
+            settings.look = Preset.random(excluding: settings.look).look
+            photosSinceLookChange = 0
+        }
+        lookChangePending = false
+    }
     /// A random look and a fresh photo.
-    func surpriseMe() { settings.look = Look.random(); renderer?.skip() }
+    func surpriseMe() {
+        surprisePending = true
+        if library.enabledItems.count <= 1 { photoWillChange() }
+        renderer?.skip()
+    }
     func apply(_ preset: Preset) { settings.look = preset.look }
 
     // MARK: PhotoProvider
@@ -202,7 +234,7 @@ final class AppState: ObservableObject, PhotoProvider {
 
     private func applySettings() {
         guard let renderer else { return }
-        renderer.targetLook = settings.look
+        renderer.targetLook = settings.effectiveLook(settings.look)
         renderer.secondsPerPhoto = settings.secondsPerPhoto
         renderer.transitionSeconds = settings.transitionSeconds
         renderer.transitionStyle = settings.transition
