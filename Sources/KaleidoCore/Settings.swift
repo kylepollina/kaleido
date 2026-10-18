@@ -27,8 +27,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public static let currentVersion = 4
 
     /// The five stops of the speed slider (turtle to rabbit), as multipliers on every motion speed.
-    /// Turtle is the old fastest stop; rabbit is twice that. Even steps on a log scale in between.
-    public static let speedMultipliers: [Double] = [4, 4.76, 5.66, 6.73, 8]
+    /// Turtle stays as it was; rabbit is four times the turtle. Even steps on a log scale in between.
+    public static let speedMultipliers: [Double] = [4, 5.66, 8, 11.3, 16]
     public static let defaultSpeedStep = 2
     public var version = Settings.currentVersion
     public var look = Look()

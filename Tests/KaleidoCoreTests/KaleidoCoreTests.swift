@@ -186,7 +186,7 @@ final class SettingsTests: XCTestCase {
         s.speedStep = 0
         XCTAssertEqual(s.effectiveLook(Look()).motion, 4, "slowest is the old fastest")
         s.speedStep = 4
-        XCTAssertEqual(s.effectiveLook(Look()).motion, 8, "fastest is twice that")
+        XCTAssertEqual(s.effectiveLook(Look()).motion, 16, "fastest is four times the slowest")
         s.speedStep = 99
         s.clamp()
         XCTAssertEqual(s.speedStep, 4)
