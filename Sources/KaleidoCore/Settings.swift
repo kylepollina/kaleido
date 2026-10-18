@@ -1,14 +1,14 @@
 import Foundation
 
-/// How often the slideshow moves on to a different preset look.
+/// Whether the slideshow switches between hearted presets, and how often.
 public enum LookShuffle: String, Codable, CaseIterable, Identifiable, Sendable {
     case off, sometimes, everyPhoto
     public var id: String { rawValue }
     public var label: String {
         switch self {
-        case .off: return "Keep one look"
-        case .sometimes: return "Now and then"
-        case .everyPhoto: return "With every photo"
+        case .off: return "Off"
+        case .sometimes: return "Every 4 photos"
+        case .everyPhoto: return "Every photo"
         }
     }
     /// Photos between look changes during automatic playback (nil = never).
@@ -44,6 +44,8 @@ public struct Settings: Codable, Equatable, Sendable {
     /// 0...4, an index into `speedMultipliers`.
     public var speedStep = Settings.defaultSpeedStep
     public var lookShuffle: LookShuffle = .sometimes
+    /// The preset `look` came from (nil after Surprise me, which makes an unsaved look).
+    public var activePresetID: UUID?
     // Global switches that win over any look, preset or Surprise me.
     public var allowHueChanges = true
     public var allowSaturationChanges = true
@@ -82,6 +84,7 @@ public struct Settings: Codable, Equatable, Sendable {
         playOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .playOnLaunch) ?? d.playOnLaunch
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
         lookShuffle = (try? c.decodeIfPresent(LookShuffle.self, forKey: .lookShuffle)) ?? d.lookShuffle
+        activePresetID = try? c.decodeIfPresent(UUID.self, forKey: .activePresetID)
         allowHueChanges = try c.decodeIfPresent(Bool.self, forKey: .allowHueChanges) ?? true
         allowSaturationChanges = try c.decodeIfPresent(Bool.self, forKey: .allowSaturationChanges) ?? true
         allowBlur = try c.decodeIfPresent(Bool.self, forKey: .allowBlur) ?? true
@@ -133,6 +136,7 @@ public enum Paths {
     }
     public static var settingsFile: URL { dataDirectory.appendingPathComponent("settings.json") }
     public static var libraryFile: URL { dataDirectory.appendingPathComponent("library.json") }
+    public static var presetsFile: URL { dataDirectory.appendingPathComponent("presets.json") }
 }
 
 public enum JSONFile {

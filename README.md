@@ -12,8 +12,11 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 
 - **Desktop playback.** One borderless window per display, just above the wallpaper and below desktop icons.
   Mouse clicks pass through. Works across Spaces, multiple displays, and display changes.
-- **Three sections.** Home (preview, Play, previous/next, Surprise me, one-click looks), Photos (the album
-  browser) and Playground (all the sliders, slideshow and performance settings).
+- **Four sections.** Home (preview, Play, previous/next, Surprise me, speed, your hearted presets), Photos (the
+  album browser), Presets (edit, create, duplicate, heart and reset presets) and Settings (slideshow, preset
+  shuffling, effect switches, performance).
+- **Presets.** Edits apply live and are saved. Reset puts a built-in preset back to its original (or a preset you
+  made back to how you created it). Hearted presets appear on Home and are the ones Shuffle presets moves between.
 - **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
   Kaleidoscope / Original switch shows the photo itself.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.

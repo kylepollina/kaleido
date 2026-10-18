@@ -19,6 +19,7 @@ final class AppState: ObservableObject, PhotoProvider {
     @Published private(set) var suspensionReason: String?
 
     let library: PhotoLibrary
+    let presets = PresetLibrary(fileURL: Paths.presetsFile)
     let photos = PhotosService()
     @Published private(set) var isSyncing = false
     private var syncAgain = false
@@ -50,6 +51,10 @@ final class AppState: ObservableObject, PhotoProvider {
         if let renderer { desktop = DesktopController(renderer: renderer) }
         applySettings()
         libraryObserver = library.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
+        presets.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        if settings.activePresetID == nil, let match = presets.presets.first(where: { $0.look == settings.look }) {
+            settings.activePresetID = match.id
+        }
         photos.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         photos.onLibraryChange = { [weak self] in self?.scheduleSync(after: 20) }
         filterObserver = library.$filters.dropFirst().removeDuplicates().sink { [weak self] _ in self?.scheduleSync(after: 1) }
@@ -117,22 +122,52 @@ final class AppState: ObservableObject, PhotoProvider {
             lookChangePending = false
             photosSinceLookChange = 0
             settings.look = Look.random()
+            settings.activePresetID = nil
             return
         }
         let due = settings.lookShuffle.interval.map { photosSinceLookChange >= $0 } ?? false
-        if lookChangePending || due {
-            settings.look = Preset.random(excluding: settings.look).look
+        if lookChangePending || due, let next = presets.randomFavorite(excluding: settings.activePresetID) {
+            apply(next)
             photosSinceLookChange = 0
         }
         lookChangePending = false
     }
-    /// A random look and a fresh photo.
+
+    /// A random, unsaved look and a fresh photo (save it from the Presets section if you like it).
     func surpriseMe() {
         surprisePending = true
         if library.enabledItems.count <= 1 { photoWillChange() }
         renderer?.skip()
     }
-    func apply(_ preset: Preset) { settings.look = preset.look }
+
+    func apply(_ preset: SavedPreset) {
+        settings.activePresetID = preset.id
+        settings.look = preset.look
+    }
+
+    // MARK: Preset editing
+
+    /// Edits go straight into the preset and, when it is the one playing, onto the screen.
+    func edit(_ id: UUID, _ change: (inout Look) -> Void) {
+        guard var look = presets.preset(id)?.look else { return }
+        change(&look)
+        look.clamp()
+        presets.update(id, look: look)
+        if settings.activePresetID == id { settings.look = look }
+    }
+
+    func resetPreset(_ id: UUID) {
+        presets.reset(id)
+        if settings.activePresetID == id, let p = presets.preset(id) { settings.look = p.look }
+    }
+
+    /// Saves whatever is on screen (e.g. a Surprise me look) as a new hearted preset.
+    @discardableResult
+    func saveCurrentAsPreset() -> UUID {
+        let id = presets.add(name: "My preset", look: settings.look)
+        settings.activePresetID = id
+        return id
+    }
 
     // MARK: PhotoProvider
 
