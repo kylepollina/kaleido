@@ -52,20 +52,31 @@ struct ScaledSliderRow: View {
 
 struct PreviewPane: View {
     @EnvironmentObject var app: AppState
+    /// The preset editor's preview adds pattern lines and its own previous / play / next controls.
+    var editor = false
     @AppStorage("previewShowsOriginal") private var showOriginal = false
+    @AppStorage("previewShowsPatternLines") private var showLines = false
 
     var body: some View {
         VStack(spacing: 8) {
-            Picker("Preview", selection: $showOriginal) {
-                Text("Kaleidoscope").tag(false)
-                Text("Original").tag(true)
+            HStack(spacing: 16) {
+                Picker("Preview", selection: $showOriginal) {
+                    Text("Kaleidoscope").tag(false)
+                    Text("Original").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                if editor {
+                    Toggle("Pattern lines", isOn: $showLines)
+                        .toggleStyle(.checkbox)
+                        .disabled(showOriginal)
+                        .help("Trace the mirrors and tile edges in red, to see the shape of the pattern itself")
+                }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
             Group {
                 if let renderer = app.renderer {
-                    PreviewView(renderer: renderer, showOriginal: showOriginal)
+                    PreviewView(renderer: renderer, showOriginal: showOriginal, showOutlines: editor && showLines)
                 } else {
                     Text("Metal is not available on this Mac.").foregroundStyle(.secondary)
                 }
@@ -84,6 +95,15 @@ struct PreviewPane: View {
                 }
                 .controlSize(.small)
             }
+            if editor {
+                HStack(spacing: 12) {
+                    Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 26) }
+                        .help("Previous photo")
+                    PlayButton(compact: true).frame(width: 120)
+                    Button { app.nextPhotoKeepingPreset() } label: { Image(systemName: "forward.fill").frame(width: 26) }
+                        .help("Next photo (keeps this preset)")
+                }
+            }
         }
     }
 }
@@ -91,6 +111,7 @@ struct PreviewPane: View {
 struct PreviewView: NSViewRepresentable {
     let renderer: KaleidoRenderer
     var showOriginal = false
+    var showOutlines = false
 
     func makeNSView(context: Context) -> KaleidoView {
         let v = KaleidoView(renderer: renderer, fps: 30)
@@ -100,6 +121,7 @@ struct PreviewView: NSViewRepresentable {
 
     func updateNSView(_ nsView: KaleidoView, context: Context) {
         nsView.showOriginal = showOriginal
+        nsView.showOutlines = showOutlines
         nsView.acceptsDrag = !showOriginal   // dragging only makes sense through the mirrors
         nsView.window?.invalidateCursorRects(for: nsView)
     }

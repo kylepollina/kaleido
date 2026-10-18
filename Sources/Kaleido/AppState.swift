@@ -135,6 +135,11 @@ final class AppState: ObservableObject, PhotoProvider {
 
     func previousPhoto() { renderer?.previous() }
 
+    /// While the preset editor is open, shuffling never swaps out the preset being edited.
+    var isEditingPresets = false
+
+    func nextPhotoKeepingPreset() { renderer?.skip() }
+
     /// "Remove from selected photos" on the Original tab: out of the rotation (it stays in its album), then move on.
     func removeCurrentFromRotation() {
         // Only this photo goes; a whole album stays whole, so its new photos still join automatically.
@@ -164,7 +169,7 @@ final class AppState: ObservableObject, PhotoProvider {
             return
         }
         let due = settings.lookShuffle.interval.map { photosSinceLookChange >= $0 } ?? false
-        if lookChangePending || due, let next = presets.randomFavorite(excluding: settings.activePresetID) {
+        if (lookChangePending || due) && !isEditingPresets, let next = presets.randomFavorite(excluding: settings.activePresetID) {
             apply(next)
             photosSinceLookChange = 0
         }

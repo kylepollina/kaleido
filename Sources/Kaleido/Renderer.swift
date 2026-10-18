@@ -7,7 +7,7 @@ import MetalKit
 import UniformTypeIdentifiers
 import os
 
-/// Must match `Uniforms` in the shader: 17 floats, then 8 int32s.
+/// Must match `Uniforms` in the shader: 17 floats, then 9 int32s.
 struct GPUUniforms {
     var width: Float = 0, height: Float = 0
     var rotation: Float = 0, sourceRotation: Float = 0
@@ -19,6 +19,7 @@ struct GPUUniforms {
     var mixAmount: Float = 0, morph: Float = 0
     var segments: Int32 = 8, mode: Int32 = 0, transition: Int32 = 0, hasB: Int32 = 0
     var segmentsB: Int32 = 8, modeB: Int32 = 0, original: Int32 = 0, segmentsMorph: Int32 = 8
+    var outlines: Int32 = 0
 }
 
 struct PhotoTexture {
@@ -397,10 +398,11 @@ final class KaleidoRenderer {
 
     // MARK: Drawing
 
-    func makeUniforms(width: Double, height: Double, original: Bool = false) -> GPUUniforms {
+    func makeUniforms(width: Double, height: Double, original: Bool = false, outlines: Bool = false) -> GPUUniforms {
         var u = GPUUniforms()
         u.width = Float(width); u.height = Float(height)
         u.original = original ? 1 : 0
+        u.outlines = outlines ? 1 : 0
         u.rotation = Float(rotation.truncatingRemainder(dividingBy: 2 * .pi))
         u.sourceRotation = Float(sourceRotation.truncatingRemainder(dividingBy: 2 * .pi))
         let amp = look.drift * 0.45
@@ -434,10 +436,10 @@ final class KaleidoRenderer {
         return u
     }
 
-    func encode(into pass: MTLRenderPassDescriptor, drawable: MTLDrawable?, width: Double, height: Double, original: Bool = false,
+    func encode(into pass: MTLRenderPassDescriptor, drawable: MTLDrawable?, width: Double, height: Double, original: Bool = false, outlines: Bool = false,
                 completion: ((MTLCommandBuffer) -> Void)? = nil) {
         guard let cb = queue.makeCommandBuffer(), let enc = cb.makeRenderCommandEncoder(descriptor: pass) else { return }
-        var u = makeUniforms(width: width, height: height, original: original)
+        var u = makeUniforms(width: width, height: height, original: original, outlines: outlines)
         enc.setRenderPipelineState(pipeline)
         enc.setFragmentBytes(&u, length: MemoryLayout<GPUUniforms>.stride, index: 0)
         enc.setFragmentTexture(current.texture, index: 0)
@@ -474,7 +476,7 @@ final class KaleidoRenderer {
         }
     }
 
-    func snapshot(width: Int, height: Int) -> CGImage? {
+    func snapshot(width: Int, height: Int, outlines: Bool = false) -> CGImage? {
         let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
         desc.usage = [.renderTarget, .shaderRead]
         guard let target = device.makeTexture(descriptor: desc) else { return nil }
@@ -483,7 +485,7 @@ final class KaleidoRenderer {
         pass.colorAttachments[0].loadAction = .clear
         pass.colorAttachments[0].storeAction = .store
         let sem = DispatchSemaphore(value: 0)
-        encode(into: pass, drawable: nil, width: Double(width), height: Double(height)) { _ in sem.signal() }
+        encode(into: pass, drawable: nil, width: Double(width), height: Double(height), outlines: outlines) { _ in sem.signal() }
         sem.wait()
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
         target.getBytes(&bytes, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
@@ -517,6 +519,8 @@ final class KaleidoView: NSView {
     var isPaused: Bool { link?.isPaused ?? true }
     /// Preview only: show the photo itself instead of the kaleidoscope.
     var showOriginal = false
+    /// Preview only: trace the pattern's mirror and tile lines in red.
+    var showOutlines = false
     /// Preview only: dragging moves the photo inside the mirrors (and keeps gliding after release).
     var acceptsDrag = false
 
@@ -616,7 +620,7 @@ final class KaleidoView: NSView {
         inFlight += 1
         let debug = renderer.debug
         MainActor.assumeIsolated {
-            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight), original: showOriginal) { [weak self] cb in
+            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight), original: showOriginal, outlines: showOutlines && !showOriginal) { [weak self] cb in
                 if debug, cb.status == .error { FileHandle.standardError.write(Data("kaleido: GPU error \(String(describing: cb.error))\n".utf8)) }
                 if debug {
                     var px = [UInt8](repeating: 0, count: 4)

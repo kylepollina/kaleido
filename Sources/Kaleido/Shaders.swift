@@ -27,6 +27,7 @@ enum Shaders {
         int modeB;
         int original;        // 1 = show the photo itself, uncut (the preview's "Original" tab)
         int segmentsMorph;   // the mirror count being faded towards
+        int outlines;        // 1 = draw the pattern's mirror and tile lines in red (preset editor preview)
     };
 
     struct VOut { float4 position [[position]]; };
@@ -180,6 +181,97 @@ enum Shaders {
         return q;
     }
 
+    // Distance (in screen heights) from a screen point to the nearest mirror or tile line of the pattern, for the
+    // "Pattern lines" overlay. Mirrors the geometry of kaleidoPoint, one mode at a time.
+    float lineDistance(float2 p, constant Uniforms &u, int mode, float segments) {
+        p = rot2(p, u.rotation);
+        p = rot2(p, u.twist * length(p));
+        if (mode == 1 || mode == 7) {
+            float density = mode == 1 ? 0.9 + 0.3 * segments : 0.5 + 0.2 * segments;
+            float2 d = hexLocal(p * density);
+            float cell = 0.5 - max(abs(d.x), max(abs(dot(d, float2(0.5, 0.8660254))), abs(dot(d, float2(-0.5, 0.8660254)))));
+            float inner;
+            if (mode == 1) {
+                // Six mirrors through the cell centre, one every 30 degrees.
+                float w = PI / 6.0;
+                float a = atan2(d.y, d.x);
+                a = a - w * floor(a / w);
+                inner = length(d) * sin(min(a, w - a));
+            } else {
+                // The three cube edges from the centre to alternate corners (90, 210 and 330 degrees).
+                inner = 1e3;
+                for (int i = 0; i < 3; i++) {
+                    float ang = PI / 2.0 + float(i) * 2.0 * PI / 3.0;
+                    float2 v = float2(cos(ang), sin(ang));
+                    if (dot(d, v) > 0.0) inner = min(inner, abs(d.x * v.y - d.y * v.x));
+                }
+            }
+            return min(cell, inner) / density;
+        }
+        if (mode == 3) {
+            float density = 0.6 + 0.25 * segments;
+            float2 g = p * density;
+            float2 fr = abs(g - round(g));
+            float2 m = triWave(g);
+            return min(min(fr.x, fr.y), abs(m.x - m.y) * 0.7071068) / density;
+        }
+        if (mode == 4) {
+            float density = 0.6 + 0.25 * segments;
+            float2 g = p * density * float2(1.0, 1.5);
+            float2 fr = abs(g - round(g));
+            return min(fr.x / density, fr.y / (1.5 * density));
+        }
+        if (mode == 5) {
+            float n = max(2.0, floor(segments * 0.5 + 0.001) * 2.0);
+            float k = n / (2.0 * PI);
+            float r = max(length(p), 1e-4);
+            float2 lp = float2(log(r) * k + u.rotation * (2.0 / PI), atan2(p.y, p.x) * k);
+            float2 fr = abs(lp - round(lp));
+            return min(fr.x, fr.y) * r / k;
+        }
+        if (mode == 6) {
+            float density = 0.6 + 0.25 * segments;
+            const float s3 = 1.7320508;
+            float2 t = p * density * 1.6;
+            t -= float2(3.0, s3) * floor(t / float2(3.0, s3));
+            float2 n1 = float2(0.8660254, -0.5), n2 = float2(-0.8660254, -0.5);
+            for (int i = 0; i < 16; i++) {
+                if (t.y < 0.0) { t.y = -t.y; continue; }
+                float d1 = dot(t, n1);
+                if (d1 < 0.0) { t -= 2.0 * d1 * n1; continue; }
+                float d2 = dot(t - float2(1.0, 0.0), n2);
+                if (d2 < 0.0) { t -= 2.0 * d2 * n2; continue; }
+                break;
+            }
+            return min(t.y, min(dot(t, n1), dot(t - float2(1.0, 0.0), n2))) / (density * 1.6);
+        }
+        // Classic and fractal: the wedge edges and the mirror down the middle of each wedge.
+        float n = floor(segments + 1e-4);
+        float w = 2.0 * PI / max(segments, 1.0);
+        float r = length(p);
+        float a = atan2(p.y, p.x);
+        a = a - 2.0 * PI * floor(a / (2.0 * PI));
+        float k = floor(a / w);
+        float width = k < n ? w : max(2.0 * PI - n * w, 1e-6);
+        float local = k < n ? a - k * w : a - n * w;
+        float ang = min(min(local, width - local), abs(local - 0.5 * width));
+        float dist = r * sin(min(ang, PI / 2.0));
+        if (mode == 2) {
+            // The fractal's extra folds: every abs() is a mirror along an axis of the current frame.
+            float2 f = foldRadial(p, segments);
+            float s = 1.0;
+            for (int i = 0; i < 3; i++) {
+                float fi = float(i);
+                dist = min(dist, min(abs(f.x), abs(f.y)) / s);
+                f = abs(f) - float2(0.20 + 0.06 * sin(u.time * 0.21 + fi * 1.7), 0.10 + 0.05 * cos(u.time * 0.17 + fi));
+                f = rot2(f, 0.55 + 0.25 * sin(u.time * 0.13 + fi * 2.1));
+                f *= 1.28;
+                s *= 1.28;
+            }
+        }
+        return dist;
+    }
+
     float3 samplePhoto(texture2d<float> tex, sampler smp, float2 q, float aspect, float scale, constant Uniforms &u) {
         // Photo space: height = 1, width = aspect. Mirrored repeat extends it without edges.
         float2 uv = float2(q.x / aspect, q.y) + 0.5;
@@ -281,6 +373,16 @@ enum Shaders {
         float vr = length(p) / (0.5 * length(float2(res.x / res.y, 1.0)));
         col *= 1.0 - u.vignette * smoothstep(0.35, 1.05, vr);
         col += (hash21(in.position.xy + fract(u.time)) - 0.5) / 255.0;
+
+        if (u.outlines == 1) {
+            // Pattern lines: dim the photo and trace every mirror and tile edge in red, about 1.5 px wide.
+            float segsNow = u.mode == 5 ? float(u.segments)
+                                        : mix(float(u.segments), float(u.segmentsMorph), smoothstep(0.0, 1.0, u.morph));
+            float d = lineDistance(p, u, u.mode, segsNow);
+            float px = 1.0 / u.height;
+            float line = 1.0 - smoothstep(px * 0.6, px * 1.8, d);
+            col = mix(col * 0.45, float3(1.0, 0.18, 0.12), line);
+        }
         return float4(saturate(col), 1.0);
     }
     """#

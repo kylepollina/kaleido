@@ -210,7 +210,11 @@ struct PresetsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .onAppear { if selection == nil { selection = app.settings.activePresetID ?? app.presets.presets.first?.id } }
+        .onAppear {
+            app.isEditingPresets = true
+            if selection == nil { selection = app.settings.activePresetID ?? app.presets.presets.first?.id }
+        }
+        .onDisappear { app.isEditingPresets = false }
         .onChange(of: selection) { _, id in if let p = app.presets.preset(id) { app.apply(p) } }
     }
 
@@ -259,7 +263,7 @@ struct PresetEditor: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PreviewPane().frame(maxWidth: 480).padding(16)
+            PreviewPane(editor: true).frame(maxWidth: 480).padding(16)
             Form {
                 Section {
                     TextField("Name", text: Binding(get: { preset.name }, set: { app.presets.rename(preset.id, to: $0) }))

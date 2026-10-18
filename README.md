@@ -19,8 +19,11 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   made back to how you created it). Hearted presets appear on Home and are the ones Shuffle presets moves between.
 - **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
   Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
-- **Six patterns.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid and a Spiral tunnel (mirror
-  tiles laid out in log-polar space, so they shrink towards the centre and slowly flow inward).
+- **Eight patterns.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror
+  tiles laid out in log-polar space, so they shrink towards the centre and slowly flow inward), Triangle (the
+  classic three-mirror toy) and Escher cubes (hexagons split into shaded diamonds, with fine outlines).
+- **Pattern lines.** In the preset editor, a toggle traces every mirror and tile edge in red over the dimmed
+  photo, so you can see the shape of the pattern itself. The editor preview has its own previous / play / next.
 - **Keep the screen awake** while playing (Settings > Performance), and a flower in the menu bar. Switching back
   to Kaleido (Cmd-Tab or the Dock) reopens its window if you closed it.
 - **Dynamic mirrors.** A preset can let its mirror count wander slowly between two numbers. A new mirror opens up
