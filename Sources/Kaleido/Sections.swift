@@ -305,9 +305,14 @@ struct PresetEditor: View {
                     SliderRow("Drift amount", value: bind(\.drift), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                     SliderRow("Swirl", value: bind(\.twist), range: -1...1) { String(format: "%.2f", $0) }
                         .disabled(!app.settings.allowSwirl)
-                    SliderRow("Outlines", value: bind(\.outline), range: 0...1) { $0 < 0.005 ? "off" : String(format: "%.0f%%", $0 * 100) }
-                        .disabled(!app.settings.allowOutlines)
-                        .help("Black lines along every mirror and tile edge")
+                    Picker("Outlines", selection: bind(\.outline)) {
+                        Text("Off").tag(0.0)
+                        Text("Medium").tag(0.5)
+                        Text("Large").tag(1.0)
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(!app.settings.allowOutlines)
+                    .help("Black lines along every mirror and tile edge")
                 }
                 Section {
                     SliderRow("Hue shift", value: bind(\.hueShift), range: 0...360, step: 1) { "\(Int($0))°" }

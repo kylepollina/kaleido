@@ -277,7 +277,7 @@ enum Shaders {
 
     // Multiplier that paints black lines along the pattern (1 = no line here).
     float outlineFactor(float2 p, constant Uniforms &u, int mode, float segments) {
-        if (u.outline <= 0.0) return 1.0;
+        if (u.outline < 0.05) return 1.0;
         float px = 1.0 / u.height;
         float w = px * 0.75 + u.outline * 0.006;           // half the line width, in screen heights
         return mix(0.06, 1.0, smoothstep(w, w + px * 1.5, lineDistance(p, u, mode, segments)));

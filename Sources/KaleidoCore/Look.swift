@@ -104,8 +104,9 @@ public struct Look: Codable, Equatable, Sendable {
     public var motion: Double = 1.0
     /// Dynamic mirrors: the mirror count (or tile density) wanders one step at a time between these bounds,
     /// cross-fading between counts so the pattern never snaps.
-    /// 0...1 thickness of black lines along every mirror and tile edge (0 = none).
+    /// Black lines along every mirror and tile edge: one of `outlineSteps` (0 = off, 0.5 = medium, 1 = large).
     public var outline: Double = 0
+    public static let outlineSteps: [Double] = [0, 0.5, 1]
     public var dynamicMirrors = false
     public var mirrorsMin = 4
     public var mirrorsMax = 12
@@ -149,7 +150,8 @@ public struct Look: Codable, Equatable, Sendable {
         hueSpeed = min(max(hueSpeed, 0), 0.6)
         breathing = min(max(breathing, 0), 1)
         motion = min(max(motion, 0), 2)
-        outline = min(max(outline, 0), 1)
+        let o = outline
+        outline = Self.outlineSteps.min { abs($0 - o) < abs($1 - o) }!
         let r = Self.segmentRange
         mirrorsMin = min(max(mirrorsMin, r.lowerBound), r.upperBound)
         mirrorsMax = min(max(mirrorsMax, r.lowerBound), r.upperBound)
@@ -175,7 +177,6 @@ public struct Look: Codable, Equatable, Sendable {
         r.vignette = l(vignette, target.vignette)
         r.breathing = l(breathing, target.breathing)
         r.motion = l(motion, target.motion)
-        r.outline = l(outline, target.outline)
         return r
     }
 
@@ -204,7 +205,7 @@ public struct Look: Codable, Equatable, Sendable {
         l.saturation = Double.random(in: 0.95...1.4, using: &g)
         l.vignette = Double.random(in: 0.1...0.45, using: &g)
         l.breathing = Double.random(in: 0.2...0.7, using: &g)
-        l.outline = Double.random(in: 0..<1, using: &g) < 0.15 ? Double.random(in: 0.15...0.5, using: &g) : 0
+        l.outline = Double.random(in: 0..<1, using: &g) < 0.15 ? 0.5 : 0
         if (l.mode == .radial || l.mode == .fractal) && Double.random(in: 0..<1, using: &g) < 0.25 {
             l.dynamicMirrors = true
             l.mirrorsMin = max(3, l.segments - 3)

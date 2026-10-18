@@ -205,6 +205,10 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(s.effectiveLook(wild).outline, 0, "the Settings switch turns outlines off everywhere")
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 7}"#.utf8)).outline, 1)
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).outline, 0, "older presets have none")
+        XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.3}"#.utf8)).outline, 0.5, "snaps to off / medium / large")
+        XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.1}"#.utf8)).outline, 0)
+        var on = Look(); on.outline = 1
+        XCTAssertEqual(on.eased(toward: Look(), by: 0.3).outline, 0, "turning outlines off is immediate, no leftover hairline")
         s.allowHueChanges = false; s.allowSaturationChanges = false; s.allowBlur = false; s.allowVignette = false; s.allowSwirl = false
         s.allowDynamicMirrors = false
         let e = s.effectiveLook(wild)
