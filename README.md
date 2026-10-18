@@ -21,7 +21,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
 - **Eight patterns.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror
   tiles laid out in log-polar space, so they shrink towards the centre and slowly flow inward), Triangle (the
-  classic three-mirror toy) and Escher cubes (hexagons split into shaded diamonds, with fine outlines).
+  classic three-mirror toy) and Escher cubes (hexagons split into shaded diamonds, each face holding its own slowly turning mandala).
 - **Pattern lines.** In the preset editor, a toggle traces every mirror and tile edge in red over the dimmed
   photo, so you can see the shape of the pattern itself. The editor preview has its own previous / play / next.
 - **Keep the screen awake** while playing (Settings > Performance), and a flower in the menu bar. Switching back

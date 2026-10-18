@@ -152,8 +152,9 @@ enum Shaders {
             scale = density * 1.6 * 0.9;
         } else if (mode == 7) {
             // Escher cubes (rhombille): each hexagon splits into three diamonds, shaded as the lit top and the
-            // two shadowed sides of a cube. Every diamond holds the same patch of photo, skewed onto its face,
-            // with a fine dark outline between tiles.
+            // two shadowed sides of a cube. Each face carries its own little mandala (an 8-mirror fold in the
+            // face's own skewed coordinates) that slowly turns, the side faces the other way, and each of the
+            // three faces looks at a different part of the photo.
             float density = 0.5 + 0.2 * segments;
             float2 d = hexLocal(p * density);
             const float R = 0.5773503;                                    // hexagon corner radius
@@ -167,12 +168,14 @@ enum Shaders {
             // Face coordinates: d = s*e1 + t*e2 with s, t in 0...1.
             float det = e1.x * e2.y - e1.y * e2.x;
             float2 st = float2(d.x * e2.y - d.y * e2.x, e1.x * d.y - e1.y * d.x) / det;
-            f = (st - 0.5) * 0.9;
+            float2 c = st - 0.5;
+            // A whole-number multiple of `rotation` keeps its wrap at 2*pi invisible.
+            c = rot2(c, u.rotation * (face == 0 ? 3.0 : -3.0));
+            c = foldRadial(c, 8.0);
+            const float2 faceOffset[3] = { float2(0.0, 0.0), float2(0.38, 0.12), float2(-0.22, 0.34) };
+            f = c * 0.9 + faceOffset[face];
             scale = density * 0.9 / R;
-            shade = face == 0 ? 1.0 : (face == 1 ? 0.78 : 0.58);
-            float edge = min(min(st.x, 1.0 - st.x), min(st.y, 1.0 - st.y)) * R;  // lattice units to the tile edge
-            float px = density / u.height;                                     // one pixel, in lattice units
-            shade *= mix(0.15, 1.0, smoothstep(0.004 + px * 0.5, 0.004 + px * 2.0, edge));
+            shade = face == 0 ? 1.0 : (face == 1 ? 0.8 : 0.62);
         } else {
             f = foldRadial(p, segments);
         }
