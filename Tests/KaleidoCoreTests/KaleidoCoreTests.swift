@@ -208,6 +208,8 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.3}"#.utf8)).outline, 0.25, "snaps to off or on")
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.1}"#.utf8)).outline, 0)
         XCTAssertFalse(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).checkerFaces, "Diamonds default to mirror faces")
+        XCTAssertFalse(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).swayingSwirl, "swirl holds still unless asked")
+        XCTAssertTrue(Preset.all.first { $0.name == "Whirlpool" }!.look.swayingSwirl)
         var on = Look(); on.outline = 1
         XCTAssertEqual(on.eased(toward: Look(), by: 0.3).outline, 0, "turning outlines off is immediate, no leftover hairline")
         s.allowHueChanges = false; s.allowSaturationChanges = false; s.allowVignette = false; s.allowSwirl = false

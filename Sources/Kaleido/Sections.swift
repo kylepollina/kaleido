@@ -321,14 +321,20 @@ struct PresetEditor: View {
                     SliderRow("Drift amount", value: bind(\.drift), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                     SliderRow("Swirl", value: bind(\.twist), range: -1...1, zeroTick: true) { $0 == 0 ? "none" : String(format: "%+.2f", $0) }
                         .disabled(!app.settings.allowSwirl)
+                    Toggle("Sway (swing the swirl slowly back and forth)", isOn: bind(\.swayingSwirl))
+                        .disabled(!app.settings.allowSwirl || preset.look.twist == 0)
+                        .help("Swings from this much swirl, through straight, to the same amount the other way and back")
                     Toggle("Outlines", isOn: Binding(get: { preset.look.outline > 0 },
                                                      set: { on in app.edit(preset.id) { $0.outline = on ? Look.outlineSteps[1] : 0 } }))
                         .disabled(!app.settings.allowOutlines)
                         .help("Thin black lines along every mirror and tile edge")
                 }
                 Section {
-                    SliderRow("Hue shift", value: bind(\.hueShift), range: 0...360) { "\(Int($0))°" }
+                    SliderRow("Hue shift", value: bind(\.hueShift), range: 0...360, zeroTick: true) { $0 < 0.5 ? "none" : "\(Int($0))°" }
                         .disabled(!app.settings.allowHueChanges)
+                    HueShiftStrip(degrees: preset.look.hueShift)
+                        .opacity(app.settings.allowHueChanges ? 1 : 0.4)
+                        .help("Top: the original colours. Bottom: what each one becomes with this hue shift.")
                     Picker("Hue cycling", selection: Binding(
                         get: { Look.hueCycleSteps.min { abs($0 - preset.look.hueSpeed) < abs($1 - preset.look.hueSpeed) }! },
                         set: { v in app.edit(preset.id) { $0.hueSpeed = v } })) {
@@ -425,5 +431,27 @@ extension AppSection {
         let args = CommandLine.arguments
         guard let i = args.firstIndex(of: "--section"), i + 1 < args.count else { return .home }
         return AppSection.allCases.first { $0.rawValue.lowercased() == args[i + 1].lowercased() } ?? .home
+    }
+}
+
+/// Shows what Hue shift does: the colour wheel as it is (top) and where each colour ends up (bottom).
+struct HueShiftStrip: View {
+    let degrees: Double
+
+    var body: some View {
+        VStack(spacing: 2) {
+            strip(offset: 0)
+            strip(offset: degrees / 360)
+        }
+        .frame(height: 18)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+
+    private func strip(offset: Double) -> some View {
+        let stops = (0...12).map { i -> Color in
+            let h = (Double(i) / 12 + offset).truncatingRemainder(dividingBy: 1)
+            return Color(hue: h, saturation: 0.75, brightness: 0.95)
+        }
+        return LinearGradient(colors: stops, startPoint: .leading, endPoint: .trailing)
     }
 }

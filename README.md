@@ -17,7 +17,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   shuffling, effect switches, performance).
 - **Built-in presets.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square
   Tiles, Hall of Mirrors, Triangle Toy, Diamonds, Checker Diamonds and Spiral Tunnel: at least one per pattern.
-- **Presets.** Pick the pattern from a grid of drawn buttons. Swirl has a zero mark (and snaps to it), Outlines
+- **Presets.** Pick the pattern from a grid of drawn buttons. Swirl has a zero mark (and snaps to it) and can sway back and forth, Hue shift shows a before/after colour strip, Outlines
   is a switch, Hue cycling is Off / Slow / Medium / Fast, and Saturation runs 50–150% with a boost that lifts dull
   colours without clipping bright ones. Edits apply live and are saved. Reset puts a built-in preset back to its original (or a preset you
   made back to how you created it). Hearted presets appear on Home and are the ones Shuffle presets moves between.

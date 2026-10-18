@@ -90,6 +90,8 @@ public struct Look: Codable, Equatable, Sendable {
     public var driftSpeed: Double = 0.08
     /// Swirl: bends the mirrors with distance from the center, in radians per screen height.
     public var twist: Double = 0
+    /// Swirl sways back and forth (through straight and the other way) instead of holding still.
+    public var swayingSwirl = false
     /// Static hue rotation in degrees.
     public var hueShift: Double = 0
     /// Degrees per second the hue keeps rotating (at most 0.6: a full cycle in 10 minutes).
@@ -126,6 +128,7 @@ public struct Look: Codable, Equatable, Sendable {
         drift = try c.decodeIfPresent(Double.self, forKey: .drift) ?? d.drift
         driftSpeed = try c.decodeIfPresent(Double.self, forKey: .driftSpeed) ?? d.driftSpeed
         twist = try c.decodeIfPresent(Double.self, forKey: .twist) ?? d.twist
+        swayingSwirl = try c.decodeIfPresent(Bool.self, forKey: .swayingSwirl) ?? d.swayingSwirl
         hueShift = try c.decodeIfPresent(Double.self, forKey: .hueShift) ?? d.hueShift
         hueSpeed = try c.decodeIfPresent(Double.self, forKey: .hueSpeed) ?? d.hueSpeed
         saturation = try c.decodeIfPresent(Double.self, forKey: .saturation) ?? d.saturation
@@ -263,7 +266,7 @@ public struct Preset: Identifiable, Equatable, Sendable {
                 $0.segments = 10; $0.outline = Look.outlineSteps[1]; $0.rotationSpeed = 0.05; $0.vignette = 0.2
             },
             make("Whirlpool") {
-                $0.segments = 7; $0.twist = 0.45; $0.rotationSpeed = -0.08
+                $0.segments = 7; $0.twist = 0.6; $0.swayingSwirl = true; $0.rotationSpeed = -0.08
             },
             make("Prism") {
                 $0.segments = 16; $0.hueSpeed = Look.hueCycleSteps[1]; $0.saturation = 1.3; $0.rotationSpeed = 0.08

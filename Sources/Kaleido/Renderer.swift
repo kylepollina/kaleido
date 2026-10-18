@@ -153,7 +153,7 @@ final class KaleidoRenderer {
     private var shownFor: Double = 0
     private var transitionClock: Double?
     private var activeStyle: TransitionStyle = .dissolve
-    private var rotation = 0.0, sourceRotation = 0.0, driftPhase = 0.0, huePhase = 0.0, breathPhase = 0.0, clock = 0.0
+    private var rotation = 0.0, sourceRotation = 0.0, driftPhase = 0.0, huePhase = 0.0, breathPhase = 0.0, swirlPhase = 0.0, clock = 0.0
     private var skipRequested = false
     /// Called just before a new photo starts fading in, so the app can switch looks in step with it.
     var willStartTransition: (() -> Void)?
@@ -216,6 +216,12 @@ final class KaleidoRenderer {
         driftPhase += look.driftSpeed * m * dt * 0.25
         huePhase += look.hueSpeed * m * .pi / 180 * dt
         breathPhase += m * dt * (2 * .pi / 600)   // one breath per ten minutes at full motion
+        swirlPhase += m * dt * (2 * .pi / 480)    // a swaying swirl swings through once every eight minutes at speed 1
+        if targetLook.hueSpeed == 0 {
+            // Cycling is off: let the colour it built up ease back out, so the photo returns to its own colours.
+            huePhase = remainder(huePhase, 2 * .pi) * exp(-dt * 1.2)
+            if abs(huePhase) < 1e-4 { huePhase = 0 }
+        }
         if !dragging {
             userPan += panVelocity * dt
             panVelocity *= exp(-dt * 0.9)   // friction: a flick coasts for a few seconds
@@ -423,7 +429,7 @@ final class KaleidoRenderer {
         u.panX = Float(amp * (sin(driftPhase * 0.173) + 0.5 * sin(driftPhase * 0.311 + 1.3)) + userPan.x)
         u.panY = Float(amp * (cos(driftPhase * 0.137) + 0.5 * cos(driftPhase * 0.263 + 0.4)) + userPan.y)
         u.zoom = Float(look.zoom * exp(0.12 * look.breathing * sin(breathPhase)))
-        u.twist = Float(look.twist)
+        u.twist = Float(look.swayingSwirl ? look.twist * sin(swirlPhase) : look.twist)
         u.hue = Float((look.hueShift * .pi / 180 + huePhase).truncatingRemainder(dividingBy: 2 * .pi))
         u.saturation = Float(look.saturation)
         u.vignette = Float(look.vignette)
