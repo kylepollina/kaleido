@@ -452,7 +452,7 @@ final class KaleidoRenderer {
     }
 
     func encode(into pass: MTLRenderPassDescriptor, drawable: MTLDrawable?, width: Double, height: Double, original: Bool = false, outlines: Bool = false,
-                completion: ((MTLCommandBuffer) -> Void)? = nil) {
+                completion: (@Sendable (MTLCommandBuffer) -> Void)? = nil) {
         guard let cb = queue.makeCommandBuffer(), let enc = cb.makeRenderCommandEncoder(descriptor: pass) else { return }
         var u = makeUniforms(width: width, height: height, original: original, outlines: outlines)
         enc.setRenderPipelineState(pipeline)
