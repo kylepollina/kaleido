@@ -120,6 +120,9 @@ public final class PhotoLibrary: ObservableObject {
     public var enabledItems: [PhotoItem] { items.filter(\.isEnabled) }
     public func item(_ id: UUID) -> PhotoItem? { items.first { $0.id == id } }
     public var activeSources: Set<String> { Set(albums.map(\.id)).union(folders.map(\.id)) }
+    private var autoSources: Set<String> {
+        Set(albums.filter(\.autoInclude).map(\.id)).union(folders.filter(\.autoInclude).map(\.id))
+    }
     public var dismissedCount: Int { dismissed.count }
 
     /// Adds files by hand. A folder becomes a watched folder: its images are imported now and new ones are
@@ -160,12 +163,14 @@ public final class PhotoLibrary: ObservableObject {
         let plan = SyncPlanner.plan(items: states, activeSources: activeSources, listings: listings, dismissed: dismissed)
         if !plan.removals.isEmpty { items.removeAll { plan.removals.contains($0.id) } }
         for i in items.indices { if let s = plan.sourceUpdates[items[i].id] { items[i].sources = s } }
+        let auto = autoSources
         for (entry, sources) in plan.adds {
+            let on = !sources.isDisjoint(with: auto)   // photos new to a partly-selected album are listed but off
             if entry.isAsset {
-                items.append(PhotoItem(path: "", assetID: entry.key, title: entry.name, isManual: false, sources: sources))
+                items.append(PhotoItem(path: "", isEnabled: on, assetID: entry.key, title: entry.name, isManual: false, sources: sources))
             } else {
                 let url = URL(fileURLWithPath: entry.key)
-                items.append(PhotoItem(bookmark: BookmarkStore.makeBookmark(for: url), path: entry.key, isManual: false, sources: sources))
+                items.append(PhotoItem(bookmark: BookmarkStore.makeBookmark(for: url), path: entry.key, isEnabled: on, isManual: false, sources: sources))
             }
         }
         if markSynced { lastSync = Date() }
@@ -182,6 +187,74 @@ public final class PhotoLibrary: ObservableObject {
     public func removeFolder(_ id: String) {
         folders.removeAll { $0.id == id }
         applySync(listings: [:])
+    }
+
+    // MARK: Per-source selection (album and folder cards)
+
+    /// Source id for photos added one by one.
+    public static let manualSource = "manual"
+
+    public func itemIDs(in source: String) -> [UUID] {
+        source == Self.manualSource ? items.filter(\.isManual).map(\.id) : items.filter { $0.sources.contains(source) }.map(\.id)
+    }
+
+    public func selectionState(in source: String) -> SelectionState {
+        let members = source == Self.manualSource ? items.filter(\.isManual) : items.filter { $0.sources.contains(source) }
+        return SelectionState(selected: members.filter(\.isEnabled).count, total: members.count)
+    }
+
+    public func autoInclude(_ source: String) -> Bool {
+        albums.first { $0.id == source }?.autoInclude ?? folders.first { $0.id == source }?.autoInclude ?? false
+    }
+
+    private func setAuto(_ source: String, _ value: Bool) {
+        if let i = albums.firstIndex(where: { $0.id == source }) { albums[i].autoInclude = value }
+        if let i = folders.firstIndex(where: { $0.id == source }) { folders[i].autoInclude = value }
+    }
+
+    /// Whole-source toggles: everything in, and new photos follow; or everything out.
+    public func selectAll(in source: String) {
+        setEnabledQuiet(true, itemIDs(in: source)); setAuto(source, true); save()
+    }
+
+    public func deselectAll(in source: String) {
+        setEnabledQuiet(false, itemIDs(in: source)); setAuto(source, false); save()
+    }
+
+    public func invertSelection(in source: String) {
+        let ids = Set(itemIDs(in: source))
+        for i in items.indices where ids.contains(items[i].id) { items[i].isEnabled.toggle() }
+        setAuto(source, false); save()
+    }
+
+    /// Picking specific photos turns a source into a partial one: new photos in it are no longer auto-included.
+    public func setSelected(_ ids: [UUID], _ on: Bool, in source: String) {
+        setEnabledQuiet(on, ids); setAuto(source, false); save()
+    }
+
+    public func toggle(_ id: UUID, in source: String) {
+        guard let it = item(id) else { return }
+        setSelected([id], !it.isEnabled, in: source)
+    }
+
+    /// Starts tracking an album with nothing selected, so its photos can be browsed and picked.
+    public func trackAlbum(_ ref: AlbumRef) {
+        guard !albums.contains(where: { $0.localID == ref.localID }) else { return }
+        var r = ref; r.autoInclude = false
+        albums.append(r)
+        save()
+    }
+
+    /// Stops tracking an album that ended up with nothing selected (e.g. it was only opened to look).
+    public func untrackIfUnused(_ source: String) {
+        guard source.hasPrefix("album:"), !autoInclude(source), selectionState(in: source) == .none else { return }
+        albums.removeAll { $0.id == source }
+        applySync(listings: [:])
+    }
+
+    private func setEnabledQuiet(_ on: Bool, _ ids: [UUID]) {
+        let set = Set(ids)
+        for i in items.indices where set.contains(items[i].id) { items[i].isEnabled = on }
     }
 
     /// Forget photos the user removed by hand, so the next sync can bring them back.

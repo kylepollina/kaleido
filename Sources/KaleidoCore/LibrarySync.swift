@@ -69,16 +69,49 @@ public enum SyncPlanner {
 public struct FolderSource: Codable, Identifiable, Hashable, Sendable {
     public var path: String
     public var bookmark: Data?
+    /// "Whole folder": new photos that appear in it are included in the rotation automatically.
+    public var autoInclude: Bool
     public var id: String { "folder:" + path }
     public var name: String { URL(fileURLWithPath: path).lastPathComponent }
-    public init(path: String, bookmark: Data?) { self.path = path; self.bookmark = bookmark }
+    public init(path: String, bookmark: Data?, autoInclude: Bool = true) { self.path = path; self.bookmark = bookmark; self.autoInclude = autoInclude }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        path = try c.decode(String.self, forKey: .path)
+        bookmark = try c.decodeIfPresent(Data.self, forKey: .bookmark)
+        autoInclude = try c.decodeIfPresent(Bool.self, forKey: .autoInclude) ?? true
+    }
 }
 
 public struct AlbumRef: Codable, Identifiable, Hashable, Sendable {
     public var localID: String
     public var title: String
+    /// "Whole album": new photos that appear in it are included in the rotation automatically. When false the
+    /// user picked specific photos and new ones are listed but not included.
+    public var autoInclude: Bool
     public var id: String { "album:" + localID }
-    public init(localID: String, title: String) { self.localID = localID; self.title = title }
+    public init(localID: String, title: String, autoInclude: Bool = true) { self.localID = localID; self.title = title; self.autoInclude = autoInclude }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        localID = try c.decode(String.self, forKey: .localID)
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        autoInclude = try c.decodeIfPresent(Bool.self, forKey: .autoInclude) ?? true
+    }
+}
+
+public enum SelectionState: Equatable, Sendable {
+    case none, partial(selected: Int, total: Int), all(total: Int)
+
+    public init(selected: Int, total: Int) {
+        if selected <= 0 { self = .none } else if selected >= total { self = .all(total: total) } else { self = .partial(selected: selected, total: total) }
+    }
+}
+
+public enum RangeSelection {
+    /// Ids between two clicked positions, inclusive, in display order (for shift-click).
+    public static func ids<ID>(in order: [ID], from anchor: ID, to target: ID) -> [ID] where ID: Equatable {
+        guard let a = order.firstIndex(of: anchor), let b = order.firstIndex(of: target) else { return [target] }
+        return Array(order[min(a, b)...max(a, b)])
+    }
 }
 
 public struct PhotoFilters: Codable, Equatable, Sendable {

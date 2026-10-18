@@ -465,3 +465,101 @@ final class SourcePersistenceTests: XCTestCase {
         XCTAssertEqual(lib.enabledItems.count, 1)
     }
 }
+
+final class SelectionTests: XCTestCase {
+    private func entries(_ keys: String...) -> [SyncEntry] { keys.map { SyncEntry(key: $0, name: $0, isAsset: true) } }
+
+    func testNewPhotosFollowWholeAlbumsButNotPartialOnes() {
+        let lib = PhotoLibrary(fileURL: nil)
+        lib.setAlbums([AlbumRef(localID: "W", title: "Whole"), AlbumRef(localID: "P", title: "Partial", autoInclude: false)])
+        lib.applySync(listings: ["album:W": entries("w1", "w2"), "album:P": entries("p1", "p2")])
+        XCTAssertEqual(lib.selectionState(in: "album:W"), .all(total: 2))
+        XCTAssertEqual(lib.selectionState(in: "album:P"), .none)
+
+        lib.setSelected([lib.items.first { $0.assetID == "p1" }!.id], true, in: "album:P")
+        XCTAssertEqual(lib.selectionState(in: "album:P"), .partial(selected: 1, total: 2))
+        lib.applySync(listings: ["album:W": entries("w1", "w2", "w3"), "album:P": entries("p1", "p2", "p3")])
+        XCTAssertEqual(lib.items.first { $0.assetID == "w3" }?.isEnabled, true, "whole album takes new photos")
+        XCTAssertEqual(lib.items.first { $0.assetID == "p3" }?.isEnabled, false, "partial album lists them but leaves them out")
+        XCTAssertEqual(lib.selectionState(in: "album:P"), .partial(selected: 1, total: 3))
+    }
+
+    func testSelectAllDeselectAllInvertAndAutoFlag() {
+        let lib = PhotoLibrary(fileURL: nil)
+        lib.setAlbums([AlbumRef(localID: "A", title: "A", autoInclude: false)])
+        lib.applySync(listings: ["album:A": entries("a", "b", "c", "d")])
+        XCTAssertFalse(lib.autoInclude("album:A"))
+        lib.selectAll(in: "album:A")
+        XCTAssertEqual(lib.selectionState(in: "album:A"), .all(total: 4))
+        XCTAssertTrue(lib.autoInclude("album:A"))
+        lib.toggle(lib.itemIDs(in: "album:A")[0], in: "album:A")
+        XCTAssertEqual(lib.selectionState(in: "album:A"), .partial(selected: 3, total: 4))
+        XCTAssertFalse(lib.autoInclude("album:A"), "picking by hand makes it partial")
+        lib.invertSelection(in: "album:A")
+        XCTAssertEqual(lib.selectionState(in: "album:A"), .partial(selected: 1, total: 4))
+        lib.deselectAll(in: "album:A")
+        XCTAssertEqual(lib.selectionState(in: "album:A"), .none)
+        XCTAssertTrue(lib.enabledItems.isEmpty)
+    }
+
+    func testOpeningAnAlbumTracksItAndLeavingUntracksIfNothingPicked() {
+        let lib = PhotoLibrary(fileURL: nil)
+        lib.trackAlbum(AlbumRef(localID: "X", title: "X"))
+        XCTAssertEqual(lib.albums.count, 1)
+        XCTAssertFalse(lib.autoInclude("album:X"), "tracking to browse selects nothing")
+        lib.applySync(listings: ["album:X": entries("1", "2")])
+        XCTAssertEqual(lib.items.count, 2)
+        XCTAssertTrue(lib.enabledItems.isEmpty)
+        lib.untrackIfUnused("album:X")
+        XCTAssertTrue(lib.albums.isEmpty)
+        XCTAssertTrue(lib.items.isEmpty)
+
+        lib.trackAlbum(AlbumRef(localID: "Y", title: "Y"))
+        lib.applySync(listings: ["album:Y": entries("1")])
+        lib.selectAll(in: "album:Y")
+        lib.untrackIfUnused("album:Y")
+        XCTAssertEqual(lib.albums.count, 1, "an album with picks stays")
+    }
+
+    func testSelectionPersistsAndOldAlbumsDefaultToWhole() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = dir.appendingPathComponent("library.json")
+        let lib = PhotoLibrary(fileURL: store)
+        lib.trackAlbum(AlbumRef(localID: "P", title: "P"))
+        lib.applySync(listings: ["album:P": entries("1", "2", "3")])
+        lib.setSelected([lib.items[0].id, lib.items[2].id], true, in: "album:P")
+        let back = PhotoLibrary(fileURL: store)
+        XCTAssertEqual(back.selectionState(in: "album:P"), .partial(selected: 2, total: 3))
+        XCTAssertFalse(back.autoInclude("album:P"))
+
+        let old = try JSONDecoder().decode(AlbumRef.self, from: Data(#"{"localID":"Z","title":"Z"}"#.utf8))
+        XCTAssertTrue(old.autoInclude)
+        let oldFolder = try JSONDecoder().decode(FolderSource.self, from: Data(#"{"path":"/tmp/x"}"#.utf8))
+        XCTAssertTrue(oldFolder.autoInclude)
+    }
+
+    func testRangeSelectionAndStates() {
+        let order = [1, 2, 3, 4, 5, 6]
+        XCTAssertEqual(RangeSelection.ids(in: order, from: 2, to: 5), [2, 3, 4, 5])
+        XCTAssertEqual(RangeSelection.ids(in: order, from: 5, to: 2), [2, 3, 4, 5])
+        XCTAssertEqual(RangeSelection.ids(in: order, from: 3, to: 3), [3])
+        XCTAssertEqual(RangeSelection.ids(in: order, from: 99, to: 4), [4])
+        XCTAssertEqual(SelectionState(selected: 0, total: 5), .none)
+        XCTAssertEqual(SelectionState(selected: 5, total: 5), .all(total: 5))
+        XCTAssertEqual(SelectionState(selected: 2, total: 5), .partial(selected: 2, total: 5))
+        XCTAssertEqual(SelectionState(selected: 0, total: 0), .none)
+    }
+
+    func testManualSourceSelection() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let a = dir.appendingPathComponent("a.png"), b = dir.appendingPathComponent("b.png")
+        writePNG(a); writePNG(b)
+        let lib = PhotoLibrary(fileURL: nil)
+        lib.add(urls: [a, b])
+        XCTAssertEqual(lib.selectionState(in: PhotoLibrary.manualSource), .all(total: 2))
+        lib.deselectAll(in: PhotoLibrary.manualSource)
+        XCTAssertEqual(lib.selectionState(in: PhotoLibrary.manualSource), .none)
+    }
+}
