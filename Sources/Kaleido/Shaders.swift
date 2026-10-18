@@ -46,14 +46,20 @@ enum Shaders {
         return float2(c * p.x - s * p.y, s * p.x + c * p.y);
     }
 
-    // Folds the plane into one wedge of 2*PI/n and mirrors it, so neighbouring wedges are reflections
-    // of each other and there is no seam. Works for any integer n.
-    float2 foldRadial(float2 p, int n) {
-        float seg = 2.0 * PI / float(n);
+    // Folds the plane into mirrored wedges. The folded angle is the distance to the nearest wedge edge, so
+    // every edge is a mirror whatever the wedge widths. That lets the count be fractional: for nf = n + t
+    // there are n wedges of 2*PI/nf plus one extra wedge that grows from nothing (t = 0) to full width
+    // (t = 1). Dynamic mirrors use this to "open up" a new mirror instead of cross-fading.
+    float2 foldRadial(float2 p, float nf) {
+        float n = floor(nf + 1e-4);
+        float w = 2.0 * PI / max(nf, 1.0);
         float r = length(p);
         float a = atan2(p.y, p.x);
-        a = a - seg * floor(a / seg);
-        a = abs(a - 0.5 * seg);
+        a = a - 2.0 * PI * floor(a / (2.0 * PI));          // 0 ... 2*PI
+        float k = floor(a / w);
+        float width = k < n ? w : max(2.0 * PI - n * w, 1e-6);
+        float local = k < n ? a - k * w : a - n * w;
+        a = min(local, width - local);
         return r * float2(cos(a), sin(a));
     }
 
@@ -74,7 +80,8 @@ enum Shaders {
 
     // Maps a screen point (centred, units of screen height) to a point in photo space.
     // `scale` is how many photo-space units one screen unit covers at this point (for the mip level).
-    float2 kaleidoPoint(float2 p, constant Uniforms &u, float zoomMul, int mode, int segments, thread float &scale) {
+    // `segments` may be fractional while dynamic mirrors open up a new mirror (or tiles grow denser).
+    float2 kaleidoPoint(float2 p, constant Uniforms &u, float zoomMul, int mode, float segments, thread float &scale) {
         float zoom = u.zoom * zoomMul;
         p = rot2(p, u.rotation);
         p = rot2(p, u.twist * length(p));
@@ -82,8 +89,8 @@ enum Shaders {
         float2 f;
         if (mode == 1) {
             // Tiled: the lattice is rotated as a whole so the cell fold keeps lining up with cell edges.
-            float density = 0.9 + 0.3 * float(segments);
-            f = foldRadial(hexLocal(p * density), 6);
+            float density = 0.9 + 0.3 * segments;
+            f = foldRadial(hexLocal(p * density), 6.0);
             scale = density;   // photo units covered by one screen unit
         } else if (mode == 2) {
             f = foldRadial(p, segments);
@@ -98,21 +105,21 @@ enum Shaders {
             scale = k;
         } else if (mode == 3) {
             // Square tiles (p4m): mirror both axes, then the diagonal, so every edge and diagonal is a mirror.
-            float density = 0.6 + 0.25 * float(segments);
+            float density = 0.6 + 0.25 * segments;
             float2 m = triWave(p * density);
             if (m.y > m.x) m = m.yx;
             f = m - 0.5;
             scale = density;
         } else if (mode == 4) {
             // Mirror grid (pmm): a plain hall of mirrors with 3:2 cells, no diagonal fold.
-            float density = 0.6 + 0.25 * float(segments);
+            float density = 0.6 + 0.25 * segments;
             float2 m = triWave(p * density * float2(1.0, 1.5));
             f = (m - 0.5) * float2(1.0, 0.6667);
             scale = density;
         } else if (mode == 5) {
             // Spiral: mirror tiles laid out in log-polar space, so they shrink towards the centre like a tunnel.
             // The arm count is even so the seam where the angle wraps is itself a mirror.
-            float n = float(max(2, (segments / 2) * 2));
+            float n = max(2.0, floor(segments * 0.5 + 0.001) * 2.0);
             float k = n / (2.0 * PI);
             float r = max(length(p), 1e-4);
             // Flows inward as the pattern turns; 2/pi keeps the wrap of `rotation` a whole number of tiles.
@@ -172,12 +179,17 @@ enum Shaders {
         float sA, sB;
         float3 col;
         if (u.hasB == 0) {
-            float2 q = kaleidoPoint(p, u, 1.0, u.mode, u.segments, sA);
-            col = samplePhoto(texA, smp, q, u.aspectA, sA, u);
-            if (u.morph > 0.0) {
-                // Mirror counts must be whole numbers to stay seamless, so changing count is a slow cross-fade.
-                float2 q2 = kaleidoPoint(p, u, 1.0, u.mode, u.segmentsMorph, sB);
-                col = mix(col, samplePhoto(texA, smp, q2, u.aspectA, sB, u), smoothstep(0.0, 1.0, u.morph));
+            float e = smoothstep(0.0, 1.0, u.morph);
+            if (u.mode == 5 && u.morph > 0.0) {
+                // The spiral needs a whole, even number of arms, so it cross-fades between counts.
+                float2 q = kaleidoPoint(p, u, 1.0, u.mode, float(u.segments), sA);
+                float2 q2 = kaleidoPoint(p, u, 1.0, u.mode, float(u.segmentsMorph), sB);
+                col = mix(samplePhoto(texA, smp, q, u.aspectA, sA, u), samplePhoto(texA, smp, q2, u.aspectA, sB, u), e);
+            } else {
+                // Everything else opens up: the count slides continuously from one whole number to the next.
+                float segs = mix(float(u.segments), float(u.segmentsMorph), e);
+                float2 q = kaleidoPoint(p, u, 1.0, u.mode, segs, sA);
+                col = samplePhoto(texA, smp, q, u.aspectA, sA, u);
             }
         } else {
             float zoomA = 1.0, zoomB = 1.0;
@@ -189,8 +201,8 @@ enum Shaders {
                 zoomA = exp(span * e);
                 zoomB = exp(-span * (1.0 - e));
             }
-            float2 qa = kaleidoPoint(p, u, zoomA, u.mode, u.segments, sA);
-            float2 qb = kaleidoPoint(p, u, zoomB, u.modeB, u.segmentsB, sB);
+            float2 qa = kaleidoPoint(p, u, zoomA, u.mode, float(u.segments), sA);
+            float2 qb = kaleidoPoint(p, u, zoomB, u.modeB, float(u.segmentsB), sB);
             float3 a = samplePhoto(texA, smp, qa, u.aspectA, sA, u);
             float3 b = samplePhoto(texB, smp, qb, u.aspectB, sB, u);
 

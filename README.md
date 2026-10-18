@@ -23,8 +23,9 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   tiles laid out in log-polar space, so they shrink towards the centre and slowly flow inward).
 - **Keep the screen awake** while playing (Settings > Performance), and a flower in the menu bar. Switching back
   to Kaleido (Cmd-Tab or the Dock) reopens its window if you closed it.
-- **Dynamic mirrors.** A preset can let its mirror count wander slowly between two numbers, cross-fading from one
-  count to the next (a change about every 50 seconds at the middle speed). See the "Shifting Mandala" preset.
+- **Dynamic mirrors.** A preset can let its mirror count wander slowly between two numbers. A new mirror opens up
+  (the wedges make room while an extra one grows from nothing), or one closes; tilings grow denser or sparser. A
+  change comes about every 50 seconds at the middle speed. See the "Shifting Mandala" preset.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
 - **Mixed-up looks.** The slideshow can switch preset looks now and then or with every photo; Next brings a new
   photo and a new look, Surprise me a new photo and a random look. Looks change in step with the cross-fade.
