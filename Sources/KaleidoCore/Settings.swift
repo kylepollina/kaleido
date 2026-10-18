@@ -41,6 +41,8 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Drops to 30 fps and stops the 60 fps option while macOS Low Power Mode is on.
     public var limitInLowPowerMode = true
     public var playOnLaunch = false
+    /// While playing, stop the display from going to sleep on its own (a screensaver-style keep-awake).
+    public var keepScreenAwake = false
     /// 0...4, an index into `speedMultipliers`.
     public var speedStep = Settings.defaultSpeedStep
     public var lookShuffle: LookShuffle = .sometimes
@@ -84,6 +86,7 @@ public struct Settings: Codable, Equatable, Sendable {
         pauseOnBattery = try c.decodeIfPresent(Bool.self, forKey: .pauseOnBattery) ?? d.pauseOnBattery
         limitInLowPowerMode = try c.decodeIfPresent(Bool.self, forKey: .limitInLowPowerMode) ?? d.limitInLowPowerMode
         playOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .playOnLaunch) ?? d.playOnLaunch
+        keepScreenAwake = try c.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? d.keepScreenAwake
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
         lookShuffle = (try? c.decodeIfPresent(LookShuffle.self, forKey: .lookShuffle)) ?? d.lookShuffle
         activePresetID = try? c.decodeIfPresent(UUID.self, forKey: .activePresetID)

@@ -30,13 +30,21 @@ struct KaleidoApp: App {
         MenuBarExtra {
             MenuBarContent().environmentObject(app)
         } label: {
-            Image(systemName: app.isPlaying ? "sparkles" : "hexagon")
+            Image(systemName: app.isPlaying ? "camera.macro.circle.fill" : "camera.macro")
         }
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    /// Switching back to Kaleido (Cmd-Tab, Dock) brings the window back if it was closed.
+    func applicationDidBecomeActive(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            let hasWindow = NSApp.windows.contains { $0.isVisible && $0.styleMask.contains(.titled) && $0.level == .normal }
+            if !hasWindow { AppState.shared.openMainWindow?() }
+        }
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {

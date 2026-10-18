@@ -34,7 +34,15 @@ codesign --force --sign - --requirements '=designated => identifier "local.kalei
 echo "Built $APP"
 
 if [ "${1:-}" = "--install" ]; then
+    # Quit a running copy first (its desktop windows go away with it), then reopen the new one.
+    was_running=false
+    if pgrep -x Kaleido >/dev/null; then
+        was_running=true
+        osascript -e 'quit app "Kaleido"' 2>/dev/null || true
+        for _ in $(seq 1 20); do pgrep -x Kaleido >/dev/null || break; sleep 0.25; done
+    fi
     rm -rf /Applications/Kaleido.app
     cp -R "$APP" /Applications/
     echo "Installed to /Applications/Kaleido.app"
+    if $was_running; then open /Applications/Kaleido.app; echo "Relaunched Kaleido"; fi
 fi

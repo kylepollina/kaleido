@@ -1,13 +1,16 @@
 import Foundation
 
 public enum MirrorMode: String, Codable, CaseIterable, Identifiable, Sendable {
-    case radial, hex, fractal
+    case radial, hex, fractal, square, grid, spiral
     public var id: String { rawValue }
     public var label: String {
         switch self {
         case .radial: return "Classic"
-        case .hex: return "Tiled hex"
+        case .hex: return "Hex"
         case .fractal: return "Fractal"
+        case .square: return "Square"
+        case .grid: return "Mirror grid"
+        case .spiral: return "Spiral"
         }
     }
     public var shaderIndex: Int32 {
@@ -15,7 +18,25 @@ public enum MirrorMode: String, Codable, CaseIterable, Identifiable, Sendable {
         case .radial: return 0
         case .hex: return 1
         case .fractal: return 2
+        case .square: return 3
+        case .grid: return 4
+        case .spiral: return 5
         }
+    }
+    /// Repeating tilings, where `segments` sets how dense the tiles are rather than a mirror count.
+    public var isTiling: Bool { self == .hex || self == .square || self == .grid }
+    /// What the `segments` slider means in this mode.
+    public var countLabel: String {
+        switch self {
+        case .hex, .square, .grid: return "Tile density"
+        case .spiral: return "Spiral arms"
+        default: return "Mirrors"
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = MirrorMode(rawValue: raw) ?? .radial
     }
 }
 
@@ -152,11 +173,14 @@ public struct Look: Codable, Equatable, Sendable {
     /// A random but good-looking look: weighted toward values that tend to read as a kaleidoscope.
     public static func random<G: RandomNumberGenerator>(using g: inout G) -> Look {
         var l = Look()
-        let modeRoll = Double.random(in: 0..<1, using: &g)
-        l.mode = modeRoll < 0.55 ? .radial : (modeRoll < 0.8 ? .hex : .fractal)
+        // Classic is still the most likely; the tilings and the spiral show up for variety.
+        let modes: [(MirrorMode, Double)] = [(.radial, 0.45), (.hex, 0.13), (.fractal, 0.12), (.square, 0.12), (.grid, 0.08), (.spiral, 0.10)]
+        var roll = Double.random(in: 0..<1, using: &g)
+        l.mode = modes.first { roll -= $0.1; return roll < 0 }?.0 ?? .radial
         switch l.mode {
-        case .hex: l.segments = Int.random(in: 3...9, using: &g)
+        case .hex, .square, .grid: l.segments = Int.random(in: 3...9, using: &g)
         case .fractal: l.segments = [3, 4, 5, 6, 8].randomElement(using: &g)!
+        case .spiral: l.segments = [2, 4, 6, 8].randomElement(using: &g)!
         case .radial: l.segments = [3, 4, 5, 6, 6, 7, 8, 8, 9, 10, 12, 14, 16].randomElement(using: &g)!
         }
         l.rotationSpeed = Double.random(in: 0.02...0.15, using: &g) * (Bool.random(using: &g) ? 1 : -1)
@@ -170,7 +194,7 @@ public struct Look: Codable, Equatable, Sendable {
         l.saturation = Double.random(in: 0.95...1.4, using: &g)
         l.vignette = Double.random(in: 0.1...0.45, using: &g)
         l.breathing = Double.random(in: 0.2...0.7, using: &g)
-        if l.mode != .hex && Double.random(in: 0..<1, using: &g) < 0.25 {
+        if (l.mode == .radial || l.mode == .fractal) && Double.random(in: 0..<1, using: &g) < 0.25 {
             l.dynamicMirrors = true
             l.mirrorsMin = max(3, l.segments - 3)
             l.mirrorsMax = min(Self.segmentRange.upperBound, l.segments + 4)
@@ -245,6 +269,14 @@ public struct Preset: Identifiable, Equatable, Sendable {
             make("Shifting Mandala") {
                 $0.segments = 8; $0.dynamicMirrors = true; $0.mirrorsMin = 6; $0.mirrorsMax = 14
                 $0.rotationSpeed = 0.05; $0.zoom = 1.3; $0.vignette = 0.3
+            },
+            make("Square Garden") {
+                $0.mode = .square; $0.segments = 4; $0.rotationSpeed = 0.03; $0.zoom = 1.1; $0.drift = 0.45
+                $0.driftSpeed = 0.08
+            },
+            make("Spiral Tunnel") {
+                $0.mode = .spiral; $0.segments = 6; $0.rotationSpeed = 0.06; $0.zoom = 1.0; $0.drift = 0.3
+                $0.vignette = 0.45
             },
             make("Gentle Window") {
                 $0.segments = 3; $0.rotationSpeed = 0.02; $0.zoom = 0.8; $0.drift = 0.6; $0.driftSpeed = 0.05

@@ -66,6 +66,9 @@ enum Shaders {
         return dot(d1, d1) < dot(d2, d2) ? d1 : d2;
     }
 
+    // Triangle wave in [0, 1] with period 2: tiles that mirror at every whole number, with no seams.
+    float2 triWave(float2 x) { return abs(fract(x * 0.5) * 2.0 - 1.0); }
+
     float hash11(float n) { return fract(sin(n * 127.1) * 43758.5453); }
     float hash21(float2 p) { return fract(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453); }
 
@@ -93,6 +96,29 @@ enum Shaders {
                 k *= 1.28;
             }
             scale = k;
+        } else if (mode == 3) {
+            // Square tiles (p4m): mirror both axes, then the diagonal, so every edge and diagonal is a mirror.
+            float density = 0.6 + 0.25 * float(segments);
+            float2 m = triWave(p * density);
+            if (m.y > m.x) m = m.yx;
+            f = m - 0.5;
+            scale = density;
+        } else if (mode == 4) {
+            // Mirror grid (pmm): a plain hall of mirrors with 3:2 cells, no diagonal fold.
+            float density = 0.6 + 0.25 * float(segments);
+            float2 m = triWave(p * density * float2(1.0, 1.5));
+            f = (m - 0.5) * float2(1.0, 0.6667);
+            scale = density;
+        } else if (mode == 5) {
+            // Spiral: mirror tiles laid out in log-polar space, so they shrink towards the centre like a tunnel.
+            // The arm count is even so the seam where the angle wraps is itself a mirror.
+            float n = float(max(2, (segments / 2) * 2));
+            float k = n / (2.0 * PI);
+            float r = max(length(p), 1e-4);
+            // Flows inward as the pattern turns; 2/pi keeps the wrap of `rotation` a whole number of tiles.
+            float2 lp = float2(log(r) * k + u.rotation * (2.0 / PI), atan2(p.y, p.x) * k);
+            f = (triWave(lp) - 0.5) * 0.8;
+            scale = 0.8 * k / r;
         } else {
             f = foldRadial(p, segments);
         }
@@ -155,7 +181,14 @@ enum Shaders {
             }
         } else {
             float zoomA = 1.0, zoomB = 1.0;
-            if (u.transition == 3) { zoomA = 1.0 + 1.6 * t; zoomB = 1.0 / (1.0 + 1.6 * (1.0 - t)); }
+            if (u.transition == 3) {
+                // Zoom through: ease in and out (zero speed at both ends) and zoom geometrically, so the
+                // incoming photo settles instead of stopping dead.
+                float e = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+                const float span = 0.9;   // ln of the total zoom travelled by each photo
+                zoomA = exp(span * e);
+                zoomB = exp(-span * (1.0 - e));
+            }
             float2 qa = kaleidoPoint(p, u, zoomA, u.mode, u.segments, sA);
             float2 qb = kaleidoPoint(p, u, zoomB, u.modeB, u.segmentsB, sB);
             float3 a = samplePhoto(texA, smp, qa, u.aspectA, sA, u);

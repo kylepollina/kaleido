@@ -19,6 +19,10 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   made back to how you created it). Hearted presets appear on Home and are the ones Shuffle presets moves between.
 - **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
   Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
+- **Six patterns.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid and a Spiral tunnel (mirror
+  tiles laid out in log-polar space, so they shrink towards the centre and slowly flow inward).
+- **Keep the screen awake** while playing (Settings > Performance), and a flower in the menu bar. Switching back
+  to Kaleido (Cmd-Tab or the Dock) reopens its window if you closed it.
 - **Dynamic mirrors.** A preset can let its mirror count wander slowly between two numbers, cross-fading from one
   count to the next (a change about every 50 seconds at the middle speed). See the "Shifting Mandala" preset.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
@@ -55,7 +59,7 @@ Requires macOS 14 or later and Xcode (or the Swift toolchain).
 ```sh
 cd ~/Projects/kaleido
 ./scripts/build.sh            # builds build/Kaleido.app
-./scripts/build.sh --install  # also copies it to /Applications
+./scripts/install.sh          # builds and installs to /Applications (quits and relaunches a running copy)
 open build/Kaleido.app
 ```
 

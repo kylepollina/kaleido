@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import IOKit.pwr_mgt
 import KaleidoCore
 import os
 import Photos
@@ -23,6 +24,9 @@ final class AppState: ObservableObject, PhotoProvider {
     let photos = PhotosService()
     @Published private(set) var isSyncing = false
     private var syncAgain = false
+    private var sleepAssertion: IOPMAssertionID?
+    /// Set by the main window while it exists; reopens it later (e.g. on Cmd-Tab after it was closed).
+    var openMainWindow: (() -> Void)?
     private var lookChangePending = false
     private var surprisePending = false
     private var photosSinceLookChange = 0
@@ -81,6 +85,7 @@ final class AppState: ObservableObject, PhotoProvider {
         isPlaying = true
         desktop.show(fps: currentFrameRate)
         refreshSuspension()
+        updateKeepAwake()
         log.info("playing on \(desktop.coveredDisplays.count) display(s)")
     }
 
@@ -88,7 +93,23 @@ final class AppState: ObservableObject, PhotoProvider {
         guard isPlaying else { return }
         isPlaying = false
         desktop?.hide()
+        updateKeepAwake()
         log.info("stopped")
+    }
+
+    /// Holds a "prevent display sleep" power assertion only while playing with Keep screen awake on.
+    private func updateKeepAwake() {
+        let want = isPlaying && settings.keepScreenAwake
+        if want, sleepAssertion == nil {
+            var id: IOPMAssertionID = 0
+            let r = IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
+                                                IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                                                "Kaleido is playing on the desktop" as CFString, &id)
+            if r == kIOReturnSuccess { sleepAssertion = id }
+        } else if !want, let id = sleepAssertion {
+            IOPMAssertionRelease(id)
+            sleepAssertion = nil
+        }
     }
 
     func diagnostics() -> String { desktop?.diagnostics() ?? "No Metal device" }
@@ -293,6 +314,7 @@ final class AppState: ObservableObject, PhotoProvider {
         queue.shuffle = settings.shuffle
         desktop?.setFrameRate(currentFrameRate)
         refreshSuspension()
+        updateKeepAwake()
     }
 
     private func scheduleSave() {

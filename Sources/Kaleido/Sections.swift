@@ -17,6 +17,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
 struct ContentView: View {
     @EnvironmentObject var app: AppState
+    @Environment(\.openWindow) private var openWindow
     @State private var section: AppSection? = .home
 
     var body: some View {
@@ -41,6 +42,11 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 900, idealWidth: 1100, minHeight: 640, idealHeight: 800)
+        .onAppear {
+            // The action stays valid after this window closes, so the app delegate can reopen it.
+            let open = openWindow
+            app.openMainWindow = { open(id: "main") }
+        }
     }
 }
 
@@ -179,7 +185,7 @@ struct PresetCard: View {
 }
 
 extension Look {
-    var summary: String { "\(mode.label), \(segments) \(mode == .hex ? "density" : "mirrors")" }
+    var summary: String { "\(mode.label), \(mode.countLabel.lowercased()) \(segments)" }
 }
 
 // MARK: Presets
@@ -271,7 +277,7 @@ struct PresetEditor: View {
                         ForEach(MirrorMode.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    SliderRow(preset.look.mode == .hex ? "Tile density" : "Mirrors",
+                    SliderRow(preset.look.mode.countLabel,
                               value: Binding(get: { Double(preset.look.segments) }, set: { v in app.edit(preset.id) { $0.segments = Int(v.rounded()) } }),
                               range: 2...24, step: 1) { "\(Int($0))" }
                     Toggle("Dynamic mirrors (slowly change how many)", isOn: bind(\.dynamicMirrors))
@@ -374,6 +380,7 @@ struct SettingsView: View {
                     Text("60 fps").tag(60)
                 }
                 .pickerStyle(.segmented)
+                Toggle("Keep the screen awake while playing", isOn: $app.settings.keepScreenAwake)
                 Toggle("Pause on battery", isOn: $app.settings.pauseOnBattery)
                 Toggle("30 fps in Low Power Mode", isOn: $app.settings.limitInLowPowerMode)
                 Toggle("Start playing when Kaleido opens", isOn: $app.settings.playOnLaunch)
