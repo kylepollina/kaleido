@@ -57,6 +57,11 @@ public struct Settings: Codable, Equatable, Sendable {
     public var allowDynamicMirrors = true
     public var allowOutlines = true
 
+    /// The Settings > Effects switches as one value, to notice when any of them changes.
+    public var effectSwitches: [Bool] {
+        [allowHueChanges, allowSaturationChanges, allowVignette, allowSwirl, allowDynamicMirrors, allowOutlines]
+    }
+
     public init() {}
 
     public var speedMultiplier: Double { Settings.speedMultipliers[min(max(speedStep, 0), Settings.speedMultipliers.count - 1)] }

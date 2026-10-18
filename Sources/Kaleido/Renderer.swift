@@ -342,6 +342,19 @@ final class KaleidoRenderer {
     }
 
     /// Jump straight to the target look (no easing); used for offscreen snapshots.
+    /// The Settings > Effects switches change things right away instead of gliding there. Turning hue off also
+    /// drops any hue the colour cycling had already built up, so the photo's real colours come straight back.
+    func applyEffectSwitchesNow(hueAllowed: Bool) {
+        look.hueShift = targetLook.hueShift
+        look.hueSpeed = targetLook.hueSpeed
+        look.saturation = targetLook.saturation
+        look.vignette = targetLook.vignette
+        look.twist = targetLook.twist
+        look.outline = targetLook.outline
+        look.dynamicMirrors = targetLook.dynamicMirrors
+        if !hueAllowed { huePhase = 0 }
+    }
+
     func snapLook() {
         look = targetLook
         currentShape = (look.mode, look.segments)

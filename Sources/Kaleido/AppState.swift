@@ -13,6 +13,9 @@ final class AppState: ObservableObject, PhotoProvider {
         didSet {
             guard settings != oldValue else { return }
             applySettings()
+            if settings.effectSwitches != oldValue.effectSwitches {
+                renderer?.applyEffectSwitchesNow(hueAllowed: settings.allowHueChanges)
+            }
             scheduleSave()
         }
     }
