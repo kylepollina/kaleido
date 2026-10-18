@@ -12,6 +12,8 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 
 - **Desktop playback.** One borderless window per display, just above the wallpaper and below desktop icons.
   Mouse clicks pass through. Works across Spaces, multiple displays, and display changes.
+- **Three sections.** Home (preview, Play, previous/next, Surprise me, one-click looks), Photos (the album
+  browser) and Playground (all the sliders, slideshow and performance settings).
 - **Album browser.** Your Photos albums (smart, yours, shared), watched folders and hand-added photos show up as
   cards with a cover photo, name, count and a badge (All / N of M). Tick a card's circle to include the whole
   album, or click the card to open it: click photos to toggle them, Shift-click for a range, plus Select All,

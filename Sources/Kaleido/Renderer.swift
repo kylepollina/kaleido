@@ -136,9 +136,13 @@ final class KaleidoRenderer {
     private(set) var look = Look()
     private var current: PhotoTexture
     private var currentID: UUID?
+    private var currentRef: PhotoRef?
+    private var incomingRef: PhotoRef?
+    private var history: [PhotoRef] = []
+    private var goingBack = false
     private var incoming: PhotoTexture?
     private var incomingID: UUID?
-    private var pending: (PhotoTexture, UUID?)?
+    private var pending: (PhotoTexture, PhotoRef)?
     private var loading = false
     private var failures = 0
     private var retryAt = 0.0
@@ -202,8 +206,12 @@ final class KaleidoRenderer {
         if var t = transitionClock {
             t += dt
             if t >= transitionSeconds {
-                if let incoming { current = incoming; currentID = incomingID }
-                incoming = nil; incomingID = nil
+                if let incoming {
+                    if let cur = currentRef, !goingBack { history.append(cur); if history.count > 40 { history.removeFirst() } }
+                    goingBack = false
+                    current = incoming; currentID = incomingID; currentRef = incomingRef
+                }
+                incoming = nil; incomingID = nil; incomingRef = nil
                 transitionClock = nil
                 shownFor = 0
             } else {
@@ -212,13 +220,14 @@ final class KaleidoRenderer {
         } else {
             shownFor += dt
             let due = shownFor >= secondsPerPhoto || skipRequested || currentID == nil
-            if let (tex, id) = pending, due {
+            if let (tex, ref) = pending, due {
+                let id: UUID? = ref.id
                 pending = nil
                 skipRequested = false
                 if id == currentID && id != nil {
                     shownFor = 0
                 } else {
-                    incoming = tex; incomingID = id
+                    incoming = tex; incomingID = id; incomingRef = ref
                     activeStyle = transitionStyle == .random ? TransitionStyle.concrete.randomElement()! : transitionStyle
                     transitionClock = 0
                 }
@@ -228,6 +237,16 @@ final class KaleidoRenderer {
     }
 
     func skip() { skipRequested = true }
+
+    /// Goes back to the photo shown before the current one, if any.
+    func previous() {
+        guard let last = history.popLast() else { return }
+        goingBack = true
+        pending = nil
+        loadAsync(last, force: true)
+    }
+
+    var canGoBack: Bool { !history.isEmpty }
 
     /// Jump straight to the target look (no easing); used for offscreen snapshots.
     func snapLook() { look = targetLook }
@@ -259,7 +278,7 @@ final class KaleidoRenderer {
         switch result {
         case .success(let tex):
             failures = 0
-            pending = (tex, ref.id)
+            pending = (tex, ref)
             if debug { FileHandle.standardError.write(Data("kaleido: loaded \(tex.texture.width)x\(tex.texture.height)\n".utf8)) }
             if force { skipRequested = true }
         case .failure(let error):

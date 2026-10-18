@@ -3,56 +3,155 @@ import KaleidoCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct ContentView: View {
-    @EnvironmentObject var app: AppState
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ControlsPane()
-                .frame(width: 340)
-            Divider()
-            VStack(spacing: 0) {
-                PreviewPane()
-                    .padding([.horizontal, .top], 16)
-                LibraryPane()
-            }
-        }
-        .frame(minWidth: 960, minHeight: 680)
+enum AppSection: String, CaseIterable, Identifiable {
+    case home = "Home", photos = "Photos", playground = "Playground"
+    var id: String { rawValue }
+    var icon: String {
+        switch self { case .home: return "house"; case .photos: return "photo.on.rectangle"; case .playground: return "slider.horizontal.3" }
     }
 }
 
-// MARK: Controls
+struct ContentView: View {
+    @EnvironmentObject var app: AppState
+    @State private var section: AppSection? = .home
 
-struct ControlsPane: View {
+    var body: some View {
+        NavigationSplitView {
+            List(AppSection.allCases, selection: $section) { s in
+                Label(s.rawValue, systemImage: s.icon).tag(s)
+            }
+            .navigationSplitViewColumnWidth(min: 160, ideal: 170, max: 200)
+            .safeAreaInset(edge: .bottom) {
+                VStack(alignment: .leading, spacing: 6) {
+                    if section != .home { PlayButton(compact: true) }
+                    Text(app.statusText).font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(12)
+            }
+        } detail: {
+            switch section ?? .home {
+            case .home: HomeView(go: { section = $0 })
+            case .photos: LibraryPane()
+            case .playground: PlaygroundView()
+            }
+        }
+        .frame(minWidth: 900, idealWidth: 1100, minHeight: 640, idealHeight: 800)
+    }
+}
+
+struct PlayButton: View {
+    @EnvironmentObject var app: AppState
+    var compact = false
+
+    var body: some View {
+        Button {
+            app.togglePlay()
+        } label: {
+            Label(app.isPlaying ? "Stop" : (compact ? "Play" : "Play on Desktop"), systemImage: app.isPlaying ? "stop.fill" : "play.fill")
+                .frame(maxWidth: .infinity)
+        }
+        .controlSize(.large)
+        .buttonStyle(.borderedProminent)
+        .tint(app.isPlaying ? .red : .accentColor)
+        .keyboardShortcut("p", modifiers: .command)
+    }
+}
+
+extension AppState {
+    var statusText: String {
+        if let r = suspensionReason, isPlaying { return "Paused: \(r.lowercased())" }
+        if isPlaying { return "Playing on your desktop. Stop or quit to get your wallpaper back." }
+        return "Your normal wallpaper is showing."
+    }
+}
+
+// MARK: Home
+
+struct HomeView: View {
+    @EnvironmentObject var app: AppState
+    let go: (AppSection) -> Void
+    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 10)]
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                PreviewPane()
+                    .frame(maxWidth: 760)
+                transport
+                let n = app.library.enabledItems.count
+                if n == 0 {
+                    HStack {
+                        Image(systemName: "photo.badge.plus")
+                        Text("No photos selected yet.")
+                        Button("Choose photos…") { go(.photos) }
+                    }
+                    .foregroundStyle(.secondary)
+                } else {
+                    Button("\(n) photos in rotation") { go(.photos) }.buttonStyle(.link).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Looks").font(.headline)
+                        Spacer()
+                        Button("Fine-tune…") { go(.playground) }.buttonStyle(.link)
+                    }
+                    LazyVGrid(columns: columns, spacing: 10) {
+                        ForEach(Preset.all) { p in PresetCard(preset: p) }
+                    }
+                }
+                .frame(maxWidth: 760)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var transport: some View {
+        HStack(spacing: 14) {
+            Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 30) }
+                .help("Previous photo")
+            PlayButton().frame(width: 200)
+            Button { app.nextPhoto() } label: { Image(systemName: "forward.fill").frame(width: 30) }
+                .help("Next photo")
+            Button { app.surpriseMe() } label: { Label("Surprise me", systemImage: "dice") }
+                .help("A random look and a new photo")
+        }
+        .controlSize(.large)
+    }
+}
+
+struct PresetCard: View {
+    @EnvironmentObject var app: AppState
+    let preset: Preset
+
+    var body: some View {
+        let active = app.settings.look == preset.look
+        Button { app.apply(preset) } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(preset.name).font(.callout.weight(.medium)).lineLimit(1)
+                Text("\(preset.look.mode.label), \(preset.look.segments) \(preset.look.mode == .hex ? "density" : "mirrors")")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(active ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(active ? Color.accentColor : Color.clear, lineWidth: 2))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: Playground
+
+struct PlaygroundView: View {
     @EnvironmentObject var app: AppState
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 8) {
-                Button {
-                    app.togglePlay()
-                } label: {
-                    Label(app.isPlaying ? "Stop" : "Play on Desktop", systemImage: app.isPlaying ? "stop.fill" : "play.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
-                .tint(app.isPlaying ? .red : .accentColor)
-                .keyboardShortcut("p", modifiers: .command)
-                Text(statusText).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(16)
-
+            PreviewPane()
+                .frame(maxWidth: 520)
+                .padding(16)
             Form {
-                Section("Photos") {
-                    Toggle("Shuffle", isOn: $app.settings.shuffle)
-                    ScaledSliderRow("Seconds per photo", value: $app.settings.secondsPerPhoto, scale: .log(15, 900)) { $0 < 90 ? "\(Int($0)) s" : String(format: "%.1f min", $0 / 60) }
-                    Picker("Transition", selection: $app.settings.transition) {
-                        ForEach(TransitionStyle.allCases) { Text($0.label).tag($0) }
-                    }
-                    ScaledSliderRow("Transition length", value: $app.settings.transitionSeconds, scale: .log(2, 30)) { String(format: "%.0f s", $0) }
-                }
-
                 Section {
                     HStack {
                         Menu("Presets") {
@@ -87,6 +186,15 @@ struct ControlsPane: View {
                     SliderRow("Vignette", value: $app.settings.look.vignette, range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                 }
 
+                Section("Slideshow") {
+                    Toggle("Shuffle", isOn: $app.settings.shuffle)
+                    ScaledSliderRow("Seconds per photo", value: $app.settings.secondsPerPhoto, scale: .log(15, 900)) { $0 < 90 ? "\(Int($0)) s" : String(format: "%.1f min", $0 / 60) }
+                    Picker("Transition", selection: $app.settings.transition) {
+                        ForEach(TransitionStyle.allCases) { Text($0.label).tag($0) }
+                    }
+                    ScaledSliderRow("Transition length", value: $app.settings.transitionSeconds, scale: .log(2, 30)) { String(format: "%.0f s", $0) }
+                }
+
                 Section("Performance") {
                     Picker("Frame rate", selection: $app.settings.frameRate) {
                         Text("30 fps").tag(30)
@@ -100,12 +208,6 @@ struct ControlsPane: View {
             }
             .formStyle(.grouped)
         }
-    }
-
-    private var statusText: String {
-        if let r = app.suspensionReason, app.isPlaying { return "Paused: \(r.lowercased())" }
-        if app.isPlaying { return "Playing. Stop or quit Kaleido to get your wallpaper back." }
-        return "Your normal wallpaper is showing."
     }
 
     static func turnText(_ v: Double) -> String {
@@ -171,26 +273,17 @@ struct PreviewPane: View {
     @EnvironmentObject var app: AppState
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        Group {
             if let renderer = app.renderer {
                 PreviewView(renderer: renderer)
             } else {
                 Text("Metal is not available on this Mac.").foregroundStyle(.secondary)
             }
-            HStack(spacing: 8) {
-                Button { app.nextPhoto() } label: { Label("Next photo", systemImage: "forward.fill") }
-                Button { app.surpriseMe() } label: { Label("Surprise me", systemImage: "dice") }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .tint(.black.opacity(0.55))
-            .padding(10)
         }
         .aspectRatio(16.0 / 9.0, contentMode: .fit)
-        .frame(maxHeight: 300)
         .background(.black)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
     }
 }
 
@@ -237,11 +330,6 @@ func makeCards(_ app: AppState) -> [SourceCard] {
         cards.append(SourceCard(id: f.id, title: f.name, group: .folders, count: lib.itemIDs(in: f.id).count, state: state(f.id),
                                 folder: f, coverItemID: lib.itemIDs(in: f.id).first))
     }
-    let manual = lib.itemIDs(in: PhotoLibrary.manualSource)
-    if !manual.isEmpty {
-        cards.append(SourceCard(id: PhotoLibrary.manualSource, title: "Photos added one by one", group: .folders, count: manual.count,
-                                state: state(PhotoLibrary.manualSource), coverItemID: manual.first))
-    }
     return cards
 }
 
@@ -263,7 +351,6 @@ struct LibraryPane: View {
                 if app.isSyncing { ProgressView().controlSize(.small) }
                 Text(syncLine).font(.caption).foregroundStyle(.secondary)
                 Button("Sync now") { app.syncNow() }.controlSize(.small).disabled(app.isSyncing)
-                Button("Add Photos…") { choose(directories: false) }
                 Button("Add Folder…") { choose(directories: true) }
                 Menu {
                     Button("Skip screenshots") {
@@ -292,7 +379,8 @@ struct LibraryPane: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            app.library.add(urls: urls) > 0
+            let folders = urls.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+            return !folders.isEmpty && app.library.add(urls: folders) >= 0
         }
     }
 

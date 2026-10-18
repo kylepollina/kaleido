@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import KaleidoCore
 import os
+import Photos
 
 @MainActor
 final class AppState: ObservableObject, PhotoProvider {
@@ -96,7 +97,9 @@ final class AppState: ObservableObject, PhotoProvider {
 
     func togglePlay() { isPlaying ? stop() : play() }
     func nextPhoto() { renderer?.skip() }
-    func surpriseMe() { settings.look = Look.random() }
+    func previousPhoto() { renderer?.previous() }
+    /// A random look and a fresh photo.
+    func surpriseMe() { settings.look = Look.random(); renderer?.skip() }
     func apply(_ preset: Preset) { settings.look = preset.look }
 
     // MARK: PhotoProvider
@@ -263,6 +266,19 @@ final class AppState: ObservableObject, PhotoProvider {
             switch args[i] {
             case "--add" where i + 1 < args.count:
                 library.add(urls: [URL(fileURLWithPath: args[i + 1])]); i += 1
+            case "--photos-probe":
+                Task.detached {
+                    func n(_ pred: [NSPredicate]) -> Int {
+                        guard let c = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .smartAlbumFavorites, options: nil).firstObject else { return -1 }
+                        let o = PHFetchOptions(); o.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: pred)
+                        return PHAsset.fetchAssets(in: c, options: o).count
+                    }
+                    let img = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+                    let shot = NSPredicate(format: "(mediaSubtypes & %d) == 0", PHAssetMediaSubtype.photoScreenshot.rawValue)
+                    let size = NSPredicate(format: "(pixelWidth >= %d) OR (pixelHeight >= %d)", 1600, 1600)
+                    let msg = "probe favorites: all \(n([])) image \(n([img])) image+noshot \(n([img, shot])) image+size \(n([img, size])) all three \(n([img, shot, size]))\n"
+                    FileHandle.standardError.write(Data(msg.utf8))
+                }
             case "--play", "--autoplay": play = true
             case "--dump-windows":
                 let path = (i + 1 < args.count && !args[i + 1].hasPrefix("--")) ? args[i + 1] : nil

@@ -17,7 +17,8 @@ struct KaleidoApp: App {
         Window("Kaleido", id: "main") {
             ContentView().environmentObject(app)
         }
-        .defaultSize(width: 1040, height: 760)
+        .defaultSize(width: 1100, height: 800)
+        .windowResizability(.contentMinSize)
         .commands {
             CommandMenu("Debug") {
                 Button("Display Diagnostics…") { DebugTools.showDiagnostics(app) }

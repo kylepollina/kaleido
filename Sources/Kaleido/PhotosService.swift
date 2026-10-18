@@ -85,21 +85,19 @@ final class PhotosService: NSObject, ObservableObject, PHPhotoLibraryChangeObser
 
     nonisolated static func listing(albumID: String, filters: PhotoFilters) -> [SyncEntry]? {
         guard let collection = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [albumID], options: nil).firstObject else { return nil }
-        var preds = [NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)]
-        if filters.excludeScreenshots {
-            preds.append(NSPredicate(format: "(mediaSubtypes & %d) == 0", PHAssetMediaSubtype.photoScreenshot.rawValue))
-        }
-        if filters.minLongEdge > 0 {
-            preds.append(NSPredicate(format: "(pixelWidth >= %d) OR (pixelHeight >= %d)", filters.minLongEdge, filters.minLongEdge))
-        }
         let o = PHFetchOptions()
-        o.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: preds)
+        o.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
         o.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        o.fetchLimit = albumCap
         let result = PHAsset.fetchAssets(in: collection, options: o)
+        // Screenshot and size filters run here, not as fetch predicates: the bit-mask predicate for
+        // screenshots silently dropped almost everything (190 favorites became 8).
         var out: [SyncEntry] = []
-        out.reserveCapacity(result.count)
-        result.enumerateObjects { a, _, _ in out.append(SyncEntry(key: a.localIdentifier, name: "Photo", isAsset: true)) }
+        result.enumerateObjects { a, _, stop in
+            if filters.excludeScreenshots && a.mediaSubtypes.contains(.photoScreenshot) { return }
+            if filters.minLongEdge > 0 && max(a.pixelWidth, a.pixelHeight) < filters.minLongEdge { return }
+            out.append(SyncEntry(key: a.localIdentifier, name: "Photo", isAsset: true))
+            if out.count >= albumCap { stop.pointee = true }
+        }
         return out
     }
 
