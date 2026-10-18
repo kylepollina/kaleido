@@ -180,13 +180,13 @@ final class SettingsTests: XCTestCase {
 
     func testSpeedStepsScaleMotionAndClamp() {
         var s = Settings()
-        XCTAssertEqual(s.speedMultiplier, 1)
+        XCTAssertEqual(s.speedMultiplier, Settings.speedMultipliers[2])
         XCTAssertEqual(Settings.speedMultipliers.count, 5)
         XCTAssertEqual(Settings.speedMultipliers, Settings.speedMultipliers.sorted(), "turtle to rabbit")
         s.speedStep = 0
-        XCTAssertEqual(s.effectiveLook(Look()).motion, 0.25)
+        XCTAssertEqual(s.effectiveLook(Look()).motion, 4, "slowest is the old fastest")
         s.speedStep = 4
-        XCTAssertEqual(s.effectiveLook(Look()).motion, 4)
+        XCTAssertEqual(s.effectiveLook(Look()).motion, 8, "fastest is twice that")
         s.speedStep = 99
         s.clamp()
         XCTAssertEqual(s.speedStep, 4)

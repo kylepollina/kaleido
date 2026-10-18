@@ -286,8 +286,9 @@ final class KaleidoRenderer {
             mirrorKey = key
             morphTo = nil; morphClock = 0; mirrorTimer = 0
         }
-        // Paced by the speed control; frozen while a photo cross-fades so the two never fight.
-        let pace = look.motion
+        // A fixed, slow pace (every few minutes) whatever the speed control says; stopped only when motion is
+        // off, and frozen while a photo cross-fades so the two never fight.
+        let pace: Double = look.motion > 0 ? 1 : 0
         guard pace > 0, transitionClock == nil, let n = dynamicCount else { return }
         if let to = morphTo {
             morphClock += dt * pace / mirrorMorphSeconds
