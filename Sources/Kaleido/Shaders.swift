@@ -151,10 +151,10 @@ enum Shaders {
             f = (t - float2(0.5, 0.2886751)) * 0.9;
             scale = density * 1.6 * 0.9;
         } else if (mode == 7) {
-            // Escher cubes (rhombille): each hexagon splits into three diamonds, shaded as the lit top and the
-            // two shadowed sides of a cube. Each face carries its own little mandala (an 8-mirror fold in the
-            // face's own skewed coordinates) that slowly turns, the side faces the other way, and each of the
-            // three faces looks at a different part of the photo.
+            // Diamonds (the rhombille tiling Escher used for his cubes, kept flat): each hexagon splits into three
+            // diamonds. Each diamond carries its own little mandala (an 8-mirror fold in the diamond's own skewed
+            // coordinates) that slowly turns, alternating direction, and each of the three orientations looks at
+            // a different part of the photo.
             float density = 0.5 + 0.2 * segments;
             float2 d = hexLocal(p * density);
             const float R = 0.5773503;                                    // hexagon corner radius
@@ -175,7 +175,6 @@ enum Shaders {
             const float2 faceOffset[3] = { float2(0.0, 0.0), float2(0.38, 0.12), float2(-0.22, 0.34) };
             f = c * 0.9 + faceOffset[face];
             scale = density * 0.9 / R;
-            shade = face == 0 ? 1.0 : (face == 1 ? 0.8 : 0.62);
         } else {
             f = foldRadial(p, segments);
         }

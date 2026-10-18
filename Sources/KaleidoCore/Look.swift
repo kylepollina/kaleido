@@ -12,7 +12,7 @@ public enum MirrorMode: String, Codable, CaseIterable, Identifiable, Sendable {
         case .grid: return "Mirror grid"
         case .spiral: return "Spiral"
         case .triangle: return "Triangle"
-        case .cubes: return "Escher cubes"
+        case .cubes: return "Diamonds"
         }
     }
     public var shaderIndex: Int32 {
