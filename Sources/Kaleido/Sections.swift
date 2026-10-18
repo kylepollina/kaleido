@@ -305,6 +305,9 @@ struct PresetEditor: View {
                     SliderRow("Drift amount", value: bind(\.drift), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                     SliderRow("Swirl", value: bind(\.twist), range: -1...1) { String(format: "%.2f", $0) }
                         .disabled(!app.settings.allowSwirl)
+                    SliderRow("Outlines", value: bind(\.outline), range: 0...1) { $0 < 0.005 ? "off" : String(format: "%.0f%%", $0 * 100) }
+                        .disabled(!app.settings.allowOutlines)
+                        .help("Black lines along every mirror and tile edge")
                 }
                 Section {
                     SliderRow("Hue shift", value: bind(\.hueShift), range: 0...360, step: 1) { "\(Int($0))°" }
@@ -371,6 +374,7 @@ struct SettingsView: View {
                 Toggle("Vignette", isOn: $app.settings.allowVignette)
                 Toggle("Swirl", isOn: $app.settings.allowSwirl)
                 Toggle("Dynamic mirrors", isOn: $app.settings.allowDynamicMirrors)
+                Toggle("Outlines", isOn: $app.settings.allowOutlines)
             } header: {
                 Text("Effects")
             } footer: {

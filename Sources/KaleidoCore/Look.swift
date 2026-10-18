@@ -104,6 +104,8 @@ public struct Look: Codable, Equatable, Sendable {
     public var motion: Double = 1.0
     /// Dynamic mirrors: the mirror count (or tile density) wanders one step at a time between these bounds,
     /// cross-fading between counts so the pattern never snaps.
+    /// 0...1 thickness of black lines along every mirror and tile edge (0 = none).
+    public var outline: Double = 0
     public var dynamicMirrors = false
     public var mirrorsMin = 4
     public var mirrorsMax = 12
@@ -127,6 +129,7 @@ public struct Look: Codable, Equatable, Sendable {
         vignette = try c.decodeIfPresent(Double.self, forKey: .vignette) ?? d.vignette
         breathing = try c.decodeIfPresent(Double.self, forKey: .breathing) ?? d.breathing
         motion = try c.decodeIfPresent(Double.self, forKey: .motion) ?? d.motion
+        outline = try c.decodeIfPresent(Double.self, forKey: .outline) ?? d.outline
         dynamicMirrors = try c.decodeIfPresent(Bool.self, forKey: .dynamicMirrors) ?? d.dynamicMirrors
         mirrorsMin = try c.decodeIfPresent(Int.self, forKey: .mirrorsMin) ?? d.mirrorsMin
         mirrorsMax = try c.decodeIfPresent(Int.self, forKey: .mirrorsMax) ?? d.mirrorsMax
@@ -146,6 +149,7 @@ public struct Look: Codable, Equatable, Sendable {
         hueSpeed = min(max(hueSpeed, 0), 0.6)
         breathing = min(max(breathing, 0), 1)
         motion = min(max(motion, 0), 2)
+        outline = min(max(outline, 0), 1)
         let r = Self.segmentRange
         mirrorsMin = min(max(mirrorsMin, r.lowerBound), r.upperBound)
         mirrorsMax = min(max(mirrorsMax, r.lowerBound), r.upperBound)
@@ -171,6 +175,7 @@ public struct Look: Codable, Equatable, Sendable {
         r.vignette = l(vignette, target.vignette)
         r.breathing = l(breathing, target.breathing)
         r.motion = l(motion, target.motion)
+        r.outline = l(outline, target.outline)
         return r
     }
 
@@ -199,6 +204,7 @@ public struct Look: Codable, Equatable, Sendable {
         l.saturation = Double.random(in: 0.95...1.4, using: &g)
         l.vignette = Double.random(in: 0.1...0.45, using: &g)
         l.breathing = Double.random(in: 0.2...0.7, using: &g)
+        l.outline = Double.random(in: 0..<1, using: &g) < 0.15 ? Double.random(in: 0.15...0.5, using: &g) : 0
         if (l.mode == .radial || l.mode == .fractal) && Double.random(in: 0..<1, using: &g) < 0.25 {
             l.dynamicMirrors = true
             l.mirrorsMin = max(3, l.segments - 3)

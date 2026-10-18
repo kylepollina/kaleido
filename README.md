@@ -22,6 +22,8 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 - **Eight patterns.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror
   tiles laid out in log-polar space, so they shrink towards the centre and slowly flow inward), Triangle (the
   classic three-mirror toy) and Diamonds (Escher's rhombille tiling, kept flat: each diamond holds its own slowly turning mandala).
+- **Outlines.** Any preset can draw black lines along its mirrors and tile edges (the Outlines slider); they bend
+  with swirl and follow dynamic mirrors. Settings > Effects can turn them off everywhere.
 - **Pattern lines.** In the preset editor, a toggle traces every mirror and tile edge in red over the dimmed
   photo, so you can see the shape of the pattern itself. The editor preview has its own previous / play / next.
 - **Keep the screen awake** while playing (Settings > Performance), and a flower in the menu bar. Switching back

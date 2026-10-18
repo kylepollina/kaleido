@@ -19,6 +19,7 @@ enum Shaders {
         float aspectA, aspectB;
         float mixAmount;     // 0...1 transition progress (raw)
         float morph;         // 0...1 cross-fade from `segments` to `segmentsMorph` (dynamic mirrors)
+        float outline;       // 0...1 thickness of black lines along the pattern's mirrors and tile edges
         int segments;       // mirrors of the outgoing photo (A)
         int mode;            // 0 radial, 1 hex, 2 fractal (A)
         int transition;      // 0 dissolve 1 iris 3 zoom 4 segments
@@ -274,6 +275,14 @@ enum Shaders {
         return dist;
     }
 
+    // Multiplier that paints black lines along the pattern (1 = no line here).
+    float outlineFactor(float2 p, constant Uniforms &u, int mode, float segments) {
+        if (u.outline <= 0.0) return 1.0;
+        float px = 1.0 / u.height;
+        float w = px * 0.75 + u.outline * 0.006;           // half the line width, in screen heights
+        return mix(0.06, 1.0, smoothstep(w, w + px * 1.5, lineDistance(p, u, mode, segments)));
+    }
+
     float3 samplePhoto(texture2d<float> tex, sampler smp, float2 q, float aspect, float scale, constant Uniforms &u) {
         // Photo space: height = 1, width = aspect. Mirrored repeat extends it without edges.
         float2 uv = float2(q.x / aspect, q.y) + 0.5;
@@ -332,6 +341,8 @@ enum Shaders {
                 float2 q = kaleidoPoint(p, u, 1.0, u.mode, segs, sA, hA);
                 col = samplePhoto(texA, smp, q, u.aspectA, sA, u) * hA;
             }
+            float segsNow = u.mode == 5 ? float(u.segments) : mix(float(u.segments), float(u.segmentsMorph), e);
+            col *= outlineFactor(p, u, u.mode, segsNow);
         } else {
             float zoomA = 1.0, zoomB = 1.0;
             if (u.transition == 3) {
@@ -344,8 +355,8 @@ enum Shaders {
             }
             float2 qa = kaleidoPoint(p, u, zoomA, u.mode, float(u.segments), sA, hA);
             float2 qb = kaleidoPoint(p, u, zoomB, u.modeB, float(u.segmentsB), sB, hB);
-            float3 a = samplePhoto(texA, smp, qa, u.aspectA, sA, u) * hA;
-            float3 b = samplePhoto(texB, smp, qb, u.aspectB, sB, u) * hB;
+            float3 a = samplePhoto(texA, smp, qa, u.aspectA, sA, u) * hA * outlineFactor(p, u, u.mode, float(u.segments));
+            float3 b = samplePhoto(texB, smp, qb, u.aspectB, sB, u) * hB * outlineFactor(p, u, u.modeB, float(u.segmentsB));
 
             float m;
             float w = 0.18;

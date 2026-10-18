@@ -198,7 +198,13 @@ final class SettingsTests: XCTestCase {
         wild.hueShift = 120; wild.hueSpeed = 0.5; wild.saturation = 1.8; wild.blur = 0.6; wild.vignette = 0.7; wild.twist = 0.5
         XCTAssertEqual(s.effectiveLook(wild).saturation, 1.8, "allowed by default")
         wild.dynamicMirrors = true
+        wild.outline = 0.4
         XCTAssertTrue(s.effectiveLook(wild).dynamicMirrors)
+        XCTAssertEqual(s.effectiveLook(wild).outline, 0.4)
+        s.allowOutlines = false
+        XCTAssertEqual(s.effectiveLook(wild).outline, 0, "the Settings switch turns outlines off everywhere")
+        XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 7}"#.utf8)).outline, 1)
+        XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).outline, 0, "older presets have none")
         s.allowHueChanges = false; s.allowSaturationChanges = false; s.allowBlur = false; s.allowVignette = false; s.allowSwirl = false
         s.allowDynamicMirrors = false
         let e = s.effectiveLook(wild)
