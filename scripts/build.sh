@@ -8,7 +8,7 @@ APP=build/Kaleido.app
 swift build -c release
 BIN="$(swift build -c release --show-bin-path)/Kaleido"
 
-if [ ! -f build/AppIcon.icns ]; then
+if [ ! -f build/AppIcon.icns ] || [ Resources/icon-source.png -nt build/AppIcon.icns ] || [ scripts/make-icon.swift -nt build/AppIcon.icns ]; then
     mkdir -p build/AppIcon.iconset
     swift scripts/make-icon.swift build/icon-1024.png
     for size in 16 32 128 256 512; do
