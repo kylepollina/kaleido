@@ -12,12 +12,17 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 
 - **Desktop playback.** One borderless window per display, just above the wallpaper and below desktop icons.
   Mouse clicks pass through. Works across Spaces, multiple displays, and display changes.
-- **Your photos, your picks.** Add photos or whole folders (JPEG, PNG, HEIC, TIFF, GIF, WebP and more), or
-  drag them onto the window. Click a thumbnail to include or exclude it. Choices are remembered between launches.
+- **Your photos, your picks.** Tick albums from your **Photos library** (Favorites, Recents, your own and shared
+  albums), add **watched folders**, or add single files (JPEG, PNG, HEIC and more; drag-and-drop works). Click a
+  thumbnail to include or exclude it. Nothing is selected until you choose. Choices are remembered.
+- **Stays up to date.** While Kaleido is running it rescans chosen albums and folders at launch and about once a
+  day (and shortly after Photos reports a change). New photos join the rotation, vanished ones leave. "Sync now"
+  does it on demand. Options skip screenshots and small photos; videos are always skipped.
 - **Three mirror modes.** Classic radial (2 to 24 mirrors), tiled hex, and a fractal fold. Mirrors are
   reflections of each other, so there are no seams.
-- **Always moving.** The mirrors rotate, the photo drifts and turns inside them, and hue can cycle slowly.
-  Controls for rotation speed, zoom, drift, swirl, blur, hue shift, saturation and vignette. Changes glide.
+- **Calm by default.** Everything moves slowly: a full turn takes about half an hour, drift laps take minutes,
+  cross-fades last six seconds. Speed sliders are logarithmic, so the slow end has fine control and even the
+  maximum stays gentle. Also zoom, swirl, blur, hue shift, saturation and vignette. Changes glide.
 - **Presets and "Surprise me"** for a random, good-looking look.
 - **Shuffle** (every photo once per round, never the same twice in a row) or in order, with a seconds-per-photo
   setting and six transitions (dissolve, iris, swirl wipe, zoom through, segment ripple, spin) or random.
@@ -62,14 +67,19 @@ Right-click a thumbnail for "Show now", "Reveal in Finder" and "Remove from libr
 - `Desktop.swift`: the windows, at `CGWindowLevelForKey(.desktopWindow) + 1`, rebuilt when displays change.
 - Settings live in `~/Library/Application Support/Kaleido/` (set `KALEIDO_DATA_DIR` to use another folder).
 
+**Troubleshooting displays:** Debug > Display Diagnostics… lists every screen, its desktop window, level,
+visibility and frame counts; Debug > Rebuild Desktop Windows (or the menu bar item) re-creates them.
+
 Developer helpers: `KALEIDO_DEBUG=1` prints frame pacing every 5 s. `Kaleido --snapshot out.png --photo a.jpg
 [--mode hex --segments 6 --time 10 --size 1920x1080]` renders one frame offscreen with the real shader.
 
 ## Limitations
 
-- Photos from the Photos app are not imported directly. Export them, or add the folder you keep them in.
+- Photos albums import at most the 3000 most recent photos each. Photos stay in Photos; Kaleido asks PhotoKit for
+  a display-sized copy (iCloud-only photos are downloaded on demand and skipped if that fails).
+- Photos access is requested only when you click "Connect Photos…". The build script signs with a fixed
+  requirement so the grant survives rebuilds.
 - The app is not sandboxed and is ad-hoc signed. Adding folders like Desktop or Documents may trigger a macOS
   privacy prompt.
-- Folders are imported once; new files added to a folder later are not picked up automatically.
 - Desktop-level windows are hidden by macOS in some modes (full-screen apps, Mission Control animations).
 - Stage Manager's "click wallpaper to show desktop" may treat the animation like the wallpaper; untested.

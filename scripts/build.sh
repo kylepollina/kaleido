@@ -27,7 +27,9 @@ vtool -set-build-version macos 14.0 "$(xcrun --show-sdk-version)" -replace \
     -output "$APP/Contents/MacOS/Kaleido" "$APP/Contents/MacOS/Kaleido"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-codesign --force --sign - "$APP" >/dev/null
+# Ad-hoc signing normally ties macOS privacy grants (Photos) to this exact build, so every rebuild would
+# ask again. A fixed designated requirement keeps the grant across rebuilds.
+codesign --force --sign - --requirements '=designated => identifier "local.kaleido.app"' "$APP" >/dev/null
 
 echo "Built $APP"
 

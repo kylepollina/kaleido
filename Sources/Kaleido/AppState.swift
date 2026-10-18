@@ -18,12 +18,17 @@ final class AppState: ObservableObject, PhotoProvider {
     @Published private(set) var suspensionReason: String?
 
     let library: PhotoLibrary
+    let photos = PhotosService()
+    @Published private(set) var isSyncing = false
+    private var syncDebounce: Task<Void, Never>?
+    private var filterObserver: AnyCancellable?
     let renderer: KaleidoRenderer?
     private var desktop: DesktopController?
     private let queue: PhotoQueue<UUID>
     private let power = PowerMonitor()
     private var saveTask: Task<Void, Never>?
     private var libraryObserver: AnyCancellable?
+    private var cancellables = Set<AnyCancellable>()
     private let log = Logger(subsystem: "local.kaleido.app", category: "app")
 
     private var screensAsleep = false, systemAsleep = false, sessionInactive = false, screenLocked = false
@@ -39,11 +44,19 @@ final class AppState: ObservableObject, PhotoProvider {
         if let renderer { desktop = DesktopController(renderer: renderer) }
         applySettings()
         libraryObserver = library.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
+        photos.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        photos.onLibraryChange = { [weak self] in self?.scheduleSync(after: 20) }
+        filterObserver = library.$filters.dropFirst().removeDuplicates().sink { [weak self] _ in self?.scheduleSync(after: 1) }
+        startSyncSchedule()
         observeSystem()
         power.onChange = { [weak self] in Task { @MainActor in self?.refreshSuspension() } }
         if renderer?.debug == true {
             Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { if let self, self.isPlaying { FileHandle.standardError.write(Data((self.diagnostics() + "\n").utf8)) } }
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    FileHandle.standardError.write(Data("kaleido: photos status \(self.photos.status.rawValue), albums \(self.photos.albums.count), items \(self.library.items.count)\n".utf8))
+                    if self.isPlaying { FileHandle.standardError.write(Data((self.diagnostics() + "\n").utf8)) }
+                }
             }
         }
         handleLaunchArguments()
@@ -76,19 +89,79 @@ final class AppState: ObservableObject, PhotoProvider {
     func surpriseMe() { settings.look = Look.random() }
     func apply(_ preset: Preset) { settings.look = preset.look }
 
-    func showNow(_ id: UUID) {
-        guard let url = library.resolveURL(for: id) else { return }
-        renderer?.show(PhotoRef(id: id, url: url))
-    }
-
     // MARK: PhotoProvider
 
     func nextPhoto(after current: UUID?) -> PhotoRef? {
         queue.shuffle = settings.shuffle
         let items = library.enabledItems
-        guard let id = queue.next(from: items.map(\.id), current: current),
-              let url = library.resolveURL(for: id) else { return nil }
-        return PhotoRef(id: id, url: url)
+        let ids = items.map(\.id)
+        var cur = current
+        // Skip photos whose file has gone missing instead of stalling on them.
+        for _ in 0..<min(items.count, 25) {
+            guard let id = queue.next(from: ids, current: cur), let item = library.item(id) else { return nil }
+            if let assetID = item.assetID { return PhotoRef(id: id, source: .asset(assetID)) }
+            if let url = library.resolveURL(for: id) { return PhotoRef(id: id, source: .file(url)) }
+            cur = id
+        }
+        return nil
+    }
+
+    // MARK: Syncing photo sources
+
+    func showNow(_ id: UUID) {
+        guard let item = library.item(id) else { return }
+        if let a = item.assetID { renderer?.show(PhotoRef(id: id, source: .asset(a))) }
+        else if let url = library.resolveURL(for: id) { renderer?.show(PhotoRef(id: id, source: .file(url))) }
+    }
+
+    func setAlbum(_ album: AlbumInfo, included: Bool) {
+        var list = library.albums.filter { $0.localID != album.localID }
+        if included { list.append(album.ref) }
+        library.setAlbums(list)
+        if included { syncNow() }
+    }
+
+    func connectPhotos() { Task { await photos.requestAccess(); syncNow() } }
+
+    /// Rescans chosen albums and watched folders, then adds new photos and drops vanished ones.
+    func syncNow() {
+        guard !isSyncing else { return }
+        isSyncing = true
+        let albums = library.albums, folders = library.folders, filters = library.filters
+        let authorized = photos.isAuthorized
+        Task {
+            let listings = await Task.detached(priority: .utility) { () -> [String: [SyncEntry]] in
+                var out: [String: [SyncEntry]] = [:]
+                for f in folders { if let l = FolderScanner.scan(f) { out[f.id] = l } }
+                if authorized {
+                    for a in albums { if let l = PhotosService.listing(albumID: a.localID, filters: filters) { out[a.id] = l } }
+                }
+                return out
+            }.value
+            library.applySync(listings: listings, markSynced: true)
+            photos.refreshAlbums()
+            isSyncing = false
+            log.info("synced: \(self.library.items.count) photos")
+        }
+    }
+
+    private func scheduleSync(after seconds: Double) {
+        syncDebounce?.cancel()
+        syncDebounce = Task {
+            try? await Task.sleep(for: .seconds(seconds))
+            if !Task.isCancelled { syncNow() }
+        }
+    }
+
+    /// Sync at launch, then check hourly and sync once the last sync is a day old.
+    private func startSyncSchedule() {
+        scheduleSync(after: 2)
+        Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if Date().timeIntervalSince(self.library.lastSync ?? .distantPast) > 23 * 3600 { self.syncNow() }
+            }
+        }
     }
 
     // MARK: Settings
@@ -164,10 +237,20 @@ final class AppState: ObservableObject, PhotoProvider {
             case "--add" where i + 1 < args.count:
                 library.add(urls: [URL(fileURLWithPath: args[i + 1])]); i += 1
             case "--play": play = true
+            case "--album" where i + 1 < args.count:
+                let want = args[i + 1]; i += 1
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1))
+                    if let a = self.photos.albums.first(where: { $0.title.localizedCaseInsensitiveContains(want) }) { self.setAlbum(a, included: true) }
+                }
+            case "--connect-photos": connectPhotos()
             default: break
             }
             i += 1
         }
         if play { self.play() }
+        if renderer?.debug == true {
+            FileHandle.standardError.write(Data("kaleido: photos status \(photos.status.rawValue), albums \(photos.albums.count)\n".utf8))
+        }
     }
 }

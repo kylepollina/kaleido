@@ -24,6 +24,8 @@
     <string>public.app-category.graphics-design</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Kaleido reads the albums you choose so it can show your photos as a kaleidoscope on your desktop. It never changes or copies your library.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

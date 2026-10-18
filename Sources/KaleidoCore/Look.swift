@@ -53,8 +53,8 @@ public struct Look: Codable, Equatable, Sendable {
     public var mode: MirrorMode = .radial
     /// Mirror segments around the center (radial/fractal) or tile density (hex).
     public var segments: Int = 8
-    /// Degrees per second the mirror pattern turns. Calm range: +-3, default about one turn per 15 minutes.
-    public var rotationSpeed: Double = 0.4
+    /// Degrees per second the mirror pattern turns. Calm range: +-3, default about one turn per 30 minutes.
+    public var rotationSpeed: Double = 0.2
     /// Magnification of the photo inside the mirrors.
     public var zoom: Double = 1.0
     /// 0...1 how far the sampled window wanders across the photo.

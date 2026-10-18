@@ -192,22 +192,36 @@ struct PreviewView: NSViewRepresentable {
 
 struct LibraryPane: View {
     @EnvironmentObject var app: AppState
+    @State private var filter = "all"
+    @State private var showSources = true
     private let columns = [GridItem(.adaptive(minimum: 130, maximum: 180), spacing: 10)]
+
+    private var shown: [PhotoItem] {
+        switch filter {
+        case "all": return app.library.items
+        case "manual": return app.library.items.filter(\.isManual)
+        default: return app.library.items.filter { $0.sources.contains(filter) }
+        }
+    }
 
     var body: some View {
         let items = app.library.items
         let enabled = app.library.enabledItems.count
+        let noSources = items.isEmpty && app.library.albums.isEmpty && app.library.folders.isEmpty
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Photo library").font(.headline)
-                    Text(items.isEmpty ? "Add photos to start" : "\(enabled) of \(items.count) in rotation")
+                    Text(items.isEmpty ? "Nothing selected yet" : "\(enabled) of \(items.count) in rotation")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
+                if app.isSyncing { ProgressView().controlSize(.small) }
                 Button("Add Photos…") { choose(directories: false) }
                 Button("Add Folder…") { choose(directories: true) }
                 Menu {
+                    Button("Sync now") { app.syncNow() }
+                    Divider()
                     Button("Use all") { app.library.setEnabled(true) }
                     Button("Use none") { app.library.setEnabled(false) }
                     Divider()
@@ -215,23 +229,54 @@ struct LibraryPane: View {
                         app.library.remove(ids: Set(items.filter { !$0.isEnabled }.map(\.id)))
                     }
                     Button("Remove missing files") { app.library.removeMissing() }
+                    Button("Bring back removed photos (\(app.library.dismissedCount))") { app.library.resetDismissed(); app.syncNow() }
+                        .disabled(app.library.dismissedCount == 0)
                 } label: { Image(systemName: "ellipsis.circle") }
                     .menuStyle(.borderlessButton).fixedSize()
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
 
+            DisclosureGroup(isExpanded: $showSources) {
+                SourcesView()
+            } label: {
+                HStack {
+                    Text("Sources").font(.subheadline.weight(.medium))
+                    Spacer()
+                    Text(syncLine).font(.caption).foregroundStyle(.secondary)
+                    Button("Sync now") { app.syncNow() }.controlSize(.small).disabled(app.isSyncing)
+                }
+            }
+            .padding(.horizontal, 16).padding(.bottom, 8)
+
+            if !items.isEmpty {
+                HStack {
+                    Picker("Show", selection: $filter) {
+                        Text("All photos").tag("all")
+                        Text("Added by hand").tag("manual")
+                        ForEach(app.library.albums) { Text("Album: \($0.title)").tag($0.id) }
+                        ForEach(app.library.folders) { Text("Folder: \($0.name)").tag($0.id) }
+                    }
+                    .labelsHidden().fixedSize()
+                    Text("\(shown.count) shown").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 16).padding(.bottom, 6)
+            }
+
             ScrollView {
                 if items.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "photo.on.rectangle.angled").font(.system(size: 40)).foregroundStyle(.tertiary)
-                        Text("Drop photos or folders here").foregroundStyle(.secondary)
-                        Text("JPEG, PNG, HEIC and more. Kaleido only reads them; your files are never copied or changed.")
-                            .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+                        Text(noSources ? "Pick some photos to get started" : "No photos yet").foregroundStyle(.secondary)
+                        Text(noSources
+                             ? "Tick albums from your Photos library above, add a folder, or drop photos and folders here. Kaleido only reads them; your files are never copied or changed, and new photos in chosen albums and folders are picked up about once a day."
+                             : "Waiting for the first sync, or the chosen albums are empty under the current filters.")
+                            .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center).frame(maxWidth: 420)
                     }
-                    .frame(maxWidth: .infinity).padding(.top, 60)
+                    .frame(maxWidth: .infinity).padding(.top, 30)
                 } else {
                     LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(items) { item in PhotoTile(item: item) }
+                        ForEach(shown) { item in PhotoTile(item: item) }
                     }
                     .padding(.horizontal, 16).padding(.bottom, 16)
                 }
@@ -242,6 +287,13 @@ struct LibraryPane: View {
         }
     }
 
+    private var syncLine: String {
+        if app.isSyncing { return "Syncing…" }
+        guard let d = app.library.lastSync else { return "Not synced yet" }
+        if Date().timeIntervalSince(d) < 10 { return "Synced just now" }
+        return "Last synced " + RelativeDateTimeFormatter().localizedString(for: d, relativeTo: Date())
+    }
+
     private func choose(directories: Bool) {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
@@ -250,6 +302,97 @@ struct LibraryPane: View {
         panel.allowedContentTypes = directories ? [] : [.image]
         panel.prompt = "Add"
         if panel.runModal() == .OK { app.library.add(urls: panel.urls) }
+    }
+}
+
+struct SourcesView: View {
+    @EnvironmentObject var app: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            photosSection
+            if !app.library.folders.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Watched folders").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    ForEach(app.library.folders) { f in
+                        HStack {
+                            Image(systemName: "folder")
+                            Text(f.name)
+                            Text(f.path).font(.caption).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.head)
+                            Spacer()
+                            Button { app.library.removeFolder(f.id) } label: { Image(systemName: "xmark.circle.fill") }
+                                .buttonStyle(.borderless).help("Stop watching this folder and remove its photos")
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.top, 6)
+    }
+
+    @ViewBuilder private var photosSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Photos library").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            switch app.photos.status {
+            case .notDetermined:
+                HStack {
+                    Text("Pull photos straight from your Photos albums. Kaleido only reads them.").font(.callout).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Connect Photos…") { app.connectPhotos() }
+                }
+            case .denied, .restricted:
+                HStack {
+                    Text("Photos access is off for Kaleido. Turn it on in System Settings > Privacy & Security > Photos.").font(.callout).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Open Settings") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Photos")!)
+                    }
+                }
+            default:
+                albumList
+            }
+        }
+    }
+
+    private var albumList: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if app.photos.status == .limited {
+                Text("Kaleido can see only the photos you allowed in System Settings (limited access).").font(.caption).foregroundStyle(.orange)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach([AlbumInfo.Group.smart, .user, .shared], id: \.rawValue) { group in
+                        let list = app.photos.albums.filter { $0.group == group }
+                        if !list.isEmpty {
+                            Text(group.rawValue).font(.caption2).foregroundStyle(.tertiary).padding(.top, 4)
+                            ForEach(list) { album in
+                                Toggle(isOn: Binding(
+                                    get: { app.library.albums.contains { $0.localID == album.localID } },
+                                    set: { app.setAlbum(album, included: $0) })) {
+                                    HStack { Text(album.title); Text("\(album.count)").foregroundStyle(.secondary).monospacedDigit() }
+                                }
+                                .toggleStyle(.checkbox)
+                            }
+                        }
+                    }
+                    if app.photos.albums.isEmpty { Text("No albums found.").foregroundStyle(.secondary) }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 150)
+            HStack(spacing: 16) {
+                Toggle("Skip screenshots", isOn: Binding(get: { app.library.filters.excludeScreenshots }, set: { app.library.filters.excludeScreenshots = $0 }))
+                Picker("Smallest photo", selection: Binding(get: { app.library.filters.minLongEdge }, set: { app.library.filters.minLongEdge = $0 })) {
+                    Text("Any size").tag(0)
+                    Text("1600 px").tag(1600)
+                    Text("2400 px").tag(2400)
+                    Text("3200 px").tag(3200)
+                }
+                .fixedSize()
+                Text("Videos are always skipped.").font(.caption).foregroundStyle(.secondary)
+            }
+            .controlSize(.small)
+        }
     }
 }
 
@@ -282,19 +425,24 @@ struct PhotoTile: View {
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(item.isEnabled ? Color.accentColor.opacity(0.7) : Color.clear, lineWidth: 2))
         .contentShape(Rectangle())
         .onTapGesture { app.library.toggle(item.id) }
-        .help(item.name)
+        .help(item.isAsset ? "Photos library" : item.name)
         .contextMenu {
             Button(item.isEnabled ? "Remove from rotation" : "Add to rotation") { app.library.toggle(item.id) }
             Button("Show now") { app.showNow(item.id) }
-            Button("Reveal in Finder") {
-                if let url = app.library.resolveURL(for: item.id) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            if !item.isAsset {
+                Button("Reveal in Finder") {
+                    if let url = app.library.resolveURL(for: item.id) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                }
             }
             Divider()
             Button("Remove from library", role: .destructive) { app.library.remove(ids: [item.id]) }
         }
         .task(id: item.id) {
-            guard let url = app.library.resolveURL(for: item.id) else { missing = true; return }
-            image = await Thumbnails.image(for: url)
+            if let assetID = item.assetID {
+                image = await Thumbnails.image(forAsset: assetID)
+            } else if let url = app.library.resolveURL(for: item.id) {
+                image = await Thumbnails.image(for: url)
+            }
             missing = image == nil
         }
     }

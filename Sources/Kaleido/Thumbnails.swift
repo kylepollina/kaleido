@@ -3,6 +3,15 @@ import ImageIO
 import KaleidoCore
 
 enum Thumbnails {
+    static func image(forAsset id: String) async -> NSImage? {
+        let key = "asset:\(id)" as NSString
+        if let hit = cache.object(forKey: key) { return hit }
+        guard let cg = await PhotosService.thumbnail(assetID: id) else { return nil }
+        let img = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        cache.setObject(img, forKey: key)
+        return img
+    }
+
     private static let cache: NSCache<NSString, NSImage> = {
         let c = NSCache<NSString, NSImage>()
         c.countLimit = 600

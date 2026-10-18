@@ -26,8 +26,24 @@ struct PhotoTexture {
 }
 
 struct PhotoRef: Equatable {
+    enum Source: Equatable { case file(URL), asset(String) }
     let id: UUID
-    let url: URL
+    let source: Source
+    var label: String {
+        switch source { case .file(let u): return u.lastPathComponent; case .asset(let a): return a }
+    }
+}
+
+enum PhotoLoader {
+    static func texture(for ref: PhotoRef, queue: MTLCommandQueue) async throws -> PhotoTexture {
+        switch ref.source {
+        case .file(let url):
+            return try TextureFactory.load(url: url, queue: queue)
+        case .asset(let id):
+            let image = try await PhotosService.image(assetID: id, maxDimension: CGFloat(TextureFactory.maxDimension))
+            return try TextureFactory.make(from: image, queue: queue)
+        }
+    }
 }
 
 /// Everything the renderer needs from the app, so it stays testable and free of UI state.
@@ -125,6 +141,7 @@ final class KaleidoRenderer {
     private var pending: (PhotoTexture, UUID?)?
     private var loading = false
     private var failures = 0
+    private var retryAt = 0.0
 
     private var lastTick: CFTimeInterval?
     private var shownFor: Double = 0
@@ -219,7 +236,7 @@ final class KaleidoRenderer {
     }
 
     private func startLoad() {
-        guard let provider else { return }
+        guard let provider, clock >= retryAt else { return }
         guard let ref = provider.nextPhoto(after: currentID) else { return }
         if ref.id == currentID { shownFor = 0; return }
         loadAsync(ref, force: false)
@@ -229,7 +246,8 @@ final class KaleidoRenderer {
         loading = true
         let queue = self.queue
         Task.detached(priority: .utility) { [weak self] in
-            let result = Result { try TextureFactory.load(url: ref.url, queue: queue) }
+            let result: Result<PhotoTexture, Error>
+            do { result = .success(try await PhotoLoader.texture(for: ref, queue: queue)) } catch { result = .failure(error) }
             await self?.finishLoad(result, ref: ref, force: force)
         }
     }
@@ -240,12 +258,15 @@ final class KaleidoRenderer {
         case .success(let tex):
             failures = 0
             pending = (tex, ref.id)
+            if debug { FileHandle.standardError.write(Data("kaleido: loaded \(tex.texture.width)x\(tex.texture.height)\n".utf8)) }
             if force { skipRequested = true }
         case .failure(let error):
             failures += 1
-            log.error("could not load \(ref.url.lastPathComponent): \(String(describing: error))")
+            if debug { FileHandle.standardError.write(Data("kaleido: load failed \(ref.label.prefix(12)): \(error)\n".utf8)) }
+            log.error("could not load \(ref.label): \(String(describing: error))")
             // The next tick asks the provider for another photo; give up quietly after repeated failures.
-            if failures > 8 { pending = nil }
+            pending = nil
+            retryAt = clock + min(pow(2, Double(failures)), 60)   // back off so a broken photo cannot spin the loader
         }
     }
 
