@@ -109,7 +109,7 @@ public struct Look: Codable, Equatable, Sendable {
     public static let outlineSteps: [Double] = [0, 0.5, 1]
     /// Diamonds pattern only: true ("Checker") gives each diamond orientation its own part of the photo and
     /// turning direction; false ("Mirror") makes every diamond the same.
-    public var checkerFaces = true
+    public var checkerFaces = false
     public var dynamicMirrors = false
     public var mirrorsMin = 4
     public var mirrorsMax = 12

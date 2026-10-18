@@ -207,7 +207,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).outline, 0, "older presets have none")
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.3}"#.utf8)).outline, 0.5, "snaps to off / medium / large")
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.1}"#.utf8)).outline, 0)
-        XCTAssertTrue(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).checkerFaces, "Diamonds keep the checker look by default")
+        XCTAssertFalse(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).checkerFaces, "Diamonds default to mirror faces")
         var on = Look(); on.outline = 1
         XCTAssertEqual(on.eased(toward: Look(), by: 0.3).outline, 0, "turning outlines off is immediate, no leftover hairline")
         s.allowHueChanges = false; s.allowSaturationChanges = false; s.allowBlur = false; s.allowVignette = false; s.allowSwirl = false

@@ -267,7 +267,7 @@ final class KaleidoRenderer {
     // MARK: Dynamic mirrors
 
     /// Seconds between mirror-count changes and how long each cross-fade lasts, at speed 1.
-    private let mirrorChangeInterval = 50.0, mirrorMorphSeconds = 10.0
+    private let mirrorChangeInterval = 180.0, mirrorMorphSeconds = 40.0
 
     private func dynamicKey(_ l: Look) -> String { "\(l.mode.rawValue)-\(l.segments)-\(l.mirrorsMin)-\(l.mirrorsMax)" }
 
