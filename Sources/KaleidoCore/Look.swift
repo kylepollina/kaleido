@@ -1,7 +1,7 @@
 import Foundation
 
 public enum MirrorMode: String, Codable, CaseIterable, Identifiable, Sendable {
-    case radial, hex, fractal, square, grid, spiral
+    case radial, hex, fractal, square, grid, spiral, triangle, cubes
     public var id: String { rawValue }
     public var label: String {
         switch self {
@@ -11,6 +11,8 @@ public enum MirrorMode: String, Codable, CaseIterable, Identifiable, Sendable {
         case .square: return "Square"
         case .grid: return "Mirror grid"
         case .spiral: return "Spiral"
+        case .triangle: return "Triangle"
+        case .cubes: return "Escher cubes"
         }
     }
     public var shaderIndex: Int32 {
@@ -21,14 +23,16 @@ public enum MirrorMode: String, Codable, CaseIterable, Identifiable, Sendable {
         case .square: return 3
         case .grid: return 4
         case .spiral: return 5
+        case .triangle: return 6
+        case .cubes: return 7
         }
     }
     /// Repeating tilings, where `segments` sets how dense the tiles are rather than a mirror count.
-    public var isTiling: Bool { self == .hex || self == .square || self == .grid }
+    public var isTiling: Bool { [.hex, .square, .grid, .triangle, .cubes].contains(self) }
     /// What the `segments` slider means in this mode.
     public var countLabel: String {
         switch self {
-        case .hex, .square, .grid: return "Tile density"
+        case .hex, .square, .grid, .triangle, .cubes: return "Tile density"
         case .spiral: return "Spiral arms"
         default: return "Mirrors"
         }
@@ -174,11 +178,12 @@ public struct Look: Codable, Equatable, Sendable {
     public static func random<G: RandomNumberGenerator>(using g: inout G) -> Look {
         var l = Look()
         // Classic is still the most likely; the tilings and the spiral show up for variety.
-        let modes: [(MirrorMode, Double)] = [(.radial, 0.45), (.hex, 0.13), (.fractal, 0.12), (.square, 0.12), (.grid, 0.08), (.spiral, 0.10)]
+        let modes: [(MirrorMode, Double)] = [(.radial, 0.40), (.hex, 0.10), (.fractal, 0.10), (.square, 0.10), (.grid, 0.05),
+                                             (.spiral, 0.09), (.triangle, 0.09), (.cubes, 0.07)]
         var roll = Double.random(in: 0..<1, using: &g)
         l.mode = modes.first { roll -= $0.1; return roll < 0 }?.0 ?? .radial
         switch l.mode {
-        case .hex, .square, .grid: l.segments = Int.random(in: 3...9, using: &g)
+        case .hex, .square, .grid, .triangle, .cubes: l.segments = Int.random(in: 3...9, using: &g)
         case .fractal: l.segments = [3, 4, 5, 6, 8].randomElement(using: &g)!
         case .spiral: l.segments = [2, 4, 6, 8].randomElement(using: &g)!
         case .radial: l.segments = [3, 4, 5, 6, 6, 7, 8, 8, 9, 10, 12, 14, 16].randomElement(using: &g)!
@@ -277,6 +282,14 @@ public struct Preset: Identifiable, Equatable, Sendable {
             make("Spiral Tunnel") {
                 $0.mode = .spiral; $0.segments = 6; $0.rotationSpeed = 0.06; $0.zoom = 1.0; $0.drift = 0.3
                 $0.vignette = 0.45
+            },
+            make("Triangle Kaleidoscope") {
+                $0.mode = .triangle; $0.segments = 4; $0.rotationSpeed = 0.04; $0.zoom = 1.2; $0.drift = 0.4
+                $0.driftSpeed = 0.08
+            },
+            make("Escher Cubes") {
+                $0.mode = .cubes; $0.segments = 4; $0.rotationSpeed = 0.02; $0.zoom = 1.0; $0.drift = 0.35
+                $0.driftSpeed = 0.06; $0.vignette = 0.3
             },
             make("Gentle Window") {
                 $0.segments = 3; $0.rotationSpeed = 0.02; $0.zoom = 0.8; $0.drift = 0.6; $0.driftSpeed = 0.05

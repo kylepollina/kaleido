@@ -81,11 +81,14 @@ enum Shaders {
     // Maps a screen point (centred, units of screen height) to a point in photo space.
     // `scale` is how many photo-space units one screen unit covers at this point (for the mip level).
     // `segments` may be fractional while dynamic mirrors open up a new mirror (or tiles grow denser).
-    float2 kaleidoPoint(float2 p, constant Uniforms &u, float zoomMul, int mode, float segments, thread float &scale) {
+    // `shade` darkens the result: cube faces and tile outlines (1 = untouched).
+    float2 kaleidoPoint(float2 p, constant Uniforms &u, float zoomMul, int mode, float segments, thread float &scale,
+                        thread float &shade) {
         float zoom = u.zoom * zoomMul;
         p = rot2(p, u.rotation);
         p = rot2(p, u.twist * length(p));
         scale = 1.0;
+        shade = 1.0;
         float2 f;
         if (mode == 1) {
             // Tiled: the lattice is rotated as a whole so the cell fold keeps lining up with cell edges.
@@ -126,6 +129,49 @@ enum Shaders {
             float2 lp = float2(log(r) * k + u.rotation * (2.0 / PI), atan2(p.y, p.x) * k);
             f = (triWave(lp) - 0.5) * 0.8;
             scale = 0.8 * k / r;
+        } else if (mode == 6) {
+            // Triangle: the classic toy, three mirrors forming an equilateral triangle (p3m1). Move into one
+            // 3 x sqrt(3) period of the pattern, then reflect across whichever triangle edge the point is
+            // outside of until it lands in the triangle.
+            float density = 0.6 + 0.25 * segments;
+            const float s3 = 1.7320508;
+            float2 t = p * density * 1.6;
+            t -= float2(3.0, s3) * floor(t / float2(3.0, s3));
+            for (int i = 0; i < 16; i++) {
+                if (t.y < 0.0) { t.y = -t.y; continue; }
+                float2 n1 = float2(0.8660254, -0.5);                      // edge through (0,0) at 60 degrees
+                float d1 = dot(t, n1);
+                if (d1 < 0.0) { t -= 2.0 * d1 * n1; continue; }
+                float2 n2 = float2(-0.8660254, -0.5);                     // edge through (1,0) at 120 degrees
+                float d2 = dot(t - float2(1.0, 0.0), n2);
+                if (d2 < 0.0) { t -= 2.0 * d2 * n2; continue; }
+                break;
+            }
+            f = (t - float2(0.5, 0.2886751)) * 0.9;
+            scale = density * 1.6 * 0.9;
+        } else if (mode == 7) {
+            // Escher cubes (rhombille): each hexagon splits into three diamonds, shaded as the lit top and the
+            // two shadowed sides of a cube. Every diamond holds the same patch of photo, skewed onto its face,
+            // with a fine dark outline between tiles.
+            float density = 0.5 + 0.2 * segments;
+            float2 d = hexLocal(p * density);
+            const float R = 0.5773503;                                    // hexagon corner radius
+            float a = atan2(d.y, d.x);
+            a = a - 2.0 * PI * floor(a / (2.0 * PI));                     // 0 ... 2*PI
+            // Corners at 90, 210 and 330 degrees bound the three faces.
+            int face = (a >= PI / 2.0 && a < 7.0 * PI / 6.0) ? 1 : ((a >= 7.0 * PI / 6.0 && a < 11.0 * PI / 6.0) ? 2 : 0);
+            float a0 = face == 0 ? -PI / 6.0 : (face == 1 ? PI / 2.0 : 7.0 * PI / 6.0);
+            float2 e1 = R * float2(cos(a0), sin(a0));
+            float2 e2 = R * float2(cos(a0 + 2.0 * PI / 3.0), sin(a0 + 2.0 * PI / 3.0));
+            // Face coordinates: d = s*e1 + t*e2 with s, t in 0...1.
+            float det = e1.x * e2.y - e1.y * e2.x;
+            float2 st = float2(d.x * e2.y - d.y * e2.x, e1.x * d.y - e1.y * d.x) / det;
+            f = (st - 0.5) * 0.9;
+            scale = density * 0.9 / R;
+            shade = face == 0 ? 1.0 : (face == 1 ? 0.78 : 0.58);
+            float edge = min(min(st.x, 1.0 - st.x), min(st.y, 1.0 - st.y)) * R;  // lattice units to the tile edge
+            float px = density / u.height;                                     // one pixel, in lattice units
+            shade *= mix(0.15, 1.0, smoothstep(0.004 + px * 0.5, 0.004 + px * 2.0, edge));
         } else {
             f = foldRadial(p, segments);
         }
@@ -178,18 +224,19 @@ enum Shaders {
 
         float sA, sB;
         float3 col;
+        float hA, hB;
         if (u.hasB == 0) {
             float e = smoothstep(0.0, 1.0, u.morph);
             if (u.mode == 5 && u.morph > 0.0) {
                 // The spiral needs a whole, even number of arms, so it cross-fades between counts.
-                float2 q = kaleidoPoint(p, u, 1.0, u.mode, float(u.segments), sA);
-                float2 q2 = kaleidoPoint(p, u, 1.0, u.mode, float(u.segmentsMorph), sB);
-                col = mix(samplePhoto(texA, smp, q, u.aspectA, sA, u), samplePhoto(texA, smp, q2, u.aspectA, sB, u), e);
+                float2 q = kaleidoPoint(p, u, 1.0, u.mode, float(u.segments), sA, hA);
+                float2 q2 = kaleidoPoint(p, u, 1.0, u.mode, float(u.segmentsMorph), sB, hB);
+                col = mix(samplePhoto(texA, smp, q, u.aspectA, sA, u) * hA, samplePhoto(texA, smp, q2, u.aspectA, sB, u) * hB, e);
             } else {
                 // Everything else opens up: the count slides continuously from one whole number to the next.
                 float segs = mix(float(u.segments), float(u.segmentsMorph), e);
-                float2 q = kaleidoPoint(p, u, 1.0, u.mode, segs, sA);
-                col = samplePhoto(texA, smp, q, u.aspectA, sA, u);
+                float2 q = kaleidoPoint(p, u, 1.0, u.mode, segs, sA, hA);
+                col = samplePhoto(texA, smp, q, u.aspectA, sA, u) * hA;
             }
         } else {
             float zoomA = 1.0, zoomB = 1.0;
@@ -201,10 +248,10 @@ enum Shaders {
                 zoomA = exp(span * e);
                 zoomB = exp(-span * (1.0 - e));
             }
-            float2 qa = kaleidoPoint(p, u, zoomA, u.mode, float(u.segments), sA);
-            float2 qb = kaleidoPoint(p, u, zoomB, u.modeB, float(u.segmentsB), sB);
-            float3 a = samplePhoto(texA, smp, qa, u.aspectA, sA, u);
-            float3 b = samplePhoto(texB, smp, qb, u.aspectB, sB, u);
+            float2 qa = kaleidoPoint(p, u, zoomA, u.mode, float(u.segments), sA, hA);
+            float2 qb = kaleidoPoint(p, u, zoomB, u.modeB, float(u.segmentsB), sB, hB);
+            float3 a = samplePhoto(texA, smp, qa, u.aspectA, sA, u) * hA;
+            float3 b = samplePhoto(texB, smp, qb, u.aspectB, sB, u) * hB;
 
             float m;
             float w = 0.18;
