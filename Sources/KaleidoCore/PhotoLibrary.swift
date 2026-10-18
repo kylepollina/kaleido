@@ -74,6 +74,8 @@ struct LibraryFile: Codable {
     var dismissed: Set<String> = []
     var lastSync: Date?
     var filters = PhotoFilters()
+    /// macOS Wallpapers source: nil = not used, otherwise whether new wallpapers join automatically.
+    var wallpapers: Bool?
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -84,6 +86,7 @@ struct LibraryFile: Codable {
         dismissed = try c.decodeIfPresent(Set<String>.self, forKey: .dismissed) ?? []
         lastSync = try c.decodeIfPresent(Date.self, forKey: .lastSync)
         filters = try c.decodeIfPresent(PhotoFilters.self, forKey: .filters) ?? PhotoFilters()
+        wallpapers = try c.decodeIfPresent(Bool.self, forKey: .wallpapers)
     }
 }
 
@@ -95,6 +98,10 @@ public final class PhotoLibrary: ObservableObject {
     @Published public private(set) var albums: [AlbumRef] = []
     @Published public private(set) var lastSync: Date?
     @Published public var filters = PhotoFilters() { didSet { if filters != oldValue { save() } } }
+    /// macOS Wallpapers: nil = not in use; true = whole source (new wallpapers join); false = hand-picked.
+    @Published public private(set) var wallpapers: Bool?
+    /// Where built-in wallpapers are looked for (tests point this at a temporary folder).
+    public var wallpaperRoots = WallpaperScanner.defaultRoots
     private var dismissed: Set<String> = []
     private let fileURL: URL?
 
@@ -115,13 +122,26 @@ public final class PhotoLibrary: ObservableObject {
 
     private func apply(_ f: LibraryFile) {
         items = f.items; folders = f.folders; albums = f.albums; dismissed = f.dismissed; lastSync = f.lastSync; filters = f.filters
+        wallpapers = f.wallpapers
     }
 
     public var enabledItems: [PhotoItem] { items.filter(\.isEnabled) }
     public func item(_ id: UUID) -> PhotoItem? { items.first { $0.id == id } }
-    public var activeSources: Set<String> { Set(albums.map(\.id)).union(folders.map(\.id)) }
+    public var activeSources: Set<String> {
+        var s = Set(albums.map(\.id)).union(folders.map(\.id))
+        if wallpapers != nil { s.insert(WallpaperScanner.sourceID) }
+        return s
+    }
     private var autoSources: Set<String> {
-        Set(albums.filter(\.autoInclude).map(\.id)).union(folders.filter(\.autoInclude).map(\.id))
+        var s = Set(albums.filter(\.autoInclude).map(\.id)).union(folders.filter(\.autoInclude).map(\.id))
+        if wallpapers == true { s.insert(WallpaperScanner.sourceID) }
+        return s
+    }
+
+    /// Turns the built-in macOS Wallpapers source on (everything included) or off (its photos leave).
+    public func setWallpapers(_ on: Bool) {
+        wallpapers = on ? true : nil
+        applySync(listings: on ? [WallpaperScanner.sourceID: WallpaperScanner.scan(roots: wallpaperRoots)] : [:])
     }
     public var dismissedCount: Int { dismissed.count }
 
@@ -154,6 +174,7 @@ public final class PhotoLibrary: ObservableObject {
     public func syncFoldersNow() {
         var listings: [String: [SyncEntry]] = [:]
         for f in folders { if let l = FolderScanner.scan(f) { listings[f.id] = l } }
+        if wallpapers != nil { listings[WallpaperScanner.sourceID] = WallpaperScanner.scan(roots: wallpaperRoots) }
         applySync(listings: listings)
     }
 
@@ -204,10 +225,12 @@ public final class PhotoLibrary: ObservableObject {
     }
 
     public func autoInclude(_ source: String) -> Bool {
-        albums.first { $0.id == source }?.autoInclude ?? folders.first { $0.id == source }?.autoInclude ?? false
+        if source == WallpaperScanner.sourceID { return wallpapers == true }
+        return albums.first { $0.id == source }?.autoInclude ?? folders.first { $0.id == source }?.autoInclude ?? false
     }
 
     private func setAuto(_ source: String, _ value: Bool) {
+        if source == WallpaperScanner.sourceID, wallpapers != nil { wallpapers = value }
         if let i = albums.firstIndex(where: { $0.id == source }) { albums[i].autoInclude = value }
         if let i = folders.firstIndex(where: { $0.id == source }) { folders[i].autoInclude = value }
     }
@@ -306,6 +329,7 @@ public final class PhotoLibrary: ObservableObject {
         guard let fileURL else { return }
         var f = LibraryFile()
         f.items = items; f.folders = folders; f.albums = albums; f.dismissed = dismissed; f.lastSync = lastSync; f.filters = filters
+        f.wallpapers = wallpapers
         JSONFile.save(f, to: fileURL)
     }
 }

@@ -131,7 +131,9 @@ struct PreviewView: NSViewRepresentable {
 
 /// One card on the library home screen: a Photos album, a watched folder, or the hand-added photos.
 struct SourceCard: Identifiable {
-    enum Group: String, CaseIterable { case smart = "Smart albums", user = "My albums", shared = "Shared albums", folders = "Folders and files" }
+    enum Group: String, CaseIterable {
+        case smart = "Smart albums", user = "My albums", shared = "Shared albums", folders = "Folders", builtIn = "Built-in"
+    }
     let id: String
     let title: String
     let group: Group
@@ -141,6 +143,7 @@ struct SourceCard: Identifiable {
     var folder: FolderSource?
     var coverAssetID: String?
     var coverItemID: UUID?
+    var coverURL: URL?
     var isManual: Bool { id == PhotoLibrary.manualSource }
 }
 
@@ -164,7 +167,20 @@ func makeCards(_ app: AppState) -> [SourceCard] {
         cards.append(SourceCard(id: f.id, title: f.name, group: .folders, count: lib.itemIDs(in: f.id).count, state: state(f.id),
                                 folder: f, coverItemID: lib.itemIDs(in: f.id).first))
     }
+    // Always offered, so there is something to play even without photos of your own.
+    let wid = WallpaperScanner.sourceID
+    let inUse = lib.wallpapers != nil
+    cards.append(SourceCard(id: wid, title: "macOS Wallpapers", group: .builtIn,
+                            count: inUse ? lib.itemIDs(in: wid).count : BuiltInWallpapers.available.count,
+                            state: inUse ? state(wid) : .none,
+                            coverItemID: inUse ? lib.itemIDs(in: wid).first : nil,
+                            coverURL: BuiltInWallpapers.available.first.map { URL(fileURLWithPath: $0.key) }))
     return cards
+}
+
+/// What the macOS Wallpapers card can offer before it is switched on (scanned once).
+enum BuiltInWallpapers {
+    static let available: [SyncEntry] = WallpaperScanner.scan()
 }
 
 struct LibraryPane: View {
@@ -262,9 +278,7 @@ struct LibraryHomeView: View {
                         }
                     }
                 }
-                if cards.isEmpty && app.photos.isAuthorized {
-                    emptyHint
-                } else if cards.isEmpty {
+                if app.library.items.isEmpty {
                     emptyHint
                 }
             }
@@ -301,7 +315,7 @@ struct LibraryHomeView: View {
         VStack(spacing: 8) {
             Image(systemName: "photo.on.rectangle.angled").font(.system(size: 40)).foregroundStyle(.tertiary)
             Text("Pick some photos to get started").foregroundStyle(.secondary)
-            Text("Open an album, add a folder, or drop photos here. Kaleido only reads them. Albums and folders you include entirely pick up new photos about once a day.")
+            Text("Open an album, add a folder, or drop photos here. Kaleido only reads them. Albums and folders you include entirely pick up new photos about once a day. No photos of your own? Tick macOS Wallpapers under Built-in; scenic ones you download in System Settings > Wallpaper show up there too.")
                 .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center).frame(maxWidth: 420)
         }
         .frame(maxWidth: .infinity).padding(.top, 30)
@@ -324,6 +338,8 @@ struct CoverImage: View {
             else if let id = card.coverItemID, let item = app.library.item(id) {
                 if let a = item.assetID { image = await Thumbnails.image(forAsset: a) }
                 else if let url = app.library.resolveURL(for: id) { image = await Thumbnails.image(for: url) }
+            } else if let url = card.coverURL {
+                image = await Thumbnails.image(for: url)
             }
         }
     }

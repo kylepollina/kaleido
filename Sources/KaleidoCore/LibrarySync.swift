@@ -137,3 +137,36 @@ public enum FolderScanner {
         }
     }
 }
+
+/// The built-in "macOS Wallpapers" source: Apple's desktop pictures that are actually on disk.
+/// Most scenic ones (Big Sur, Catalina, The Lake...) are only stubs until downloaded in System Settings >
+/// Wallpaper; once downloaded they land in the MobileAsset folder and are picked up on the next sync.
+public enum WallpaperScanner {
+    public static let sourceID = "wallpapers"
+
+    public static let defaultRoots: [URL] = [
+        URL(fileURLWithPath: "/System/Library/Desktop Pictures"),
+        URL(fileURLWithPath: "/Library/Desktop Pictures"),
+        URL(fileURLWithPath: "/System/Library/AssetsV2/com_apple_MobileAsset_DesktopPicture"),
+    ]
+
+    /// Image files under the roots, skipping the plain "Solid Colors" swatches and hidden thumbnails.
+    public static func scan(roots: [URL] = defaultRoots) -> [SyncEntry] {
+        let fm = FileManager.default
+        var seen = Set<String>()
+        var out: [SyncEntry] = []
+        for root in roots {
+            guard let e = fm.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) else { continue }
+            var found: [URL] = []
+            for case let url as URL in e {
+                if url.lastPathComponent == "Solid Colors" || url.pathExtension == "madesktop" { e.skipDescendants(); continue }
+                if ImageFiles.isSupported(url) { found.append(url.standardizedFileURL) }
+            }
+            for url in found.sorted(by: { $0.path.localizedStandardCompare($1.path) == .orderedAscending })
+            where seen.insert(url.path).inserted {
+                out.append(SyncEntry(key: url.path, name: url.deletingPathExtension().lastPathComponent, isAsset: false))
+            }
+        }
+        return out
+    }
+}

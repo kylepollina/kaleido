@@ -94,6 +94,8 @@ struct HomeView: View {
                         Image(systemName: "photo.badge.plus")
                         Text("No photos selected yet.")
                         Button("Choose photos…") { go(.photos) }
+                        Button("Use macOS wallpapers") { app.library.setWallpapers(true) }
+                            .help("Play Apple's desktop pictures until you pick your own")
                     }
                     .foregroundStyle(.secondary)
                 } else {

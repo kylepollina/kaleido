@@ -35,6 +35,9 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 - **Mixed-up looks.** The slideshow can switch preset looks now and then or with every photo; Next brings a new
   photo and a new look, Surprise me a new photo and a random look. Looks change in step with the cross-fade.
 - **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every look.
+- **macOS Wallpapers.** No photos of your own? A built-in card offers Apple's desktop pictures that are on disk
+  (skipping the plain solid colours). Scenic ones like Big Sur or The Lake are only downloaded when you pick them in
+  System Settings > Wallpaper; once downloaded they join automatically on the next sync.
 - **Album browser.** Your Photos albums (smart, yours, shared), watched folders and hand-added photos show up as
   cards with a cover photo, name, count and a badge (All / N of M). Tick a card's circle to include the whole
   album, or click the card to open it: click photos to toggle them, Shift-click for a range, plus Select All,

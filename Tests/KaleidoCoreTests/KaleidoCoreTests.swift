@@ -750,3 +750,43 @@ final class PresetRenameTests: XCTestCase {
         XCTAssertEqual(lib.presets.filter { $0.originalName == "Dream" }.count, 2, "no duplicate Dream is added")
     }
 }
+
+final class WallpaperSourceTests: XCTestCase {
+    func testScanSkipsSolidColorsStubsAndHiddenFiles() throws {
+        let root = tempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fm = FileManager.default
+        try fm.createDirectory(at: root.appendingPathComponent("Solid Colors"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: root.appendingPathComponent("asset/AssetData"), withIntermediateDirectories: true)
+        writePNG(root.appendingPathComponent("Sonoma.png"))
+        writePNG(root.appendingPathComponent("Solid Colors/Black.png"))
+        writePNG(root.appendingPathComponent("asset/AssetData/The Lake.png"))
+        try Data("<plist/>".utf8).write(to: root.appendingPathComponent("Big Sur.madesktop"))
+        writePNG(root.appendingPathComponent(".thumb.png"))
+        let names = WallpaperScanner.scan(roots: [root, root.appendingPathComponent("missing")]).map(\.name)
+        XCTAssertEqual(Set(names), ["Sonoma", "The Lake"], "downloaded wallpapers in sub-folders are found; swatches and stubs are not")
+    }
+
+    func testTurningWallpapersOnAndOff() throws {
+        let root = tempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        writePNG(root.appendingPathComponent("A.png"))
+        writePNG(root.appendingPathComponent("B.png"))
+        let store = root.appendingPathComponent("lib/library.json")
+        let lib = PhotoLibrary(fileURL: store)
+        lib.wallpaperRoots = [root]
+        lib.setWallpapers(true)
+        XCTAssertEqual(lib.selectionState(in: WallpaperScanner.sourceID), .all(total: 2))
+        XCTAssertTrue(lib.autoInclude(WallpaperScanner.sourceID))
+
+        writePNG(root.appendingPathComponent("C.png"))   // e.g. a wallpaper downloaded later
+        lib.syncFoldersNow()
+        XCTAssertEqual(lib.selectionState(in: WallpaperScanner.sourceID), .all(total: 3), "new wallpapers join a whole source")
+
+        let back = PhotoLibrary(fileURL: store)
+        XCTAssertEqual(back.wallpapers, true, "the choice is remembered")
+        back.setWallpapers(false)
+        XCTAssertNil(back.wallpapers)
+        XCTAssertTrue(back.items.isEmpty)
+    }
+}
