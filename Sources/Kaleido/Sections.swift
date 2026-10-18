@@ -331,8 +331,6 @@ struct PresetEditor: View {
                     .disabled(!app.settings.allowHueChanges)
                     SliderRow("Saturation", value: bind(\.saturation), range: 0...2) { String(format: "%.0f%%", $0 * 100) }
                         .disabled(!app.settings.allowSaturationChanges)
-                    SliderRow("Blur", value: bind(\.blur), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
-                        .disabled(!app.settings.allowBlur)
                     SliderRow("Vignette", value: bind(\.vignette), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
                         .disabled(!app.settings.allowVignette)
                 } header: {
@@ -383,7 +381,6 @@ struct SettingsView: View {
             Section {
                 Toggle("Hue shifts and color cycling", isOn: $app.settings.allowHueChanges)
                 Toggle("Saturation changes", isOn: $app.settings.allowSaturationChanges)
-                Toggle("Blur", isOn: $app.settings.allowBlur)
                 Toggle("Vignette", isOn: $app.settings.allowVignette)
                 Toggle("Swirl", isOn: $app.settings.allowSwirl)
                 Toggle("Dynamic mirrors", isOn: $app.settings.allowDynamicMirrors)

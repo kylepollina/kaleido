@@ -30,8 +30,16 @@ public final class PresetLibrary: ObservableObject {
         self.fileURL = fileURL
         if let fileURL, let saved = JSONFile.load([SavedPreset].self, from: fileURL), !saved.isEmpty {
             presets = saved
+            // Built-ins renamed in later versions keep their place (and the user's edits).
+            let renamed = ["Dream Blur": "Dream"]
+            for i in presets.indices where presets[i].isBuiltIn {
+                guard let new = renamed[presets[i].originalName] else { continue }
+                if presets[i].name == presets[i].originalName { presets[i].name = new }
+                presets[i].originalName = new
+                if let fresh = Preset.all.first(where: { $0.name == new }) { presets[i].originalLook = fresh.look }
+            }
             // Built-ins added in later versions show up for existing users too.
-            let have = Set(saved.filter(\.isBuiltIn).map(\.originalName))
+            let have = Set(presets.filter(\.isBuiltIn).map(\.originalName))
             for p in Preset.all where !have.contains(p.name) {
                 presets.append(SavedPreset(name: p.name, look: p.look, isBuiltIn: true))
             }

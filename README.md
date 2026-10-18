@@ -34,7 +34,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
 - **Mixed-up looks.** The slideshow can switch preset looks now and then or with every photo; Next brings a new
   photo and a new look, Surprise me a new photo and a random look. Looks change in step with the cross-fade.
-- **Global switches.** Turn off hue shifts, saturation changes, blur, vignette or swirl for every look.
+- **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every look.
 - **Album browser.** Your Photos albums (smart, yours, shared), watched folders and hand-added photos show up as
   cards with a cover photo, name, count and a badge (All / N of M). Tick a card's circle to include the whole
   album, or click the card to open it: click photos to toggle them, Shift-click for a range, plus Select All,
@@ -49,7 +49,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 - **Barely moving by default.** The default look is the "Slow Mandala": a full turn takes well over an hour, the
   zoom breathes once every ten minutes, cross-fades last 12 seconds. A master **Motion** slider runs from Still
   to Gentle (and a little livelier), with per-parameter speeds under "Advanced motion". Speed sliders are
-  logarithmic, so the slow end has fine control. Also zoom, swirl, blur, hue shift, saturation and vignette.
+  logarithmic, so the slow end has fine control. Also zoom, swirl, hue shift, saturation and vignette.
 - **Presets and "Surprise me"** for a random, good-looking look.
 - **Shuffle** (every photo once per round, never the same twice in a row) or in order, with a seconds-per-photo
   setting and six transitions (dissolve, iris, swirl wipe, zoom through, segment ripple, spin) or random.

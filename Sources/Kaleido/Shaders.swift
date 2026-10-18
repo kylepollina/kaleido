@@ -14,7 +14,6 @@ enum Shaders {
         float hue;           // radians
         float saturation;
         float vignette;
-        float blurLod;       // extra mip levels
         float time;
         float aspectA, aspectB;
         float mixAmount;     // 0...1 transition progress (raw)
@@ -289,7 +288,7 @@ enum Shaders {
         // Photo space: height = 1, width = aspect. Mirrored repeat extends it without edges.
         float2 uv = float2(q.x / aspect, q.y) + 0.5;
         float texels = (scale / u.height) * float(tex.get_height());
-        float lod = max(log2(max(texels, 1.0)), 0.0) + u.blurLod;
+        float lod = max(log2(max(texels, 1.0)), 0.0);
         return tex.sample(smp, uv, level(lod)).rgb;
     }
 

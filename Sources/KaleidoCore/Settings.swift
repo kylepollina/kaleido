@@ -52,7 +52,6 @@ public struct Settings: Codable, Equatable, Sendable {
     // Global switches that win over any look, preset or Surprise me.
     public var allowHueChanges = true
     public var allowSaturationChanges = true
-    public var allowBlur = true
     public var allowVignette = true
     public var allowSwirl = true
     public var allowDynamicMirrors = true
@@ -67,7 +66,6 @@ public struct Settings: Codable, Equatable, Sendable {
         var r = l
         if !allowHueChanges { r.hueShift = 0; r.hueSpeed = 0 }
         if !allowSaturationChanges { r.saturation = 1 }
-        if !allowBlur { r.blur = 0 }
         if !allowVignette { r.vignette = 0 }
         if !allowSwirl { r.twist = 0 }
         if !allowDynamicMirrors { r.dynamicMirrors = false }
@@ -95,7 +93,6 @@ public struct Settings: Codable, Equatable, Sendable {
         activePresetID = try? c.decodeIfPresent(UUID.self, forKey: .activePresetID)
         allowHueChanges = try c.decodeIfPresent(Bool.self, forKey: .allowHueChanges) ?? true
         allowSaturationChanges = try c.decodeIfPresent(Bool.self, forKey: .allowSaturationChanges) ?? true
-        allowBlur = try c.decodeIfPresent(Bool.self, forKey: .allowBlur) ?? true
         allowVignette = try c.decodeIfPresent(Bool.self, forKey: .allowVignette) ?? true
         allowSwirl = try c.decodeIfPresent(Bool.self, forKey: .allowSwirl) ?? true
         allowDynamicMirrors = try c.decodeIfPresent(Bool.self, forKey: .allowDynamicMirrors) ?? true

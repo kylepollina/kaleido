@@ -3,7 +3,7 @@ import KaleidoCore
 import UniformTypeIdentifiers
 
 /// `Kaleido --snapshot out.png --photo a.jpg [--photo2 b.jpg --mix 0.5 --transition iris]
-///  [--mode radial|hex|fractal] [--segments 8] [--zoom 1] [--time 12] [--size 1280x720] [--blur 0] [--twist 0] [--hue 0]`
+///  [--mode radial|hex|fractal] [--segments 8] [--zoom 1] [--time 12] [--size 1280x720] [--twist 0] [--hue 0]`
 /// Renders one frame offscreen with the real shader and exits. Needs no window or screen-recording permission.
 enum Snapshot {
     @MainActor
@@ -21,7 +21,6 @@ enum Snapshot {
         if let m = value("--mode"), let mode = MirrorMode(rawValue: m) { look.mode = mode }
         if let s = value("--segments").flatMap(Int.init) { look.segments = s }
         if let z = value("--zoom").flatMap(Double.init) { look.zoom = z }
-        if let b = value("--blur").flatMap(Double.init) { look.blur = b }
         if let t = value("--twist").flatMap(Double.init) { look.twist = t }
         if let o = value("--outline").flatMap(Double.init) { look.outline = o }
         if args.contains("--mirror-faces") { look.checkerFaces = false }

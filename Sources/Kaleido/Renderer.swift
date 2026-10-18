@@ -7,14 +7,14 @@ import MetalKit
 import UniformTypeIdentifiers
 import os
 
-/// Must match `Uniforms` in the shader: 18 floats, then 10 int32s.
+/// Must match `Uniforms` in the shader: 17 floats, then 10 int32s.
 struct GPUUniforms {
     var width: Float = 0, height: Float = 0
     var rotation: Float = 0, sourceRotation: Float = 0
     var panX: Float = 0, panY: Float = 0
     var zoom: Float = 1, twist: Float = 0
     var hue: Float = 0, saturation: Float = 1, vignette: Float = 0
-    var blurLod: Float = 0, time: Float = 0
+    var time: Float = 0
     var aspectA: Float = 1, aspectB: Float = 1
     var mixAmount: Float = 0, morph: Float = 0, outline: Float = 0
     var segments: Int32 = 8, mode: Int32 = 0, transition: Int32 = 0, hasB: Int32 = 0
@@ -416,7 +416,6 @@ final class KaleidoRenderer {
         u.vignette = Float(look.vignette)
         u.outline = Float(look.outline)
         u.checkerFaces = look.checkerFaces ? 1 : 0
-        u.blurLod = Float(look.blur * 5)
         u.time = Float(clock.truncatingRemainder(dividingBy: 1000))
         u.aspectA = current.aspect
         u.segments = Int32(currentShape.segments)

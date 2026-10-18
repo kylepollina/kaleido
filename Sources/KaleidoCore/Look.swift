@@ -90,8 +90,6 @@ public struct Look: Codable, Equatable, Sendable {
     public var driftSpeed: Double = 0.08
     /// Swirl: bends the mirrors with distance from the center, in radians per screen height.
     public var twist: Double = 0
-    /// 0...1 softness (samples blurrier mip levels).
-    public var blur: Double = 0
     /// Static hue rotation in degrees.
     public var hueShift: Double = 0
     /// Degrees per second the hue keeps rotating (at most 0.6: a full cycle in 10 minutes).
@@ -126,7 +124,6 @@ public struct Look: Codable, Equatable, Sendable {
         drift = try c.decodeIfPresent(Double.self, forKey: .drift) ?? d.drift
         driftSpeed = try c.decodeIfPresent(Double.self, forKey: .driftSpeed) ?? d.driftSpeed
         twist = try c.decodeIfPresent(Double.self, forKey: .twist) ?? d.twist
-        blur = try c.decodeIfPresent(Double.self, forKey: .blur) ?? d.blur
         hueShift = try c.decodeIfPresent(Double.self, forKey: .hueShift) ?? d.hueShift
         hueSpeed = try c.decodeIfPresent(Double.self, forKey: .hueSpeed) ?? d.hueSpeed
         saturation = try c.decodeIfPresent(Double.self, forKey: .saturation) ?? d.saturation
@@ -160,7 +157,6 @@ public struct Look: Codable, Equatable, Sendable {
         mirrorsMin = min(max(mirrorsMin, r.lowerBound), r.upperBound)
         mirrorsMax = min(max(mirrorsMax, r.lowerBound), r.upperBound)
         if mirrorsMin > mirrorsMax { swap(&mirrorsMin, &mirrorsMax) }
-        blur = min(max(blur, 0), 1)
         saturation = min(max(saturation, 0), 2)
         vignette = min(max(vignette, 0), 1)
     }
@@ -174,7 +170,6 @@ public struct Look: Codable, Equatable, Sendable {
         r.drift = l(drift, target.drift)
         r.driftSpeed = l(driftSpeed, target.driftSpeed)
         r.twist = l(twist, target.twist)
-        r.blur = l(blur, target.blur)
         r.hueShift = l(hueShift, target.hueShift)
         r.hueSpeed = l(hueSpeed, target.hueSpeed)
         r.saturation = l(saturation, target.saturation)
@@ -203,7 +198,6 @@ public struct Look: Codable, Equatable, Sendable {
         l.drift = Double.random(in: 0.15...0.7, using: &g)
         l.driftSpeed = Double.random(in: 0.03...0.15, using: &g)
         l.twist = Double.random(in: 0..<1, using: &g) < 0.3 ? Double.random(in: -0.4...0.4, using: &g) : 0
-        l.blur = Double.random(in: 0..<1, using: &g) < 0.25 ? Double.random(in: 0.1...0.5, using: &g) : 0
         l.hueShift = Double.random(in: 0..<1, using: &g) < 0.4 ? Double.random(in: 0...360, using: &g) : 0
         l.hueSpeed = Double.random(in: 0..<1, using: &g) < 0.3 ? Double.random(in: 0.05...0.2, using: &g) : 0
         l.saturation = Double.random(in: 0.95...1.4, using: &g)
@@ -272,8 +266,8 @@ public struct Preset: Identifiable, Equatable, Sendable {
                 $0.mode = .fractal; $0.segments = 5; $0.rotationSpeed = 0.1; $0.zoom = 1.3; $0.drift = 0.45
                 $0.driftSpeed = 0.1; $0.saturation = 1.25
             },
-            make("Dream Blur") {
-                $0.segments = 6; $0.rotationSpeed = 0.06; $0.zoom = 0.9; $0.blur = 0.45; $0.drift = 0.5
+            make("Dream") {
+                $0.segments = 6; $0.rotationSpeed = 0.06; $0.zoom = 0.9; $0.drift = 0.5
                 $0.saturation = 1.3; $0.vignette = 0.4
             },
             make("Prism") {

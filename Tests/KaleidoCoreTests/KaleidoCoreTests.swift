@@ -195,7 +195,7 @@ final class SettingsTests: XCTestCase {
     func testGlobalSwitchesOverrideAnyLook() {
         var s = Settings()
         var wild = Look()
-        wild.hueShift = 120; wild.hueSpeed = 0.5; wild.saturation = 1.8; wild.blur = 0.6; wild.vignette = 0.7; wild.twist = 0.5
+        wild.hueShift = 120; wild.hueSpeed = 0.5; wild.saturation = 1.8; wild.vignette = 0.7; wild.twist = 0.5
         XCTAssertEqual(s.effectiveLook(wild).saturation, 1.8, "allowed by default")
         wild.dynamicMirrors = true
         wild.outline = 0.4
@@ -210,12 +210,12 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).checkerFaces, "Diamonds default to mirror faces")
         var on = Look(); on.outline = 1
         XCTAssertEqual(on.eased(toward: Look(), by: 0.3).outline, 0, "turning outlines off is immediate, no leftover hairline")
-        s.allowHueChanges = false; s.allowSaturationChanges = false; s.allowBlur = false; s.allowVignette = false; s.allowSwirl = false
+        s.allowHueChanges = false; s.allowSaturationChanges = false; s.allowVignette = false; s.allowSwirl = false
         s.allowDynamicMirrors = false
         let e = s.effectiveLook(wild)
         XCTAssertFalse(e.dynamicMirrors)
         XCTAssertEqual(e.hueShift, 0); XCTAssertEqual(e.hueSpeed, 0); XCTAssertEqual(e.saturation, 1)
-        XCTAssertEqual(e.blur, 0); XCTAssertEqual(e.vignette, 0); XCTAssertEqual(e.twist, 0)
+        XCTAssertEqual(e.vignette, 0); XCTAssertEqual(e.twist, 0)
         XCTAssertEqual(e.segments, wild.segments, "shape is untouched")
         let back = try! JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s))
         XCTAssertFalse(back.allowHueChanges); XCTAssertFalse(back.allowSwirl)
@@ -728,5 +728,25 @@ final class DynamicMirrorTests: XCTestCase {
         XCTAssertEqual(swapped.mirrorsMin, 2)
         XCTAssertEqual(swapped.mirrorsMax, 24)
         XCTAssertTrue(Preset.all.contains { $0.look.dynamicMirrors }, "there is a built-in dynamic preset")
+    }
+}
+
+final class PresetRenameTests: XCTestCase {
+    func testDreamBlurBecomesDreamAndKeepsEdits() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("presets.json")
+        var old = SavedPreset(name: "Dream Blur", look: Look(), isBuiltIn: true)
+        old.isFavorite = false
+        var untouched = SavedPreset(name: "Dream Blur", look: Look(), isBuiltIn: true)
+        untouched.name = "My dreamy one"
+        try JSONEncoder().encode([old, untouched]).write(to: file)
+
+        let lib = PresetLibrary(fileURL: file)
+        XCTAssertFalse(lib.presets.contains { $0.originalName == "Dream Blur" })
+        XCTAssertEqual(lib.preset(old.id)?.name, "Dream")
+        XCTAssertEqual(lib.preset(old.id)?.isFavorite, false, "the user's heart choice is kept")
+        XCTAssertEqual(lib.preset(untouched.id)?.name, "My dreamy one", "a name the user changed is kept")
+        XCTAssertEqual(lib.presets.filter { $0.originalName == "Dream" }.count, 2, "no duplicate Dream is added")
     }
 }
