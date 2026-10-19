@@ -28,6 +28,28 @@ public enum SceneShuffle: String, Codable, CaseIterable, Identifiable, Sendable 
     }
 }
 
+/// How the view zooms, for every scene. Infinite zooms loop seamlessly (each doubling cross-fades into the next).
+public enum ZoomMotion: String, Codable, CaseIterable, Identifiable, Sendable {
+    case breathe, zoomIn, zoomOut, still
+    public var id: String { rawValue }
+    public var label: String {
+        switch self {
+        case .breathe: return "In and out"
+        case .zoomIn: return "Zoom in"
+        case .zoomOut: return "Zoom out"
+        case .still: return "Still"
+        }
+    }
+    /// +1 zooms in forever, -1 out forever, 0 neither.
+    public var direction: Int {
+        switch self {
+        case .zoomIn: return 1
+        case .zoomOut: return -1
+        case .breathe, .still: return 0
+        }
+    }
+}
+
 /// Where a new scene's pattern comes from.
 public enum PatternSource: String, Codable, CaseIterable, Identifiable, Sendable {
     case current, mine, invented, both
@@ -84,6 +106,9 @@ public struct Settings: Codable, Equatable, Sendable {
     public var keepScreenAwake = false
     /// 0...4, an index into `speedMultipliers`.
     public var speedStep = Settings.defaultSpeedStep
+    /// Movement, on top of any pattern: how the view zooms, and whether the photo drifts around.
+    public var zoomMotion: ZoomMotion = .breathe
+    public var driftMotion = true
     public var sceneShuffle: SceneShuffle = .mixed
     public var patternSource: PatternSource = .both
     /// Shapes invented patterns may not use (e.g. Diamonds, if you don't like it).
@@ -117,6 +142,8 @@ public struct Settings: Codable, Equatable, Sendable {
         if !allowSwirl { r.twist = 0 }
         if !allowDynamicMirrors { r.dynamicMirrors = false }
         if !allowOutlines { r.outline = 0 }
+        if !driftMotion { r.drift = 0 }
+        if zoomMotion != .breathe { r.breathing = 0 }
         r.motion = l.motion * speedMultiplier
         return r
     }
@@ -136,6 +163,8 @@ public struct Settings: Codable, Equatable, Sendable {
         playOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .playOnLaunch) ?? d.playOnLaunch
         keepScreenAwake = try c.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? d.keepScreenAwake
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
+        zoomMotion = (try? c.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion)) ?? d.zoomMotion
+        driftMotion = try c.decodeIfPresent(Bool.self, forKey: .driftMotion) ?? d.driftMotion
         sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
         patternSource = (try? c.decodeIfPresent(PatternSource.self, forKey: .patternSource)) ?? d.patternSource
         excludedShapes = (try? c.decodeIfPresent([MirrorMode].self, forKey: .excludedShapes)) ?? []

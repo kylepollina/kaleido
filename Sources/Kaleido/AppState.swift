@@ -553,6 +553,7 @@ final class AppState: ObservableObject, PhotoProvider {
         renderer.secondsPerPhoto = settings.secondsPerPhoto
         renderer.transitionSeconds = settings.transitionSeconds
         renderer.transitionStyle = settings.transition
+        renderer.zoomFlow = settings.zoomMotion.direction
         queue.shuffle = settings.shuffle
         updateHold()
         desktop?.setFrameRate(currentFrameRate)

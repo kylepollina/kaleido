@@ -37,6 +37,7 @@ enum Snapshot {
             if let to = value("--morph-to").flatMap(Int.init) {
                 renderer.forceMorph(to: to, progress: value("--morph").flatMap(Double.init) ?? 0.5)
             }
+            if let z = value("--zoom-phase").flatMap(Double.init) { renderer.forceZoomPhase(z) }
             let seconds = value("--time").flatMap(Double.init) ?? 0
             if photo2 == nil {
                 var t = 0.0

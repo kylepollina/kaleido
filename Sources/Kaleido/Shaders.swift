@@ -19,6 +19,7 @@ enum Shaders {
         float mixAmount;     // 0...1 transition progress (raw)
         float morph;         // 0...1 cross-fade from `segments` to `segmentsMorph` (dynamic mirrors)
         float outline;       // 0...1 thickness of black lines along the pattern's mirrors and tile edges
+        float zoomPhase;     // 0...1 through one doubling of an endless zoom
         int segments;       // mirrors of the outgoing photo (A)
         int mode;            // 0 radial, 1 hex, 2 fractal (A)
         int transition;      // 0 dissolve 1 iris 3 zoom 4 segments
@@ -28,6 +29,7 @@ enum Shaders {
         int original;        // 1 = show the photo itself, uncut (the preview's "Original" tab)
         int segmentsMorph;   // the mirror count being faded towards
         int outlines;        // 1 = draw the pattern's mirror and tile lines in red (preset editor preview)
+        int zoomLayers;      // 1 = endless zoom: blend two layers a doubling apart
     };
 
     struct VOut { float4 position [[position]]; };
@@ -303,25 +305,11 @@ enum Shaders {
         return c * cs + cross(k, c) * sn + k * dot(k, c) * (1.0 - cs);
     }
 
-    fragment float4 kaleido_fragment(VOut in [[stage_in]],
-                                     constant Uniforms &u [[buffer(0)]],
-                                     texture2d<float> texA [[texture(0)]],
-                                     texture2d<float> texB [[texture(1)]]) {
-        constexpr sampler smp(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::linear);
+    // The kaleidoscope (with any photo transition) at a given extra magnification.
+    float3 kaleidoColor(float2 p, constant Uniforms &u, texture2d<float> texA, texture2d<float> texB, sampler smp,
+                        float zoomMul) {
         float2 res = float2(u.width, u.height);
-        float2 p = (in.position.xy - 0.5 * res) / u.height;   // centred, y down; screen height = 1
-        p.y = -p.y;
         float t = u.mixAmount;
-
-        if (u.original == 1) {
-            float3 a = samplePlain(texA, smp, p, u.aspectA, res.x / res.y);
-            if (u.hasB == 1) {
-                float3 b = samplePlain(texB, smp, p, u.aspectB, res.x / res.y);
-                a = mix(a, b, smoothstep(0.0, 1.0, t));
-            }
-            return float4(a, 1.0);
-        }
-
         float sA, sB;
         float3 col;
         float hA, hB;
@@ -329,26 +317,26 @@ enum Shaders {
             float e = smoothstep(0.0, 1.0, u.morph);
             if (u.mode == 5 && u.morph > 0.0) {
                 // The spiral needs a whole, even number of arms, so it cross-fades between counts.
-                float2 q = kaleidoPoint(p, u, 1.0, u.mode, float(u.segments), sA, hA);
-                float2 q2 = kaleidoPoint(p, u, 1.0, u.mode, float(u.segmentsMorph), sB, hB);
+                float2 q = kaleidoPoint(p, u, zoomMul, u.mode, float(u.segments), sA, hA);
+                float2 q2 = kaleidoPoint(p, u, zoomMul, u.mode, float(u.segmentsMorph), sB, hB);
                 col = mix(samplePhoto(texA, smp, q, u.aspectA, sA, u) * hA, samplePhoto(texA, smp, q2, u.aspectA, sB, u) * hB, e);
             } else {
                 // Everything else opens up: the count slides continuously from one whole number to the next.
                 float segs = mix(float(u.segments), float(u.segmentsMorph), e);
-                float2 q = kaleidoPoint(p, u, 1.0, u.mode, segs, sA, hA);
+                float2 q = kaleidoPoint(p, u, zoomMul, u.mode, segs, sA, hA);
                 col = samplePhoto(texA, smp, q, u.aspectA, sA, u) * hA;
             }
             float segsNow = u.mode == 5 ? float(u.segments) : mix(float(u.segments), float(u.segmentsMorph), e);
             col *= outlineFactor(p, u, u.mode, segsNow);
         } else {
-            float zoomA = 1.0, zoomB = 1.0;
+            float zoomA = zoomMul, zoomB = zoomMul;
             if (u.transition == 3) {
                 // Zoom through: ease in and out (zero speed at both ends) and zoom geometrically, so the
                 // incoming photo settles instead of stopping dead.
                 float e = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
                 const float span = 0.9;   // ln of the total zoom travelled by each photo
-                zoomA = exp(span * e);
-                zoomB = exp(-span * (1.0 - e));
+                zoomA *= exp(span * e);
+                zoomB *= exp(-span * (1.0 - e));
             }
             float2 qa = kaleidoPoint(p, u, zoomA, u.mode, float(u.segments), sA, hA);
             float2 qb = kaleidoPoint(p, u, zoomB, u.modeB, float(u.segmentsB), sB, hB);
@@ -374,6 +362,37 @@ enum Shaders {
                 m = smoothstep(0.0, 1.0, t);
             }
             col = mix(a, b, m);
+        }
+        return col;
+    }
+
+    fragment float4 kaleido_fragment(VOut in [[stage_in]],
+                                     constant Uniforms &u [[buffer(0)]],
+                                     texture2d<float> texA [[texture(0)]],
+                                     texture2d<float> texB [[texture(1)]]) {
+        constexpr sampler smp(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::linear);
+        float2 res = float2(u.width, u.height);
+        float2 p = (in.position.xy - 0.5 * res) / u.height;   // centred, y down; screen height = 1
+        p.y = -p.y;
+
+        if (u.original == 1) {
+            float3 a = samplePlain(texA, smp, p, u.aspectA, res.x / res.y);
+            if (u.hasB == 1) {
+                float3 b = samplePlain(texB, smp, p, u.aspectB, res.x / res.y);
+                a = mix(a, b, smoothstep(0.0, 1.0, u.mixAmount));
+            }
+            return float4(a, 1.0);
+        }
+
+        float3 col;
+        if (u.zoomLayers == 1) {
+            // Endless zoom: one layer grows from 1x to 2x and fades out while the next grows from 0.5x to 1x and
+            // fades in. At the end of each doubling the picture is exactly where it started, so it loops.
+            float ph = u.zoomPhase;
+            float w = smoothstep(0.0, 1.0, ph);
+            col = mix(kaleidoColor(p, u, texA, texB, smp, exp2(ph)), kaleidoColor(p, u, texA, texB, smp, exp2(ph - 1.0)), w);
+        } else {
+            col = kaleidoColor(p, u, texA, texB, smp, 1.0);
         }
 
         // Grade: hue rotation, saturation, vignette, a hair of dither against banding in soft areas.

@@ -16,10 +16,10 @@ struct GPUUniforms {
     var hue: Float = 0, saturation: Float = 1, vignette: Float = 0
     var time: Float = 0
     var aspectA: Float = 1, aspectB: Float = 1
-    var mixAmount: Float = 0, morph: Float = 0, outline: Float = 0
+    var mixAmount: Float = 0, morph: Float = 0, outline: Float = 0, zoomPhase: Float = 0
     var segments: Int32 = 8, mode: Int32 = 0, transition: Int32 = 0, hasB: Int32 = 0
     var segmentsB: Int32 = 8, modeB: Int32 = 0, original: Int32 = 0, segmentsMorph: Int32 = 8
-    var outlines: Int32 = 0
+    var outlines: Int32 = 0, zoomLayers: Int32 = 0
 }
 
 struct PhotoTexture {
@@ -134,6 +134,11 @@ final class KaleidoRenderer {
     var secondsPerPhoto: Double = 20
     var transitionSeconds: Double = 2.5
     var transitionStyle: TransitionStyle = .random
+    /// +1 zooms in forever, -1 out, 0 neither (a running doubling finishes first, so nothing jumps).
+    var zoomFlow = 0
+    private var zoomPhase = 0.0, zoomDirection = 1
+    /// Seconds per doubling of an endless zoom at speed 1.
+    private let zoomDoublingSeconds = 300.0
 
     private(set) var look = Look()
     private var current: PhotoTexture
@@ -233,6 +238,15 @@ final class KaleidoRenderer {
         huePhase += look.hueSpeed * m * .pi / 180 * dt
         breathPhase += m * dt * (2 * .pi / 600)   // one breath per ten minutes at full motion
         swirlPhase += m * dt * (2 * .pi / 480)    // a swaying swirl swings through once every eight minutes at speed 1
+        if zoomFlow != 0 { zoomDirection = zoomFlow }
+        if zoomFlow != 0 || zoomPhase != 0 {
+            let next = zoomPhase + Double(zoomDirection) * m * dt / zoomDoublingSeconds
+            if zoomFlow == 0 && (next >= 1 || next <= 0) {
+                zoomPhase = 0   // switched off: stop where the loop meets itself
+            } else {
+                zoomPhase = next - floor(next)
+            }
+        }
         if targetLook.hueSpeed == 0 {
             // Cycling is off: let the colour it built up ease back out, so the photo returns to its own colours.
             huePhase = remainder(huePhase, 2 * .pi) * exp(-dt * 1.2)
@@ -424,6 +438,9 @@ final class KaleidoRenderer {
         incomingShape = currentShape
     }
 
+    /// Offscreen snapshots only: freeze an endless zoom part way through a doubling.
+    func forceZoomPhase(_ p: Double) { zoomPhase = p }
+
     /// Offscreen snapshots only: freeze a mirror-count cross-fade part way.
     func forceMorph(to count: Int, progress: Double) {
         morphTo = count
@@ -492,6 +509,8 @@ final class KaleidoRenderer {
         u.panX = Float(amp * (sin(driftPhase * 0.173) + 0.5 * sin(driftPhase * 0.311 + 1.3)) + userPan.x)
         u.panY = Float(amp * (cos(driftPhase * 0.137) + 0.5 * cos(driftPhase * 0.263 + 0.4)) + userPan.y)
         u.zoom = Float(look.zoom * exp(0.12 * look.breathing * sin(breathPhase)))
+        u.zoomPhase = Float(zoomPhase)
+        u.zoomLayers = zoomPhase != 0 ? 1 : 0
         u.twist = Float(look.swayingSwirl ? look.twist * sin(swirlPhase) : look.twist)
         u.hue = Float((look.hueShift * .pi / 180 + huePhase).truncatingRemainder(dividingBy: 2 * .pi))
         u.saturation = Float(look.saturation)

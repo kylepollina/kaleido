@@ -110,6 +110,12 @@ struct HomeView: View {
                         ForEach(SceneShuffle.allCases) { Text($0.label).tag($0) }
                     }
                     .help("What comes next as time passes. New scenes' patterns are set in Settings.")
+                    Picker("Zoom", selection: $app.settings.zoomMotion) {
+                        ForEach(ZoomMotion.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .help("For every scene: breathe in and out, zoom in or out forever, or hold still")
+                    Toggle("Drift (the photo wanders slowly)", isOn: $app.settings.driftMotion)
                     photosRow
                 }
                 Section {
