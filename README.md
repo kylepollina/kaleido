@@ -46,9 +46,10 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   (the wedges make room while an extra one grows from nothing), or one closes; tilings grow denser or sparser. A
   change comes about every 3 minutes, whatever the speed, and takes about 40 seconds to open up. See the "Shifting Mandala" pattern.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
-- **Movement.** On top of any pattern, Home picks how the view zooms: in and out (a slow breath), zoom in forever,
-  zoom out forever, or still; and whether the photo drifts. The endless zooms loop seamlessly: two layers a
-  doubling apart cross-fade as they grow, and switching it off lets the current doubling finish so nothing jumps.
+- **Movement.** On top of any pattern, Home picks how the view moves: in and out (a slow breath), zoom in, zoom
+  out, or still; and whether the photo drifts. Zoom in is what dragging the preview from a corner to the centre
+  does, done continuously: the photo keeps sliding through the mirrors so the pattern pours into the middle
+  (zoom out spreads it outward). It eases in and out when switched.
 - **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every pattern.
 - **macOS Aerials (video).** The slow-motion aerial films macOS downloads for its moving wallpapers and screen
   saver (Yosemite, Iceland, Hong Kong, Palau Jellies...) appear as a built-in card, named from Apple's manifest with

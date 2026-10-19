@@ -19,7 +19,6 @@ enum Shaders {
         float mixAmount;     // 0...1 transition progress (raw)
         float morph;         // 0...1 cross-fade from `segments` to `segmentsMorph` (dynamic mirrors)
         float outline;       // 0...1 thickness of black lines along the pattern's mirrors and tile edges
-        float zoomPhase;     // 0...1 through one doubling of an endless zoom
         int segments;       // mirrors of the outgoing photo (A)
         int mode;            // 0 radial, 1 hex, 2 fractal (A)
         int transition;      // 0 dissolve 1 iris 3 zoom 4 segments
@@ -29,7 +28,6 @@ enum Shaders {
         int original;        // 1 = show the photo itself, uncut (the preview's "Original" tab)
         int segmentsMorph;   // the mirror count being faded towards
         int outlines;        // 1 = draw the pattern's mirror and tile lines in red (preset editor preview)
-        int zoomLayers;      // 1 = endless zoom: blend two layers a doubling apart
     };
 
     struct VOut { float4 position [[position]]; };
@@ -384,16 +382,7 @@ enum Shaders {
             return float4(a, 1.0);
         }
 
-        float3 col;
-        if (u.zoomLayers == 1) {
-            // Endless zoom: one layer grows from 1x to 2x and fades out while the next grows from 0.5x to 1x and
-            // fades in. At the end of each doubling the picture is exactly where it started, so it loops.
-            float ph = u.zoomPhase;
-            float w = smoothstep(0.0, 1.0, ph);
-            col = mix(kaleidoColor(p, u, texA, texB, smp, exp2(ph)), kaleidoColor(p, u, texA, texB, smp, exp2(ph - 1.0)), w);
-        } else {
-            col = kaleidoColor(p, u, texA, texB, smp, 1.0);
-        }
+        float3 col = kaleidoColor(p, u, texA, texB, smp, 1.0);
 
         // Grade: hue rotation, saturation, vignette, a hair of dither against banding in soft areas.
         col = hueRotate(col, u.hue);
