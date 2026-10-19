@@ -109,6 +109,12 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Movement, on top of any pattern: how the view zooms, and whether the photo drifts around.
     public var zoomMotion: ZoomMotion = .breathe
     public var driftMotion = true
+    /// Surprise me: as scenes change, mix saved scenes with brand-new ones (a photo with an invented pattern).
+    /// Off: play through the saved scenes (or, with none saved, the photos with the pattern on screen).
+    public var surprise = true
+    /// The scene shuffle and pattern source Surprise me stands for.
+    public var effectiveSceneShuffle: SceneShuffle { surprise ? .mixed : .saved }
+    public var effectivePatternSource: PatternSource { surprise ? .invented : .current }
     public var sceneShuffle: SceneShuffle = .mixed
     public var patternSource: PatternSource = .both
     /// Shapes invented patterns may not use (e.g. Diamonds, if you don't like it).
@@ -165,6 +171,7 @@ public struct Settings: Codable, Equatable, Sendable {
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
         zoomMotion = (try? c.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion)) ?? d.zoomMotion
         driftMotion = try c.decodeIfPresent(Bool.self, forKey: .driftMotion) ?? d.driftMotion
+        surprise = try c.decodeIfPresent(Bool.self, forKey: .surprise) ?? d.surprise
         sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
         patternSource = (try? c.decodeIfPresent(PatternSource.self, forKey: .patternSource)) ?? d.patternSource
         excludedShapes = (try? c.decodeIfPresent([MirrorMode].self, forKey: .excludedShapes)) ?? []

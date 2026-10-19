@@ -14,6 +14,8 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .settings: return "gearshape"
         }
     }
+    /// Patterns (presets) are hidden for now; the section still exists and `--section patterns` opens it.
+    static let visible: [AppSection] = [.home, .photos, .scenes, .settings]
 }
 
 struct ContentView: View {
@@ -23,7 +25,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(AppSection.allCases, selection: $section) { s in
+            List(AppSection.visible, selection: $section) { s in
                 Label(s.rawValue, systemImage: s.icon).tag(s)
             }
             .navigationSplitViewColumnWidth(min: 160, ideal: 170, max: 200)
@@ -104,42 +106,24 @@ struct HomeView: View {
             transport
             Form {
                 Section {
-                    sceneRow
                     LabeledContent("Speed") { SpeedControl().frame(maxWidth: 260) }
-                    Picker("Shuffle", selection: $app.settings.sceneShuffle) {
-                        ForEach(SceneShuffle.allCases) { Text($0.label).tag($0) }
-                    }
-                    .help("What comes next as time passes. New scenes' patterns are set in Settings.")
                     Picker("Zoom", selection: $app.settings.zoomMotion) {
                         ForEach(ZoomMotion.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .help("For every scene: breathe in and out, zoom in or out forever, or hold still")
-                    Toggle("Drift (the photo wanders slowly)", isOn: $app.settings.driftMotion)
-                    photosRow
-                }
-                Section {
-                    let shown = app.presets.favorites.isEmpty ? app.presets.presets : app.presets.favorites
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140, maximum: 220), spacing: 8)], spacing: 8) {
-                        ForEach(shown) { p in PatternCard(preset: p) }
-                    }
-                    .padding(.vertical, 4)
-                } header: {
-                    HStack {
-                        Text("Patterns")
-                        Spacer()
-                        Button("Edit patterns…") { go(.presets) }.buttonStyle(.link).font(.caption)
-                    }
+                    .help("For every scene: breathe in and out, zoom in or out, or hold still")
+                    if app.library.enabledItems.isEmpty { photosRow }
                 }
                 if editing {
                     Section("Edit scene") {
-                        Picker("Pattern", selection: Binding(
-                            get: { app.settings.activePresetID },
-                            set: { id in if let p = app.presets.preset(id) { app.choosePattern(p) } })) {
-                            if app.settings.activePresetID == nil { Text("Invented").tag(UUID?.none) }
-                            ForEach(app.presets.presets) { p in Text(p.name).tag(Optional(p.id)) }
+                        HStack {
+                            sceneRow
+                            Spacer()
+                            Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
+                                .help("A random pattern and settings for this photo")
                         }
-                        .help("Loads the pattern's settings onto this photo; adjust them below")
+                        Toggle("Drift (the photo wanders slowly)", isOn: $app.settings.driftMotion)
+                        if !app.library.enabledItems.isEmpty { photosRow }
                     }
                     LookControls(look: app.settings.look, edit: app.tweakScene)
                 }
@@ -156,8 +140,11 @@ struct HomeView: View {
             PlayButton().frame(width: 150)
             Button { app.nextPhoto() } label: { Image(systemName: "forward.fill").frame(width: 30) }
                 .help("Next scene")
-            Button { app.surpriseMe() } label: { Label("Surprise me", systemImage: "dice") }
-                .help("A new photo with an invented pattern")
+            Toggle(isOn: $app.settings.surprise) { Label("Surprise me", systemImage: "dice") }
+                .toggleStyle(.button)
+                .help(app.settings.surprise
+                      ? "On: as scenes change, Kaleido mixes your saved scenes with new ones it makes up"
+                      : "Off: plays through your saved scenes (or, with none saved, your photos with this look)")
             let saved = app.scenes.scene(app.activeSceneID) != nil
             Button { app.saveScene() } label: { Label(saved ? "Saved" : "Save scene", systemImage: saved ? "bookmark.fill" : "bookmark") }
                 .disabled(saved)
@@ -175,8 +162,7 @@ struct HomeView: View {
             if let s = app.scenes.scene(app.activeSceneID) {
                 Label(s.name, systemImage: "bookmark.fill")
             } else {
-                let pattern = app.presets.preset(app.settings.activePresetID)?.name ?? "an invented pattern"
-                Text(app.sceneTweaked ? "Your scene, from \(pattern)" : "New scene with \(pattern)")
+                Text(app.sceneTweaked ? "Your scene (not saved yet)" : "New scene")
             }
             if app.sceneTweaked {
                 Text("Shuffle waits on this scene until you press Next or save it.")
@@ -456,12 +442,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Scenes") {
-                Picker("Shuffle", selection: $app.settings.sceneShuffle) {
-                    ForEach(SceneShuffle.allCases) { Text($0.label).tag($0) }
-                }
-                Picker("New scenes use", selection: $app.settings.patternSource) {
-                    ForEach(PatternSource.allCases) { Text($0.label).tag($0) }
-                }
+                Toggle("Surprise me (mix in new scenes Kaleido makes up)", isOn: $app.settings.surprise)
                 Toggle("Shuffle photo order", isOn: $app.settings.shuffle)
                 ScaledSliderRow("Time per scene", value: $app.settings.secondsPerPhoto, scale: .log(15, 900)) {
                     $0 < 90 ? "\(Int($0)) s" : String(format: "%.1f min", $0 / 60)

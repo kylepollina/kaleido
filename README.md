@@ -12,17 +12,17 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 
 - **Desktop playback.** One borderless window per display, just above the wallpaper and below desktop icons.
   Mouse clicks pass through. Works across Spaces, multiple displays, and display changes.
-- **Scenes and patterns.** A pattern is a kaleidoscope recipe (shape, mirrors, swirl, colour...). A scene is a
-  photo with a pattern. What's on screen is always a scene: a saved one, or a new one Kaleido just put together.
-  "Save scene" keeps it (photo, pattern and where you dragged the photo); "Save pattern" keeps an invented pattern.
-  Saved scenes keep their own copy of the pattern, so editing a pattern never changes them.
-- **Shuffle.** Off (stay on this scene), saved scenes, saved and new, or new only. New scenes take their pattern
-  from your hearted patterns, invented ones, both, or keep the current one. Invented patterns use only the shapes
-  ticked in Settings (untick Diamonds if it isn't for you). Next and Back fade in 3 seconds; Back brings back the
-  scene before, pattern and all, and pressing it mid-fade fades back to the scene that was leaving.
-- **Five sections.** Home (preview, Play (or Space), back/next, Surprise me, Save scene, and an Edit scene button that reveals a Pattern menu that loads
-  a pattern's settings, every setting to adjust, Save scene, speed, Shuffle), Photos (the album browser), Patterns (edit, create, duplicate, heart and reset), Scenes and
-  Settings (scenes, invented-pattern shapes, effect switches, performance).
+- **Scenes.** A scene is a photo with a look (shape, mirrors, swirl, colour...). What's on screen is always a
+  scene: a saved one, or a new one Kaleido just put together. "Save scene" keeps it (photo, look and where you
+  dragged the photo).
+- **Surprise me** (a toggle, on by default): as scenes change, Kaleido mixes your saved scenes with new ones it
+  invents. Off, it plays through your saved scenes (or, with none saved, your photos with the look on screen).
+  Invented looks use only the shapes ticked in Settings (untick Diamonds if it isn't for you). Next and Back fade
+  in 3 seconds; Back brings back the scene before, look and all.
+- **Home** is kept simple: preview, Back / Play (or Space) / Next, Surprise me, Save scene and Edit scene, then
+  Speed and Zoom. Edit scene reveals Randomize, Drift and every setting of the scene on screen.
+- **Sections.** Home, Photos (the album browser), Scenes and Settings. Patterns (saved looks, below) are hidden
+  for now; the code is still there.
 - **Built-in patterns.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square
   Tiles, Hall of Mirrors, Triangle Toy, Diamonds and Spiral Tunnel: at least one per shape.
 - **Pattern editor.** Pick the shape from a grid of drawn buttons. Swirl has a zero mark (and snaps to it) and can sway back and forth, Hue shift shows a before/after colour strip, Outlines

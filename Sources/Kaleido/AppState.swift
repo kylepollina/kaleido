@@ -173,11 +173,11 @@ final class AppState: ObservableObject, PhotoProvider {
 
     func nextPhotoKeepingPreset() { renderer?.skip() }
 
-    /// Shuffle off, or a scene open in the editor: the scene stays until you move on.
+    /// A scene being edited (Home or the Scenes editor) stays until you move on.
     private func updateHold() {
         var editingScene = false
         if case .scene = draft?.target { editingScene = true }
-        renderer?.holdPhoto = settings.sceneShuffle == .off || editingScene || sceneTweaked
+        renderer?.holdPhoto = editingScene || sceneTweaked
     }
 
     /// "Remove from selected photos" on the Original tab: out of the rotation (it stays in its album), then move on.
@@ -221,7 +221,7 @@ final class AppState: ObservableObject, PhotoProvider {
         if surprisePending {
             look = Look.random(shapes: settings.inventedShapes, using: &g); id = nil
         } else if !isEditingPresets {
-            (look, id) = settings.patternSource.pick(current: settings.look, currentID: settings.activePresetID,
+            (look, id) = settings.effectivePatternSource.pick(current: settings.look, currentID: settings.activePresetID,
                                                      patterns: presets, inventedShapes: settings.inventedShapes, using: &g)
         }
         surprisePending = false
@@ -286,6 +286,14 @@ final class AppState: ObservableObject, PhotoProvider {
         guard l != settings.look else { return }
         settings.look = l
         markTweaked()
+    }
+
+    /// Edit scene's Randomize: an invented pattern on the photo showing (shapes as allowed in Settings).
+    func randomizeScene() {
+        var g = SystemRandomNumberGenerator()
+        let look = Look.random(shapes: settings.inventedShapes, using: &g)
+        settings.activePresetID = nil
+        tweakScene { $0 = look }
     }
 
     private func clearTweaked() {
@@ -440,7 +448,7 @@ final class AppState: ObservableObject, PhotoProvider {
     func nextPhoto(after current: UUID?) -> PhotoRef? {
         plannedScene = nil
         let saved = shuffleScenes.filter { $0.id != activeSceneID }
-        if !isEditingPresets, settings.sceneShuffle.nextIsSaved(savedCount: saved.count, roll: Double.random(in: 0..<1)),
+        if !isEditingPresets, settings.effectiveSceneShuffle.nextIsSaved(savedCount: saved.count, roll: Double.random(in: 0..<1)),
            let s = saved.randomElement(), let ref = photoRef(s.photoID) {
             plannedScene = s
             return ref

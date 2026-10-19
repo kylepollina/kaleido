@@ -245,6 +245,16 @@ final class SettingsTests: XCTestCase {
         }
     }
 
+    func testSurpriseMeChoosesTheMix() throws {
+        var s = Settings()
+        XCTAssertTrue(s.surprise, "on by default")
+        XCTAssertEqual(s.effectiveSceneShuffle, .mixed); XCTAssertEqual(s.effectivePatternSource, .invented)
+        s.surprise = false
+        XCTAssertEqual(s.effectiveSceneShuffle, .saved, "saved scenes only")
+        XCTAssertEqual(s.effectivePatternSource, .current, "with none saved, photos keep the look on screen")
+        XCTAssertFalse(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).surprise)
+    }
+
     func testMovementSwitches() throws {
         var s = Settings()
         XCTAssertEqual(s.zoomMotion, .breathe); XCTAssertTrue(s.driftMotion)
