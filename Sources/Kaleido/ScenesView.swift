@@ -98,35 +98,11 @@ struct SceneEditor: View {
                         Text("Drag the preview to move the photo inside the mirrors; Save keeps where it sits.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    LookControls()
+                    LookControls(look: draft.look, edit: app.edit)
                 }
                 .formStyle(.grouped)
             }
         }
-    }
-}
-
-/// A scene on Home: its picture and name. Click to show it.
-struct SceneCard: View {
-    @EnvironmentObject var app: AppState
-    let scene: SavedScene
-
-    var body: some View {
-        let active = app.activeSceneID == scene.id
-        Button { app.showScene(scene) } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                SceneThumbnail(id: scene.id)
-                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                Text(scene.name).font(.callout.weight(.medium)).lineLimit(1)
-            }
-            .padding(8)
-            .background(active ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(active ? Color.accentColor : Color.clear, lineWidth: 2))
-        }
-        .buttonStyle(.plain)
-        .disabled(!app.isSceneAvailable(scene))
-        .help(app.isSceneAvailable(scene) ? "Show this scene (it stays until you press Next)" : "This scene's photo is no longer in your library")
     }
 }
 

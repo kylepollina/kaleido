@@ -177,7 +177,7 @@ final class AppState: ObservableObject, PhotoProvider {
     private func updateHold() {
         var editingScene = false
         if case .scene = draft?.target { editingScene = true }
-        renderer?.holdPhoto = settings.sceneShuffle == .off || editingScene
+        renderer?.holdPhoto = settings.sceneShuffle == .off || editingScene || sceneTweaked
     }
 
     /// "Remove from selected photos" on the Original tab: out of the rotation (it stays in its album), then move on.
@@ -199,6 +199,7 @@ final class AppState: ObservableObject, PhotoProvider {
 
     /// Runs as each new photo starts fading in, so the scene's pattern rides along with its photo.
     private func sceneWillStart(photoID: UUID?, back: Bool) {
+        clearTweaked()
         if back, let last = sceneHistory.last, last.photoID == photoID {
             sceneHistory.removeLast()
             restore(last)
@@ -262,6 +263,35 @@ final class AppState: ObservableObject, PhotoProvider {
         settings.look = preset.look
     }
 
+    /// Home changed the scene on screen (a pattern picked or a setting moved). Shuffle waits on it until Next,
+    /// Back or Save scene, so the changes are not whisked away.
+    @Published private(set) var sceneTweaked = false
+
+    private func markTweaked() {
+        activeSceneID = nil   // it is a new scene now, even if it started as a saved one
+        if !sceneTweaked { sceneTweaked = true; updateHold() }
+    }
+
+    /// Home's pattern menu: loads the pattern's settings onto the photo showing.
+    func choosePattern(_ preset: SavedPreset) {
+        apply(preset)
+        markTweaked()
+    }
+
+    /// Home's controls: changes the scene on screen (not the pattern it came from).
+    func tweakScene(_ change: (inout Look) -> Void) {
+        var l = settings.look
+        change(&l)
+        l.clamp()
+        guard l != settings.look else { return }
+        settings.look = l
+        markTweaked()
+    }
+
+    private func clearTweaked() {
+        if sceneTweaked { sceneTweaked = false; updateHold() }
+    }
+
     /// Keeps an invented pattern that is showing.
     @discardableResult
     func saveCurrentPattern() -> UUID {
@@ -304,6 +334,7 @@ final class AppState: ObservableObject, PhotoProvider {
         let id = scenes.add(name: base, photoID: photo, look: settings.look, panX: renderer.pan.x, panY: renderer.pan.y)
         writeSceneThumbnail(id)
         activeSceneID = id
+        clearTweaked()
         return id
     }
 

@@ -91,114 +91,96 @@ extension AppState {
 
 // MARK: Home
 
+/// Home is the editor for the scene on screen: pick a pattern to load its settings, adjust them, save the scene.
+/// Changes here never touch the pattern itself (that's the Patterns section).
 struct HomeView: View {
     @EnvironmentObject var app: AppState
     let go: (AppSection) -> Void
-    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 10)]
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                PreviewPane().frame(maxWidth: 760)
-                transport
-                let n = app.library.enabledItems.count
-                if n == 0 {
-                    HStack {
-                        Image(systemName: "photo.badge.plus")
-                        Text("No photos selected yet.")
-                        Button("Choose photos…") { go(.photos) }
-                        Button("Use macOS wallpapers") { app.library.setWallpapers(true) }
-                            .help("Play Apple's desktop pictures until you pick your own")
+        VStack(spacing: 12) {
+            PreviewPane().frame(maxWidth: 560)
+            transport
+            Form {
+                Section {
+                    sceneRow
+                    Picker("Pattern", selection: Binding(
+                        get: { app.settings.activePresetID },
+                        set: { id in if let p = app.presets.preset(id) { app.choosePattern(p) } })) {
+                        if app.settings.activePresetID == nil { Text("Invented").tag(UUID?.none) }
+                        ForEach(app.presets.presets) { p in Text(p.name).tag(Optional(p.id)) }
                     }
-                    .foregroundStyle(.secondary)
-                } else {
-                    Button("\(n) photos in rotation") { go(.photos) }.buttonStyle(.link).foregroundStyle(.secondary)
+                    .help("Loads the pattern's settings onto this photo; adjust them below")
+                    photosRow
                 }
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Saved scenes").font(.headline)
-                        Text("A photo with its pattern").font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Edit scenes…") { go(.scenes) }.buttonStyle(.link)
+                Section {
+                    LabeledContent("Speed") { SpeedControl().frame(maxWidth: 260) }
+                    Picker("Shuffle", selection: $app.settings.sceneShuffle) {
+                        ForEach(SceneShuffle.allCases) { Text($0.label).tag($0) }
                     }
-                    let scenes = app.scenes.favorites
-                    if scenes.isEmpty {
-                        Text("When you like what you see, press Save scene to keep it.").foregroundStyle(.secondary)
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 10) {
-                            ForEach(scenes) { s in SceneCard(scene: s) }
-                        }
-                    }
+                    .help("What comes next as time passes. New scenes' patterns are set in Settings.")
                 }
-                .frame(maxWidth: 760)
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Patterns").font(.headline)
-                        Text("Put one on this photo").font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Edit patterns…") { go(.presets) }.buttonStyle(.link)
-                    }
-                    let favorites = app.presets.favorites
-                    if favorites.isEmpty {
-                        Text("Heart some patterns in the Patterns section to see them here.").foregroundStyle(.secondary)
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 10) {
-                            ForEach(favorites) { p in PresetCard(preset: p) }
-                        }
-                    }
-                }
-                .frame(maxWidth: 760)
+                LookControls(look: app.settings.look, edit: app.tweakScene)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity)
+            .formStyle(.grouped)
         }
+        .padding(.top, 16)
     }
 
     private var transport: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 14) {
-                Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 30) }
-                    .help("The scene before")
-                PlayButton().frame(width: 200)
-                Button { app.nextPhoto() } label: { Image(systemName: "forward.fill").frame(width: 30) }
-                    .help("Next scene")
-                Button { app.surpriseMe() } label: { Label("Surprise me", systemImage: "dice") }
-                    .help("A new photo with an invented pattern")
-            }
-            .controlSize(.large)
-            nowShowing
-            HStack(spacing: 28) {
-                HStack(spacing: 8) {
-                    Text("Speed").foregroundStyle(.secondary)
-                    SpeedControl().frame(width: 220)
+        HStack(spacing: 14) {
+            Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 30) }
+                .help("The scene before")
+            PlayButton().frame(width: 180)
+            Button { app.nextPhoto() } label: { Image(systemName: "forward.fill").frame(width: 30) }
+                .help("Next scene")
+            Button { app.surpriseMe() } label: { Label("Surprise me", systemImage: "dice") }
+                .help("A new photo with an invented pattern")
+        }
+        .controlSize(.large)
+    }
+
+    /// Which scene this is, and Save scene.
+    private var sceneRow: some View {
+        HStack(spacing: 10) {
+            if let s = app.scenes.scene(app.activeSceneID) {
+                Label(s.name, systemImage: "bookmark.fill")
+                Spacer()
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Scene").font(.headline)
+                    if app.sceneTweaked {
+                        Text("Shuffle waits on this scene until you press Next or save it.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
-                Picker("Shuffle", selection: $app.settings.sceneShuffle) {
-                    ForEach(SceneShuffle.allCases) { Text($0.label).tag($0) }
-                }
-                .fixedSize()
-                .help("What comes next as time passes. New scenes' patterns are set in Settings.")
+                Spacer()
+                Button { app.saveScene() } label: { Label("Save scene", systemImage: "bookmark") }
+                    .buttonStyle(.borderedProminent)
+                    .help("Keep this photo with these settings and where the photo sits")
             }
         }
     }
 
-    /// What the scene on screen is, and buttons to keep it.
-    private var nowShowing: some View {
-        HStack(spacing: 10) {
-            if let s = app.scenes.scene(app.activeSceneID) {
-                Label(s.name, systemImage: "bookmark.fill").foregroundStyle(.secondary)
+    private var photosRow: some View {
+        let n = app.library.enabledItems.count
+        return HStack {
+            if n == 0 {
+                Image(systemName: "photo.badge.plus")
+                Text("No photos selected yet.")
+                Spacer()
+                Button("Choose photos…") { go(.photos) }
+                Button("Use macOS wallpapers") { app.library.setWallpapers(true) }
+                    .help("Play Apple's desktop pictures until you pick your own")
             } else {
-                let pattern = app.presets.preset(app.settings.activePresetID)?.name ?? "an invented pattern"
-                Text("New scene with \(pattern)").foregroundStyle(.secondary)
-                Button { app.saveScene() } label: { Label("Save scene", systemImage: "bookmark") }
-                    .help("Keep this photo with this pattern and position")
-                if app.settings.activePresetID == nil {
-                    Button { app.saveCurrentPattern() } label: { Label("Save pattern", systemImage: "sparkles") }
-                        .help("Keep this invented pattern to use on other photos")
-                }
+                Text("\(n) photos in rotation").foregroundStyle(.secondary)
+                Spacer()
+                Button("Choose photos…") { go(.photos) }.buttonStyle(.link)
             }
         }
     }
 }
+
 
 /// The one speed control: five stops from turtle to rabbit, like the trackpad speed setting.
 struct SpeedControl: View {
@@ -212,26 +194,6 @@ struct SpeedControl: View {
                    in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
             Image(systemName: "hare.fill").foregroundStyle(.secondary).help("Fastest")
         }
-    }
-}
-
-struct PresetCard: View {
-    @EnvironmentObject var app: AppState
-    let preset: SavedPreset
-
-    var body: some View {
-        let active = app.settings.activePresetID == preset.id
-        Button { app.apply(preset) } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(preset.name).font(.callout.weight(.medium)).lineLimit(1)
-                Text(preset.look.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-            .background(active ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(active ? Color.accentColor : Color.clear, lineWidth: 2))
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -329,7 +291,7 @@ struct PresetEditor: View {
                                                        : "Back to how it was when you created it (then Save to keep it)")
                         }
                     }
-                    LookControls()
+                    LookControls(look: draft.look, edit: app.edit)
                 }
                 .formStyle(.grouped)
             }
@@ -364,17 +326,18 @@ struct DraftHeader<Extra: View>: View {
     }
 }
 
-/// The look controls shared by the preset and scene editors. Every change goes into the draft.
+/// The look controls shared by Home and the pattern and scene editors. `edit` says where a change goes.
 struct LookControls: View {
     @EnvironmentObject var app: AppState
-    private var look: Look { app.draft?.look ?? Look() }
+    let look: Look
+    let edit: ((inout Look) -> Void) -> Void
 
     var body: some View {
         Group {
                 Section("Shape") {
                     PatternPicker(selection: bind(\.mode))
                     SliderRow(look.mode.countLabel,
-                              value: Binding(get: { Double(look.segments) }, set: { v in app.edit { $0.segments = Int(v.rounded()) } }),
+                              value: Binding(get: { Double(look.segments) }, set: { v in edit { $0.segments = Int(v.rounded()) } }),
                               range: 2...24, step: 1) { "\(Int($0))" }
                     Toggle("Dynamic mirrors (slowly change how many)", isOn: bind(\.dynamicMirrors))
                         .disabled(!app.settings.allowDynamicMirrors)
@@ -382,11 +345,11 @@ struct LookControls: View {
                         LabeledContent("Between") {
                             HStack {
                                 Stepper("\(look.mirrorsMin)", value: Binding(get: { look.mirrorsMin },
-                                                                                   set: { v in app.edit { $0.mirrorsMin = min(v, $0.mirrorsMax) } }),
+                                                                                   set: { v in edit { $0.mirrorsMin = min(v, $0.mirrorsMax) } }),
                                         in: Look.segmentRange)
                                 Text("and")
                                 Stepper("\(look.mirrorsMax)", value: Binding(get: { look.mirrorsMax },
-                                                                                   set: { v in app.edit { $0.mirrorsMax = max(v, $0.mirrorsMin) } }),
+                                                                                   set: { v in edit { $0.mirrorsMax = max(v, $0.mirrorsMin) } }),
                                         in: Look.segmentRange)
                             }
                             .monospacedDigit()
@@ -401,7 +364,7 @@ struct LookControls: View {
                         .disabled(!app.settings.allowSwirl || look.twist == 0)
                         .help("Swings from this much swirl, through straight, to the same amount the other way and back")
                     Toggle("Outlines", isOn: Binding(get: { look.outline > 0 },
-                                                     set: { on in app.edit { $0.outline = on ? Look.outlineSteps[1] : 0 } }))
+                                                     set: { on in edit { $0.outline = on ? Look.outlineSteps[1] : 0 } }))
                         .disabled(!app.settings.allowOutlines)
                         .help("Thin black lines along every mirror and tile edge")
                 }
@@ -413,7 +376,7 @@ struct LookControls: View {
                         .help("Top: the original colours. Bottom: what each one becomes with this hue shift.")
                     Picker("Hue cycling", selection: Binding(
                         get: { Look.hueCycleSteps.min { abs($0 - look.hueSpeed) < abs($1 - look.hueSpeed) }! },
-                        set: { v in app.edit { $0.hueSpeed = v } })) {
+                        set: { v in edit { $0.hueSpeed = v } })) {
                         Text("Off").tag(Look.hueCycleSteps[0])
                         Text("Slow").tag(Look.hueCycleSteps[1])
                         Text("Medium").tag(Look.hueCycleSteps[2])
@@ -435,7 +398,7 @@ struct LookControls: View {
     }
 
     private func bind<T>(_ keyPath: WritableKeyPath<Look, T>) -> Binding<T> {
-        Binding(get: { look[keyPath: keyPath] }, set: { v in app.edit { $0[keyPath: keyPath] = v } })
+        Binding(get: { look[keyPath: keyPath] }, set: { v in edit { $0[keyPath: keyPath] = v } })
     }
 }
 

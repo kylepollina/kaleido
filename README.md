@@ -20,8 +20,8 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   from your hearted patterns, invented ones, both, or keep the current one. Invented patterns use only the shapes
   ticked in Settings (untick Diamonds if it isn't for you). Next and Back fade in 3 seconds; Back brings back the
   scene before, pattern and all, and pressing it mid-fade fades back to the scene that was leaving.
-- **Five sections.** Home (preview, Play, back/next, Surprise me, Save scene, Shuffle, speed, saved scenes and
-  hearted patterns), Photos (the album browser), Patterns (edit, create, duplicate, heart and reset), Scenes and
+- **Five sections.** Home (the scene editor: preview, Play (or Space), back/next, Surprise me, a Pattern menu that loads
+  a pattern's settings, every setting to adjust, Save scene, speed, Shuffle), Photos (the album browser), Patterns (edit, create, duplicate, heart and reset), Scenes and
   Settings (scenes, invented-pattern shapes, effect switches, performance).
 - **Built-in patterns.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square
   Tiles, Hall of Mirrors, Triangle Toy, Diamonds and Spiral Tunnel: at least one per shape.

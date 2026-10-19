@@ -38,6 +38,19 @@ struct KaleidoApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    private var spaceMonitor: Any?
+
+    /// Space plays and stops, except while typing in a text field.
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        spaceMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
+            guard event.keyCode == 49, mods.isEmpty, !event.isARepeat,
+                  !(event.window?.firstResponder is NSText) else { return event }
+            MainActor.assumeIsolated { AppState.shared.togglePlay() }
+            return nil
+        }
+    }
+
     /// Switching back to Kaleido (Cmd-Tab, Dock) brings the window back if it was closed.
     func applicationDidBecomeActive(_ notification: Notification) {
         MainActor.assumeIsolated {
