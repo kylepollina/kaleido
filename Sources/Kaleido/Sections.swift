@@ -96,6 +96,7 @@ extension AppState {
 struct HomeView: View {
     @EnvironmentObject var app: AppState
     let go: (AppSection) -> Void
+    @AppStorage("homeEditingScene") private var editing = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -104,23 +105,25 @@ struct HomeView: View {
             Form {
                 Section {
                     sceneRow
-                    Picker("Pattern", selection: Binding(
-                        get: { app.settings.activePresetID },
-                        set: { id in if let p = app.presets.preset(id) { app.choosePattern(p) } })) {
-                        if app.settings.activePresetID == nil { Text("Invented").tag(UUID?.none) }
-                        ForEach(app.presets.presets) { p in Text(p.name).tag(Optional(p.id)) }
-                    }
-                    .help("Loads the pattern's settings onto this photo; adjust them below")
-                    photosRow
-                }
-                Section {
                     LabeledContent("Speed") { SpeedControl().frame(maxWidth: 260) }
                     Picker("Shuffle", selection: $app.settings.sceneShuffle) {
                         ForEach(SceneShuffle.allCases) { Text($0.label).tag($0) }
                     }
                     .help("What comes next as time passes. New scenes' patterns are set in Settings.")
+                    photosRow
                 }
-                LookControls(look: app.settings.look, edit: app.tweakScene)
+                if editing {
+                    Section("Edit scene") {
+                        Picker("Pattern", selection: Binding(
+                            get: { app.settings.activePresetID },
+                            set: { id in if let p = app.presets.preset(id) { app.choosePattern(p) } })) {
+                            if app.settings.activePresetID == nil { Text("Invented").tag(UUID?.none) }
+                            ForEach(app.presets.presets) { p in Text(p.name).tag(Optional(p.id)) }
+                        }
+                        .help("Loads the pattern's settings onto this photo; adjust them below")
+                    }
+                    LookControls(look: app.settings.look, edit: app.tweakScene)
+                }
             }
             .formStyle(.grouped)
         }
@@ -131,33 +134,34 @@ struct HomeView: View {
         HStack(spacing: 14) {
             Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 30) }
                 .help("The scene before")
-            PlayButton().frame(width: 180)
+            PlayButton().frame(width: 150)
             Button { app.nextPhoto() } label: { Image(systemName: "forward.fill").frame(width: 30) }
                 .help("Next scene")
             Button { app.surpriseMe() } label: { Label("Surprise me", systemImage: "dice") }
                 .help("A new photo with an invented pattern")
+            let saved = app.scenes.scene(app.activeSceneID) != nil
+            Button { app.saveScene() } label: { Label(saved ? "Saved" : "Save scene", systemImage: saved ? "bookmark.fill" : "bookmark") }
+                .disabled(saved)
+                .help(saved ? "This is one of your saved scenes" : "Keep this photo with these settings and where the photo sits")
+            Toggle(isOn: $editing.animation(.easeInOut(duration: 0.2))) { Label("Edit scene", systemImage: "slider.horizontal.3") }
+                .toggleStyle(.button)
+                .help("Show the pattern and every setting of this scene")
         }
         .controlSize(.large)
     }
 
-    /// Which scene this is, and Save scene.
+    /// Which scene this is.
     private var sceneRow: some View {
-        HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 2) {
             if let s = app.scenes.scene(app.activeSceneID) {
                 Label(s.name, systemImage: "bookmark.fill")
-                Spacer()
             } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Scene").font(.headline)
-                    if app.sceneTweaked {
-                        Text("Shuffle waits on this scene until you press Next or save it.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                Button { app.saveScene() } label: { Label("Save scene", systemImage: "bookmark") }
-                    .buttonStyle(.borderedProminent)
-                    .help("Keep this photo with these settings and where the photo sits")
+                let pattern = app.presets.preset(app.settings.activePresetID)?.name ?? "an invented pattern"
+                Text(app.sceneTweaked ? "Your scene, from \(pattern)" : "New scene with \(pattern)")
+            }
+            if app.sceneTweaked {
+                Text("Shuffle waits on this scene until you press Next or save it.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }
