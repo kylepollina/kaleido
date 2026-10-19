@@ -112,6 +112,19 @@ struct HomeView: View {
                     .help("What comes next as time passes. New scenes' patterns are set in Settings.")
                     photosRow
                 }
+                Section {
+                    let shown = app.presets.favorites.isEmpty ? app.presets.presets : app.presets.favorites
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140, maximum: 220), spacing: 8)], spacing: 8) {
+                        ForEach(shown) { p in PatternCard(preset: p) }
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    HStack {
+                        Text("Patterns")
+                        Spacer()
+                        Button("Edit patterns…") { go(.presets) }.buttonStyle(.link).font(.caption)
+                    }
+                }
                 if editing {
                     Section("Edit scene") {
                         Picker("Pattern", selection: Binding(
@@ -198,6 +211,29 @@ struct SpeedControl: View {
                    in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
             Image(systemName: "hare.fill").foregroundStyle(.secondary).help("Fastest")
         }
+    }
+}
+
+/// A hearted pattern on Home: click to put it on the photo showing.
+struct PatternCard: View {
+    @EnvironmentObject var app: AppState
+    let preset: SavedPreset
+
+    var body: some View {
+        let active = app.settings.activePresetID == preset.id
+        Button { app.choosePattern(preset) } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(preset.name).font(.callout.weight(.medium)).lineLimit(1)
+                Text(preset.look.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+            .background(active ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(active ? Color.accentColor : Color.clear, lineWidth: 2))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Put \(preset.name) on this photo")
     }
 }
 
