@@ -204,12 +204,23 @@ func makeCards(_ app: AppState) -> [SourceCard] {
                             state: inUse ? state(wid) : .none,
                             coverItemID: inUse ? lib.itemIDs(in: wid).first : nil,
                             coverURL: BuiltInWallpapers.available.first.map { URL(fileURLWithPath: $0.key) }))
+    // Shown once macOS has downloaded at least one aerial.
+    let aid = AerialScanner.sourceID
+    let aerialsInUse = lib.aerials != nil
+    if aerialsInUse || !BuiltInWallpapers.aerials.isEmpty {
+        cards.append(SourceCard(id: aid, title: "macOS Aerials", group: .builtIn,
+                                count: aerialsInUse ? lib.itemIDs(in: aid).count : BuiltInWallpapers.aerials.count,
+                                state: aerialsInUse ? state(aid) : .none,
+                                coverItemID: aerialsInUse ? lib.itemIDs(in: aid).first : nil,
+                                coverURL: BuiltInWallpapers.aerials.first.map { URL(fileURLWithPath: $0.key) }))
+    }
     return cards
 }
 
-/// What the macOS Wallpapers card can offer before it is switched on (scanned once).
+/// What the built-in cards can offer before they are switched on (scanned once).
 enum BuiltInWallpapers {
     static let available: [SyncEntry] = WallpaperScanner.scan()
+    static let aerials: [SyncEntry] = AerialScanner.scan()
 }
 
 struct LibraryPane: View {
@@ -344,7 +355,7 @@ struct LibraryHomeView: View {
         VStack(spacing: 8) {
             Image(systemName: "photo.on.rectangle.angled").font(.system(size: 40)).foregroundStyle(.tertiary)
             Text("Pick some photos to get started").foregroundStyle(.secondary)
-            Text("Open an album, add a folder, or drop photos here. Kaleido only reads them. Albums and folders you include entirely pick up new photos about once a day. No photos of your own? Tick macOS Wallpapers under Built-in; scenic ones you download in System Settings > Wallpaper show up there too.")
+            Text("Open an album, add a folder, or drop photos here. Kaleido only reads them. Albums and folders you include entirely pick up new photos about once a day. No photos of your own? Tick macOS Wallpapers or macOS Aerials (moving video) under Built-in; ones you download in System Settings > Wallpaper show up there too.")
                 .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center).frame(maxWidth: 420)
         }
         .frame(maxWidth: .infinity).padding(.top, 30)

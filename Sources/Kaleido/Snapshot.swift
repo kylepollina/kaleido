@@ -47,7 +47,8 @@ enum Snapshot {
             FileHandle.standardError.write(Data("load failed: \(error)\n".utf8))
             exit(1)
         }
-        guard let image = renderer.snapshot(width: size.w, height: size.h, outlines: args.contains("--outlines")),
+        guard let image = renderer.snapshot(width: size.w, height: size.h, outlines: args.contains("--outlines"),
+                                            original: args.contains("--original")),
               let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: out) as CFURL, UTType.png.identifier as CFString, 1, nil)
         else { exit(1) }
         CGImageDestinationAddImage(dest, image, nil)

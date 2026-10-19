@@ -474,6 +474,10 @@ final class AppState: ObservableObject, PhotoProvider {
             if library.wallpapers == nil || on { library.setWallpapers(true) } else { library.setWallpapers(false) }
             return
         }
+        if card.id == AerialScanner.sourceID {
+            library.setAerials(library.aerials == nil || on)
+            return
+        }
         if let album = card.album, !library.albums.contains(where: { $0.localID == album.localID }) {
             library.trackAlbum(album.ref)   // arrives with nothing selected; the sync that follows fills it in
             library.setAutoInclude(card.id, true)
@@ -489,6 +493,7 @@ final class AppState: ObservableObject, PhotoProvider {
     /// Opening an album to browse it starts tracking it (nothing selected) and pulls its photos in.
     func open(_ card: SourceCard) {
         if card.id == WallpaperScanner.sourceID, library.wallpapers == nil { library.setWallpapers(true); return }
+        if card.id == AerialScanner.sourceID, library.aerials == nil { library.setAerials(true); return }
         if let album = card.album, !library.albums.contains(where: { $0.localID == album.localID }) {
             library.trackAlbum(album.ref)
             syncNow()
@@ -503,12 +508,14 @@ final class AppState: ObservableObject, PhotoProvider {
         isSyncing = true
         let albums = library.albums, folders = library.folders, filters = library.filters
         let wallpaperRoots = library.wallpapers != nil ? library.wallpaperRoots : nil
+        let aerialRoot = library.aerials != nil ? library.aerialRoot : nil
         let authorized = photos.isAuthorized
         Task {
             let listings = await Task.detached(priority: .utility) { () -> [String: [SyncEntry]] in
                 var out: [String: [SyncEntry]] = [:]
                 for f in folders { if let l = FolderScanner.scan(f) { out[f.id] = l } }
                 if let wallpaperRoots { out[WallpaperScanner.sourceID] = WallpaperScanner.scan(roots: wallpaperRoots) }
+                if let aerialRoot { out[AerialScanner.sourceID] = AerialScanner.scan(root: aerialRoot) }
                 if authorized {
                     for a in albums { if let l = PhotosService.listing(albumID: a.localID, filters: filters) { out[a.id] = l } }
                 }

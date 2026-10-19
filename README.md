@@ -50,6 +50,11 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   zoom out forever, or still; and whether the photo drifts. The endless zooms loop seamlessly: two layers a
   doubling apart cross-fade as they grow, and switching it off lets the current doubling finish so nothing jumps.
 - **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every pattern.
+- **macOS Aerials (video).** The slow-motion aerial films macOS downloads for its moving wallpapers and screen
+  saver (Yosemite, Iceland, Hong Kong, Palau Jellies...) appear as a built-in card, named from Apple's manifest with
+  Apple's own thumbnails. They play through the kaleidoscope like any photo: decoded in hardware at screen size,
+  the 240 fps footage slowed to about 30 frames a second (an 8x slow motion), looping, muted, and paused whenever
+  nothing is drawing. More arrive when you pick them in System Settings > Wallpaper; Kaleido never copies them.
 - **macOS Wallpapers.** No photos of your own? A built-in card offers Apple's desktop pictures that are on disk
   (skipping the plain solid colours). Scenic ones like Big Sur or The Lake are only downloaded when you pick them in
   System Settings > Wallpaper; once downloaded they join automatically on the next sync.

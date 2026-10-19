@@ -138,6 +138,54 @@ public enum FolderScanner {
     }
 }
 
+/// The built-in "macOS Aerials" source: the slow-motion aerial videos (landscapes, cities, underwater, space)
+/// that macOS has downloaded for its moving wallpapers and screen saver. Only what is already on disk is used;
+/// more arrive when you pick them in System Settings > Wallpaper.
+public enum AerialScanner {
+    public static let sourceID = "aerials"
+
+    public static let defaultRoot = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Application Support/com.apple.wallpaper/aerials")
+
+    /// Downloaded aerial videos, named from Apple's manifest ("Yosemite", "London", ...).
+    public static func scan(root: URL = defaultRoot) -> [SyncEntry] {
+        let videos = root.appendingPathComponent("videos")
+        guard let files = try? FileManager.default.contentsOfDirectory(at: videos, includingPropertiesForKeys: nil) else { return [] }
+        let names = manifestNames(root: root)
+        var used: [String: Int] = [:]
+        return files.filter(VideoFiles.isVideo)
+            .map { $0.standardizedFileURL }
+            .sorted { (names[stem($0)] ?? "~").localizedStandardCompare(names[stem($1)] ?? "~") == .orderedAscending }
+            .map { url in
+                var name = names[stem(url)] ?? "Aerial"
+                used[name, default: 0] += 1
+                if used[name]! > 1 { name += " \(used[name]!)" }   // several shots share a place name
+                return SyncEntry(key: url.path, name: name, isAsset: false)
+            }
+    }
+
+    /// Apple's own still for a video, if it has one.
+    public static func thumbnail(for video: URL, root: URL = defaultRoot) -> URL? {
+        let url = root.appendingPathComponent("thumbnails/\(stem(video)).png")
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    private static func stem(_ url: URL) -> String { url.deletingPathExtension().lastPathComponent }
+
+    /// Video id to place name, from manifest/entries.json.
+    static func manifestNames(root: URL) -> [String: String] {
+        struct Manifest: Decodable {
+            struct Asset: Decodable { let id: String; let accessibilityLabel: String? }
+            let assets: [Asset]
+        }
+        guard let data = try? Data(contentsOf: root.appendingPathComponent("manifest/entries.json")),
+              let m = try? JSONDecoder().decode(Manifest.self, from: data) else { return [:] }
+        var out: [String: String] = [:]
+        for a in m.assets { if let label = a.accessibilityLabel, !label.isEmpty { out[a.id] = label } }
+        return out
+    }
+}
+
 /// The built-in "macOS Wallpapers" source: Apple's desktop pictures that are actually on disk.
 /// Most scenic ones (Big Sur, Catalina, The Lake...) are only stubs until downloaded in System Settings >
 /// Wallpaper; once downloaded they land in the MobileAsset folder and are picked up on the next sync.

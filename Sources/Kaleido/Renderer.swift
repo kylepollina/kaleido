@@ -25,6 +25,8 @@ struct GPUUniforms {
 struct PhotoTexture {
     let texture: MTLTexture
     let aspect: Float
+    /// Set for a video: it refreshes `texture` with each new frame.
+    var video: VideoSource? = nil
 }
 
 struct PhotoRef: Equatable {
@@ -39,6 +41,9 @@ struct PhotoRef: Equatable {
 enum PhotoLoader {
     static func texture(for ref: PhotoRef, queue: MTLCommandQueue) async throws -> PhotoTexture {
         switch ref.source {
+        case .file(let url) where VideoFiles.isVideo(url):
+            let video = try await VideoSource.load(url: url, queue: queue)
+            return PhotoTexture(texture: video.texture, aspect: video.aspect, video: video)
         case .file(let url):
             return try TextureFactory.load(url: url, queue: queue)
         case .asset(let id):
@@ -540,7 +545,9 @@ final class KaleidoRenderer {
 
     func encode(into pass: MTLRenderPassDescriptor, drawable: MTLDrawable?, width: Double, height: Double, original: Bool = false, outlines: Bool = false,
                 completion: (@Sendable (MTLCommandBuffer) -> Void)? = nil) {
-        guard let cb = queue.makeCommandBuffer(), let enc = cb.makeRenderCommandEncoder(descriptor: pass) else { return }
+        guard let cb = queue.makeCommandBuffer() else { return }
+        refreshVideos(into: cb)
+        guard let enc = cb.makeRenderCommandEncoder(descriptor: pass) else { return }
         var u = makeUniforms(width: width, height: height, original: original, outlines: outlines)
         enc.setRenderPipelineState(pipeline)
         enc.setFragmentBytes(&u, length: MemoryLayout<GPUUniforms>.stride, index: 0)
@@ -551,6 +558,31 @@ final class KaleidoRenderer {
         if let drawable { cb.present(drawable) }
         if let completion { cb.addCompletedHandler(completion) }
         cb.commit()
+    }
+
+    // MARK: Videos
+
+    private var lastDraw = 0.0
+    private var idleTimer: Timer?
+
+    /// Videos on screen play and copy in their newest frame; a preloaded one waits paused until its fade.
+    /// When nothing has drawn for a second (desktop hidden, window closed, display asleep) they all pause.
+    private func refreshVideos(into cb: MTLCommandBuffer) {
+        lastDraw = CACurrentMediaTime()
+        for v in [current.video, incoming?.video].compactMap({ $0 }) {
+            v.setPaused(false)
+            v.update(into: cb)
+        }
+        pending?.0.video?.setPaused(true)
+        guard current.video != nil || incoming?.video != nil, idleTimer == nil else { return }
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self else { timer.invalidate(); return }
+                let videos = [self.current.video, self.incoming?.video].compactMap { $0 }
+                if videos.isEmpty { timer.invalidate(); self.idleTimer = nil; return }
+                if CACurrentMediaTime() - self.lastDraw > 1 { videos.forEach { $0.setPaused(true) } }
+            }
+        }
     }
 
     func noteFrame() { recordFrame(cpu: 0) }
@@ -569,6 +601,18 @@ final class KaleidoRenderer {
     // MARK: Offscreen (screenshots without screen-recording permission)
 
     func setPhotosImmediately(_ a: URL, _ b: URL? = nil, progress: Double = 0.5, style: TransitionStyle = .dissolve) throws {
+        if VideoFiles.isVideo(a) {
+            // Offscreen checks of the video path: load it off the main thread, keeping the main run loop turning
+            // (AVPlayer needs it) until it is ready.
+            nonisolated(unsafe) var loaded: Result<PhotoTexture, Error>?
+            let ref = PhotoRef(id: UUID(), source: .file(a)), queue = self.queue
+            Task.detached {
+                do { loaded = .success(try await PhotoLoader.texture(for: ref, queue: queue)) } catch { loaded = .failure(error) }
+            }
+            while loaded == nil { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+            current = try loaded!.get()
+            return
+        }
         current = try TextureFactory.load(url: a, queue: queue)
         if let b {
             incoming = try TextureFactory.load(url: b, queue: queue)
@@ -579,7 +623,7 @@ final class KaleidoRenderer {
         }
     }
 
-    func snapshot(width: Int, height: Int, outlines: Bool = false) -> CGImage? {
+    func snapshot(width: Int, height: Int, outlines: Bool = false, original: Bool = false) -> CGImage? {
         let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
         desc.usage = [.renderTarget, .shaderRead]
         guard let target = device.makeTexture(descriptor: desc) else { return nil }
@@ -588,7 +632,7 @@ final class KaleidoRenderer {
         pass.colorAttachments[0].loadAction = .clear
         pass.colorAttachments[0].storeAction = .store
         let sem = DispatchSemaphore(value: 0)
-        encode(into: pass, drawable: nil, width: Double(width), height: Double(height), outlines: outlines) { _ in sem.signal() }
+        encode(into: pass, drawable: nil, width: Double(width), height: Double(height), original: original, outlines: outlines) { _ in sem.signal() }
         sem.wait()
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
         target.getBytes(&bytes, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)

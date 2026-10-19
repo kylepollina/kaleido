@@ -41,6 +41,12 @@ public struct PhotoItem: Codable, Identifiable, Hashable, Sendable {
     public var name: String { title ?? URL(fileURLWithPath: path).lastPathComponent }
 }
 
+public enum VideoFiles {
+    public static let extensions: Set<String> = ["mov", "mp4", "m4v"]
+    public static func isVideo(_ url: URL) -> Bool { extensions.contains(url.pathExtension.lowercased()) }
+    public static func isVideo(path: String) -> Bool { isVideo(URL(fileURLWithPath: path)) }
+}
+
 public enum ImageFiles {
     public static let extensions: Set<String> = ["jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "gif", "webp", "bmp", "avif"]
 
@@ -76,6 +82,8 @@ struct LibraryFile: Codable {
     var filters = PhotoFilters()
     /// macOS Wallpapers source: nil = not used, otherwise whether new wallpapers join automatically.
     var wallpapers: Bool?
+    /// macOS Aerials source, the same way.
+    var aerials: Bool?
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -87,6 +95,7 @@ struct LibraryFile: Codable {
         lastSync = try c.decodeIfPresent(Date.self, forKey: .lastSync)
         filters = try c.decodeIfPresent(PhotoFilters.self, forKey: .filters) ?? PhotoFilters()
         wallpapers = try c.decodeIfPresent(Bool.self, forKey: .wallpapers)
+        aerials = try c.decodeIfPresent(Bool.self, forKey: .aerials)
     }
 }
 
@@ -102,6 +111,9 @@ public final class PhotoLibrary: ObservableObject {
     @Published public private(set) var wallpapers: Bool?
     /// Where built-in wallpapers are looked for (tests point this at a temporary folder).
     public var wallpaperRoots = WallpaperScanner.defaultRoots
+    /// macOS Aerials (videos): nil = not in use; true = whole source; false = hand-picked.
+    @Published public private(set) var aerials: Bool?
+    public var aerialRoot = AerialScanner.defaultRoot
     private var dismissed: Set<String> = []
     private let fileURL: URL?
 
@@ -123,6 +135,7 @@ public final class PhotoLibrary: ObservableObject {
     private func apply(_ f: LibraryFile) {
         items = f.items; folders = f.folders; albums = f.albums; dismissed = f.dismissed; lastSync = f.lastSync; filters = f.filters
         wallpapers = f.wallpapers
+        aerials = f.aerials
     }
 
     public var enabledItems: [PhotoItem] { items.filter(\.isEnabled) }
@@ -130,11 +143,13 @@ public final class PhotoLibrary: ObservableObject {
     public var activeSources: Set<String> {
         var s = Set(albums.map(\.id)).union(folders.map(\.id))
         if wallpapers != nil { s.insert(WallpaperScanner.sourceID) }
+        if aerials != nil { s.insert(AerialScanner.sourceID) }
         return s
     }
     private var autoSources: Set<String> {
         var s = Set(albums.filter(\.autoInclude).map(\.id)).union(folders.filter(\.autoInclude).map(\.id))
         if wallpapers == true { s.insert(WallpaperScanner.sourceID) }
+        if aerials == true { s.insert(AerialScanner.sourceID) }
         return s
     }
 
@@ -142,6 +157,20 @@ public final class PhotoLibrary: ObservableObject {
     public func setWallpapers(_ on: Bool) {
         wallpapers = on ? true : nil
         applySync(listings: on ? [WallpaperScanner.sourceID: WallpaperScanner.scan(roots: wallpaperRoots)] : [:])
+    }
+
+    /// Turns the built-in macOS Aerials source on (every downloaded video included) or off.
+    public func setAerials(_ on: Bool) {
+        aerials = on ? true : nil
+        applySync(listings: on ? [AerialScanner.sourceID: AerialScanner.scan(root: aerialRoot)] : [:])
+    }
+
+    /// Scan results for whichever built-in sources are in use.
+    public func builtInListings() -> [String: [SyncEntry]] {
+        var out: [String: [SyncEntry]] = [:]
+        if wallpapers != nil { out[WallpaperScanner.sourceID] = WallpaperScanner.scan(roots: wallpaperRoots) }
+        if aerials != nil { out[AerialScanner.sourceID] = AerialScanner.scan(root: aerialRoot) }
+        return out
     }
     public var dismissedCount: Int { dismissed.count }
 
@@ -174,7 +203,7 @@ public final class PhotoLibrary: ObservableObject {
     public func syncFoldersNow() {
         var listings: [String: [SyncEntry]] = [:]
         for f in folders { if let l = FolderScanner.scan(f) { listings[f.id] = l } }
-        if wallpapers != nil { listings[WallpaperScanner.sourceID] = WallpaperScanner.scan(roots: wallpaperRoots) }
+        listings.merge(builtInListings()) { a, _ in a }
         applySync(listings: listings)
     }
 
@@ -191,7 +220,9 @@ public final class PhotoLibrary: ObservableObject {
                 items.append(PhotoItem(path: "", isEnabled: on, assetID: entry.key, title: entry.name, isManual: false, sources: sources))
             } else {
                 let url = URL(fileURLWithPath: entry.key)
-                items.append(PhotoItem(bookmark: BookmarkStore.makeBookmark(for: url), path: entry.key, isEnabled: on, isManual: false, sources: sources))
+                let title = entry.name == url.lastPathComponent ? nil : entry.name   // e.g. an aerial's place name
+                items.append(PhotoItem(bookmark: BookmarkStore.makeBookmark(for: url), path: entry.key, isEnabled: on,
+                                       title: title, isManual: false, sources: sources))
             }
         }
         if markSynced { lastSync = Date() }
@@ -226,11 +257,13 @@ public final class PhotoLibrary: ObservableObject {
 
     public func autoInclude(_ source: String) -> Bool {
         if source == WallpaperScanner.sourceID { return wallpapers == true }
+        if source == AerialScanner.sourceID { return aerials == true }
         return albums.first { $0.id == source }?.autoInclude ?? folders.first { $0.id == source }?.autoInclude ?? false
     }
 
     private func setAuto(_ source: String, _ value: Bool) {
         if source == WallpaperScanner.sourceID, wallpapers != nil { wallpapers = value }
+        if source == AerialScanner.sourceID, aerials != nil { aerials = value }
         if let i = albums.firstIndex(where: { $0.id == source }) { albums[i].autoInclude = value }
         if let i = folders.firstIndex(where: { $0.id == source }) { folders[i].autoInclude = value }
     }
@@ -330,6 +363,7 @@ public final class PhotoLibrary: ObservableObject {
         var f = LibraryFile()
         f.items = items; f.folders = folders; f.albums = albums; f.dismissed = dismissed; f.lastSync = lastSync; f.filters = filters
         f.wallpapers = wallpapers
+        f.aerials = aerials
         JSONFile.save(f, to: fileURL)
     }
 }

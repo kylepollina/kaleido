@@ -895,3 +895,43 @@ final class SceneTests: XCTestCase {
         XCTAssertTrue(s.hasChanges, "moving the photo counts")
     }
 }
+
+final class AerialTests: XCTestCase {
+    private func makeAerials() throws -> URL {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let fm = FileManager.default
+        try fm.createDirectory(at: root.appendingPathComponent("videos"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: root.appendingPathComponent("manifest"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: root.appendingPathComponent("thumbnails"), withIntermediateDirectories: true)
+        for id in ["AAA", "BBB", "CCC"] { try Data().write(to: root.appendingPathComponent("videos/\(id).mov")) }
+        try Data().write(to: root.appendingPathComponent("videos/notes.txt"))
+        try Data().write(to: root.appendingPathComponent("thumbnails/AAA.png"))
+        let manifest = #"{"assets": [{"id": "AAA", "accessibilityLabel": "Yosemite"}, {"id": "BBB", "accessibilityLabel": "London"}, {"id": "CCC", "accessibilityLabel": "London"}], "categories": []}"#
+        try Data(manifest.utf8).write(to: root.appendingPathComponent("manifest/entries.json"))
+        return root
+    }
+
+    func testScanNamesVideosFromTheManifest() throws {
+        let root = try makeAerials()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let entries = AerialScanner.scan(root: root)
+        XCTAssertEqual(entries.map(\.name), ["London", "London 2", "Yosemite"], "videos only, named, sorted, repeats numbered")
+        XCTAssertTrue(entries.allSatisfy { VideoFiles.isVideo(path: $0.key) })
+        XCTAssertNotNil(AerialScanner.thumbnail(for: URL(fileURLWithPath: entries[2].key), root: root))
+        XCTAssertNil(AerialScanner.thumbnail(for: URL(fileURLWithPath: entries[0].key), root: root))
+        XCTAssertEqual(AerialScanner.scan(root: root.appendingPathComponent("missing")), [])
+    }
+
+    func testAerialsSourceJoinsAndLeavesTheLibrary() throws {
+        let root = try makeAerials()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let lib = PhotoLibrary(fileURL: nil)
+        lib.aerialRoot = root
+        lib.setAerials(true)
+        XCTAssertEqual(lib.enabledItems.count, 3)
+        XCTAssertEqual(Set(lib.items.map(\.name)), ["Yosemite", "London", "London 2"], "place names, not file ids")
+        XCTAssertEqual(lib.selectionState(in: AerialScanner.sourceID), .all(total: 3))
+        lib.setAerials(false)
+        XCTAssertTrue(lib.items.isEmpty)
+    }
+}
