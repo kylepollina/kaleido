@@ -245,9 +245,9 @@ final class KaleidoRenderer {
         huePhase += look.hueSpeed * m * .pi / 180 * dt
         breathPhase += m * dt * (2 * .pi / 600)   // one breath per ten minutes at full motion
         swirlPhase += m * dt * (2 * .pi / 480)    // a swaying swirl swings through once every eight minutes at speed 1
-        // Dragging from the top-right corner to the centre moves the pointer down-left, which pans the photo
-        // up-right (see `drag`); "zoom in" keeps doing that.
-        let wanted = SIMD2<Double>(1, 1) / 2.0.squareRoot() * Double(zoomFlow) * flowSpeed * m
+        // "Zoom in" slides the photo down-left in photo space, which on screen reads as the pattern pouring into
+        // the centre (checked by eye); "zoom out" slides it the other way.
+        let wanted = SIMD2<Double>(-1, -1) / 2.0.squareRoot() * Double(zoomFlow) * flowSpeed * m
         flowVelocity += (wanted - flowVelocity) * (1 - exp(-dt * 0.5))
         if !dragging, panGoal == nil { userPan += flowVelocity * dt }
         if targetLook.hueSpeed == 0 {
