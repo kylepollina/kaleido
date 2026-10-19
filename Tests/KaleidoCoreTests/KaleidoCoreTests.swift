@@ -257,15 +257,14 @@ final class SettingsTests: XCTestCase {
 
     func testMovementSwitches() throws {
         var s = Settings()
-        XCTAssertEqual(s.zoomMotion, .breathe); XCTAssertTrue(s.driftMotion)
-        var l = Look(); l.drift = 0.8; l.breathing = 0.7
+        XCTAssertEqual(s.zoomMotion, .breathe)
+        var l = Look(); l.breathing = 0.7
         XCTAssertEqual(s.effectiveLook(l).breathing, 0.7)
-        s.zoomMotion = .zoomIn; s.driftMotion = false
-        XCTAssertEqual(s.effectiveLook(l).breathing, 0, "an endless zoom replaces the breathing")
-        XCTAssertEqual(s.effectiveLook(l).drift, 0)
+        s.zoomMotion = .zoomIn
+        XCTAssertEqual(s.effectiveLook(l).breathing, 0, "a steady zoom replaces the breathing")
         XCTAssertEqual(ZoomMotion.zoomOut.direction, -1)
         let back = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s))
-        XCTAssertEqual(back.zoomMotion, .zoomIn); XCTAssertFalse(back.driftMotion)
+        XCTAssertEqual(back.zoomMotion, .zoomIn)
     }
 
     func testOldPresetShuffleBecomesSceneShuffle() throws {

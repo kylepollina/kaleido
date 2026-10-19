@@ -245,9 +245,19 @@ final class KaleidoRenderer {
         huePhase += look.hueSpeed * m * .pi / 180 * dt
         breathPhase += m * dt * (2 * .pi / 600)   // one breath per ten minutes at full motion
         swirlPhase += m * dt * (2 * .pi / 480)    // a swaying swirl swings through once every eight minutes at speed 1
-        // "Zoom in" slides the photo down-left in photo space, which on screen reads as the pattern pouring into
-        // the centre (checked by eye); "zoom out" slides it the other way.
-        let wanted = SIMD2<Double>(-1, -1) / 2.0.squareRoot() * Double(zoomFlow) * flowSpeed * m
+        // "Zoom in" slides the photo along the mirror wedge's own axis: whatever the photo shows at the wedge's
+        // outer edge then travels toward its point, so the pattern pours into the centre (of the screen for the
+        // mandalas, of each cell for hex). The wedge turns with `sourceRotation`, so the slide follows it; a
+        // fixed direction would flip between in and out as the pattern turns. Plain tilings have no centre and
+        // simply flow diagonally.
+        let axis: Double
+        switch look.mode {
+        case .radial, .fractal: axis = .pi / (2 * Double(max(currentShape.segments, 2)))
+        case .hex: axis = .pi / 12
+        default: axis = .pi / 4
+        }
+        let a = sourceRotation + axis
+        let wanted = SIMD2<Double>(cos(a), sin(a)) * Double(zoomFlow) * flowSpeed * m
         flowVelocity += (wanted - flowVelocity) * (1 - exp(-dt * 0.5))
         if !dragging, panGoal == nil { userPan += flowVelocity * dt }
         if targetLook.hueSpeed == 0 {

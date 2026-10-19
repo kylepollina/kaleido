@@ -106,9 +106,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var keepScreenAwake = false
     /// 0...4, an index into `speedMultipliers`.
     public var speedStep = Settings.defaultSpeedStep
-    /// Movement, on top of any pattern: how the view zooms, and whether the photo drifts around.
+    /// Movement, on top of any look: how the view zooms.
     public var zoomMotion: ZoomMotion = .breathe
-    public var driftMotion = true
     /// Surprise me: as scenes change, mix saved scenes with brand-new ones (a photo with an invented pattern).
     /// Off: play through the saved scenes (or, with none saved, the photos with the pattern on screen).
     public var surprise = true
@@ -148,7 +147,6 @@ public struct Settings: Codable, Equatable, Sendable {
         if !allowSwirl { r.twist = 0 }
         if !allowDynamicMirrors { r.dynamicMirrors = false }
         if !allowOutlines { r.outline = 0 }
-        if !driftMotion { r.drift = 0 }
         if zoomMotion != .breathe { r.breathing = 0 }
         r.motion = l.motion * speedMultiplier
         return r
@@ -170,7 +168,6 @@ public struct Settings: Codable, Equatable, Sendable {
         keepScreenAwake = try c.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? d.keepScreenAwake
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
         zoomMotion = (try? c.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion)) ?? d.zoomMotion
-        driftMotion = try c.decodeIfPresent(Bool.self, forKey: .driftMotion) ?? d.driftMotion
         surprise = try c.decodeIfPresent(Bool.self, forKey: .surprise) ?? d.surprise
         sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
         patternSource = (try? c.decodeIfPresent(PatternSource.self, forKey: .patternSource)) ?? d.patternSource

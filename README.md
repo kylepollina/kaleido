@@ -20,7 +20,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   Invented looks use only the shapes ticked in Settings (untick Diamonds if it isn't for you). Next and Back fade
   in 3 seconds; Back brings back the scene before, look and all.
 - **Home** is kept simple: preview, Back / Play (or Space) / Next, Surprise me, Save scene and Edit scene, then
-  Speed and Zoom. Edit scene reveals Randomize, Drift and every setting of the scene on screen.
+  Speed and Zoom. Edit scene (closed whenever the window opens) reveals Randomize and every setting of the scene on screen.
 - **Sections.** Home, Photos (the album browser), Scenes and Settings. Patterns (saved looks, below) are hidden
   for now; the code is still there.
 - **Built-in patterns.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square
@@ -46,10 +46,10 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   (the wedges make room while an extra one grows from nothing), or one closes; tilings grow denser or sparser. A
   change comes about every 3 minutes, whatever the speed, and takes about 40 seconds to open up. See the "Shifting Mandala" pattern.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
-- **Movement.** On top of any pattern, Home picks how the view moves: in and out (a slow breath), zoom in, zoom
-  out, or still; and whether the photo drifts. Zoom in is what dragging the preview from a corner to the centre
-  does, done continuously: the photo keeps sliding through the mirrors so the pattern pours into the middle
-  (zoom out spreads it outward). It eases in and out when switched.
+- **Zoom.** On top of any look, Home picks how the view moves: in and out (a slow breath), zoom in, zoom out, or
+  still. Zoom in is what dragging the preview from a corner to the centre does, done continuously: the photo keeps
+  sliding along the mirrors' own axis (which turns with the pattern), so the pattern always pours into the middle;
+  zoom out spreads it outward. It eases in and out when switched.
 - **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every pattern.
 - **macOS Aerials (video).** The slow-motion aerial films macOS downloads for its moving wallpapers and screen
   saver (Yosemite, Iceland, Hong Kong, Palau Jellies...) appear as a built-in card, named from Apple's manifest with

@@ -98,7 +98,8 @@ extension AppState {
 struct HomeView: View {
     @EnvironmentObject var app: AppState
     let go: (AppSection) -> Void
-    @AppStorage("homeEditingScene") private var editing = false
+    /// Edit scene starts closed every time the window opens.
+    @State private var editing = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -122,7 +123,6 @@ struct HomeView: View {
                             Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
                                 .help("A random pattern and settings for this photo")
                         }
-                        Toggle("Drift (the photo wanders slowly)", isOn: $app.settings.driftMotion)
                         if !app.library.enabledItems.isEmpty { photosRow }
                     }
                     LookControls(look: app.settings.look, edit: app.tweakScene)
