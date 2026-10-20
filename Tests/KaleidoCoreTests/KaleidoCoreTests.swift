@@ -255,6 +255,13 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).surprise)
     }
 
+    func testTripIsOffByDefaultAndSaved() throws {
+        var s = Settings()
+        XCTAssertFalse(s.trip, "experimental, off until chosen")
+        s.trip = true
+        XCTAssertTrue(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).trip)
+    }
+
     func testMovementSwitches() throws {
         var s = Settings()
         XCTAssertEqual(s.zoomMotion, .breathe)

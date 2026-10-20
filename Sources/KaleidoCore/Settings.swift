@@ -108,6 +108,9 @@ public struct Settings: Codable, Equatable, Sendable {
     public var speedStep = Settings.defaultSpeedStep
     /// Movement, on top of any look: how the view zooms.
     public var zoomMotion: ZoomMotion = .breathe
+    /// Experimental "Trip": the kaleidoscope breathes in and out of the plain photo in symmetric patches, and
+    /// moving the mouse makes it bloom around the pointer.
+    public var trip = false
     /// Surprise me: as scenes change, mix saved scenes with brand-new ones (a photo with an invented pattern).
     /// Off: play through the saved scenes (or, with none saved, the photos with the pattern on screen).
     public var surprise = true
@@ -169,6 +172,7 @@ public struct Settings: Codable, Equatable, Sendable {
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
         zoomMotion = (try? c.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion)) ?? d.zoomMotion
         surprise = try c.decodeIfPresent(Bool.self, forKey: .surprise) ?? d.surprise
+        trip = try c.decodeIfPresent(Bool.self, forKey: .trip) ?? d.trip
         sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
         patternSource = (try? c.decodeIfPresent(PatternSource.self, forKey: .patternSource)) ?? d.patternSource
         excludedShapes = (try? c.decodeIfPresent([MirrorMode].self, forKey: .excludedShapes)) ?? []

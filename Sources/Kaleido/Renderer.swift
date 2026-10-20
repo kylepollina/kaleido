@@ -7,7 +7,7 @@ import MetalKit
 import UniformTypeIdentifiers
 import os
 
-/// Must match `Uniforms` in the shader: 17 floats, then 9 int32s.
+/// Must match `Uniforms` in the shader: 21 floats, then 9 int32s.
 struct GPUUniforms {
     var width: Float = 0, height: Float = 0
     var rotation: Float = 0, sourceRotation: Float = 0
@@ -16,7 +16,8 @@ struct GPUUniforms {
     var hue: Float = 0, saturation: Float = 1, vignette: Float = 0
     var time: Float = 0
     var aspectA: Float = 1, aspectB: Float = 1
-    var mixAmount: Float = 0, morph: Float = 0, outline: Float = 0
+    var mixAmount: Float = 0, morph: Float = 0, outline: Float = 0, trip: Float = 1
+    var cursorX: Float = 0, cursorY: Float = 0, cursorAmount: Float = 0
     var segments: Int32 = 8, mode: Int32 = 0, transition: Int32 = 0, hasB: Int32 = 0
     var segmentsB: Int32 = 8, modeB: Int32 = 0, original: Int32 = 0, segmentsMorph: Int32 = 8
     var outlines: Int32 = 0
@@ -146,6 +147,14 @@ final class KaleidoRenderer {
     private var flowVelocity = SIMD2<Double>(0, 0)
     /// Photo heights per second at speed 1 (scaled by the speed control like every other motion).
     private let flowSpeed = 0.008
+    /// Trip: the kaleidoscope breathes in and out of the plain photo through symmetric patches.
+    var tripEnabled = false
+    private var tripPhase = 0.0, tripAmount = 1.0
+    /// Seconds per trip breath at speed 1.
+    private let tripBreathSeconds = 240.0
+    /// Moving the mouse makes the kaleidoscope bloom around the pointer (during a trip); it fades when still.
+    private var lastMouse: NSPoint?
+    private(set) var cursorEnergy = 0.0
 
     private(set) var look = Look()
     private var current: PhotoTexture
@@ -259,6 +268,20 @@ final class KaleidoRenderer {
         let a = sourceRotation + axis
         let wanted = SIMD2<Double>(cos(a), sin(a)) * Double(zoomFlow) * flowSpeed * m
         flowVelocity += (wanted - flowVelocity) * (1 - exp(-dt * 0.5))
+        // Trip breathing: each breath rises from the plain photo and sinks back to it; the peaks vary (a slower
+        // wave), so some breaths open a few patches and others go all the way.
+        tripPhase += m * dt * (2 * .pi / tripBreathSeconds)
+        let breath = 0.5 - 0.5 * cos(tripPhase)
+        let peak = 0.6 + 0.4 * sin(tripPhase * 0.383 + 1.0)
+        let tripTarget = tripEnabled ? breath * peak : 1
+        tripAmount += (tripTarget - tripAmount) * (1 - exp(-dt * 0.8))
+        let mouse = NSEvent.mouseLocation
+        if let last = lastMouse {
+            let speed = hypot(mouse.x - last.x, mouse.y - last.y) / dt   // points per second
+            cursorEnergy = min(1, cursorEnergy + min(speed / 1500, 1) * dt * 1.6)
+        }
+        cursorEnergy *= exp(-dt * 0.5)
+        lastMouse = mouse
         if !dragging, panGoal == nil { userPan += flowVelocity * dt }
         if targetLook.hueSpeed == 0 {
             // Cycling is off: let the colour it built up ease back out, so the photo returns to its own colours.
@@ -451,6 +474,9 @@ final class KaleidoRenderer {
         incomingShape = currentShape
     }
 
+    /// Offscreen snapshots only: a fixed trip amount (0 plain photo ... 1 all kaleidoscope).
+    func forceTrip(_ amount: Double) { tripAmount = amount }
+
     /// Offscreen snapshots only: freeze a mirror-count cross-fade part way.
     func forceMorph(to count: Int, progress: Double) {
         morphTo = count
@@ -510,8 +536,14 @@ final class KaleidoRenderer {
 
     // MARK: Drawing
 
-    func makeUniforms(width: Double, height: Double, original: Bool = false, outlines: Bool = false) -> GPUUniforms {
+    /// `cursor`: where the mouse is in this view, in shader units (centred, screen height = 1, y up).
+    func makeUniforms(width: Double, height: Double, original: Bool = false, outlines: Bool = false,
+                      cursor: SIMD2<Double>? = nil) -> GPUUniforms {
         var u = GPUUniforms()
+        u.trip = Float(tripAmount)
+        if let cursor, tripAmount < 0.999 {
+            u.cursorX = Float(cursor.x); u.cursorY = Float(cursor.y); u.cursorAmount = Float(cursorEnergy)
+        }
         u.width = Float(width); u.height = Float(height)
         u.original = original ? 1 : 0
         u.outlines = outlines ? 1 : 0
@@ -549,11 +581,11 @@ final class KaleidoRenderer {
     }
 
     func encode(into pass: MTLRenderPassDescriptor, drawable: MTLDrawable?, width: Double, height: Double, original: Bool = false, outlines: Bool = false,
-                completion: (@Sendable (MTLCommandBuffer) -> Void)? = nil) {
+                cursor: SIMD2<Double>? = nil, completion: (@Sendable (MTLCommandBuffer) -> Void)? = nil) {
         guard let cb = queue.makeCommandBuffer() else { return }
         refreshVideos(into: cb)
         guard let enc = cb.makeRenderCommandEncoder(descriptor: pass) else { return }
-        var u = makeUniforms(width: width, height: height, original: original, outlines: outlines)
+        var u = makeUniforms(width: width, height: height, original: original, outlines: outlines, cursor: cursor)
         enc.setRenderPipelineState(pipeline)
         enc.setFragmentBytes(&u, length: MemoryLayout<GPUUniforms>.stride, index: 0)
         enc.setFragmentTexture(current.texture, index: 0)
@@ -759,6 +791,15 @@ final class KaleidoView: NSView {
         return true
     }
 
+    /// The mouse in shader units for this view (centred, view height = 1, y up). Works for the desktop windows
+    /// too: they ignore clicks, but the pointer's position is still known.
+    private func cursorInView() -> SIMD2<Double>? {
+        guard let window, bounds.height > 0 else { return nil }
+        let inWindow = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+        let p = convert(inWindow, from: nil)
+        return SIMD2((p.x - bounds.midX) / bounds.height, (p.y - bounds.midY) / bounds.height)
+    }
+
     @objc private func tick(_ link: CADisplayLink) {
         drawCount += 1
         guard inFlight < maxInFlight, ensureSurfaces() else { return }
@@ -772,7 +813,8 @@ final class KaleidoView: NSView {
         inFlight += 1
         let debug = renderer.debug
         MainActor.assumeIsolated {
-            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight), original: showOriginal, outlines: showOutlines && !showOriginal) { [weak self] cb in
+            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight), original: showOriginal,
+                            outlines: showOutlines && !showOriginal, cursor: cursorInView()) { [weak self] cb in
                 if debug, cb.status == .error { FileHandle.standardError.write(Data("kaleido: GPU error \(String(describing: cb.error))\n".utf8)) }
                 if debug {
                     var px = [UInt8](repeating: 0, count: 4)

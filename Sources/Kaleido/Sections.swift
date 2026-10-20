@@ -113,6 +113,8 @@ struct HomeView: View {
                     }
                     .pickerStyle(.segmented)
                     .help("For every scene: breathe in and out, zoom in or out, or hold still")
+                    Toggle("Trip (experimental): the kaleidoscope breathes in and out of the photo; move the mouse to make it bloom",
+                           isOn: $app.settings.trip)
                     if app.library.enabledItems.isEmpty { photosRow }
                 }
                 if editing {

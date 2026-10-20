@@ -46,6 +46,10 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   (the wedges make room while an extra one grows from nothing), or one closes; tilings grow denser or sparser. A
   change comes about every 3 minutes, whatever the speed, and takes about 40 seconds to open up. See the "Shifting Mandala" pattern.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
+- **Trip (experimental, a switch on Home).** The kaleidoscope breathes in and out of the plain photo: from the
+  photo as it is, a few small mirrored patches open, then more, then it sinks back, and some breaths go all the way.
+  The patches come from noise read through six-fold mirrors, so they appear in symmetric places. Moving the mouse
+  makes the kaleidoscope bloom around the pointer (on the desktop and in the preview); it fades when the mouse rests.
 - **Zoom.** On top of any look, Home picks how the view moves: in and out (a slow breath), zoom in, zoom out, or
   still. Zoom in is what dragging the preview from a corner to the centre does, done continuously: the photo keeps
   sliding along the mirrors' own axis (which turns with the pattern), so the pattern always pours into the middle;

@@ -19,6 +19,9 @@ enum Shaders {
         float mixAmount;     // 0...1 transition progress (raw)
         float morph;         // 0...1 cross-fade from `segments` to `segmentsMorph` (dynamic mirrors)
         float outline;       // 0...1 thickness of black lines along the pattern's mirrors and tile edges
+        float trip;          // 0 = the plain photo, 1 = all kaleidoscope; in between, symmetric patches
+        float cursorX, cursorY;  // the mouse in this view (same units as p)
+        float cursorAmount;  // 0...1 how much the kaleidoscope blooms around the mouse (moving it builds this up)
         int segments;       // mirrors of the outgoing photo (A)
         int mode;            // 0 radial, 1 hex, 2 fractal (A)
         int transition;      // 0 dissolve 1 iris 3 zoom 4 segments
@@ -78,6 +81,40 @@ enum Shaders {
 
     float hash11(float n) { return fract(sin(n * 127.1) * 43758.5453); }
     float hash21(float2 p) { return fract(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453); }
+
+    // Smooth value noise in 0...1.
+    float valueNoise(float2 p) {
+        float2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = hash21(i), b = hash21(i + float2(1, 0)), c = hash21(i + float2(0, 1)), d = hash21(i + float2(1, 1));
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+
+    // Trip mask: 1 where the kaleidoscope shows through the plain photo. The noise is read through mirror folds,
+    // so patches open in symmetric places; as `trip` rises they grow and merge until everything is kaleidoscope.
+    float tripMask(float2 p, constant Uniforms &u) {
+        float2 f = foldRadial(p, 6.0);
+        float2 drift = float2(u.time * 0.013, -u.time * 0.009);
+        float n = 0.6 * valueNoise(f * 3.6 + drift) + 0.4 * valueNoise(f * 8.3 - drift * 1.7);
+        float level = mix(0.12, 1.0, u.trip);                // 0 shows nothing, 1 covers everything
+        float m = smoothstep(n - 0.05, n + 0.05, level);
+        if (u.cursorAmount > 0.001) {
+            // Around the mouse: a symmetric bloom (its edge wobbles in a six-fold pattern) that grows as the
+            // mouse keeps moving and shrinks away when it rests.
+            float2 c = p - float2(u.cursorX, u.cursorY);
+            float d = length(c) + 0.09 * (valueNoise(foldRadial(c, 6.0) * 7.0 + u.time * 0.05) - 0.5);
+            float r = 0.04 + 0.3 * u.cursorAmount;
+            m = max(m, (1.0 - smoothstep(r - 0.05, r + 0.05, d)) * smoothstep(0.0, 0.15, u.cursorAmount));
+        }
+        return m;
+    }
+
+    // The photo as it is, filling the screen (cropped, never letterboxed), for the "sober" parts of a trip.
+    float3 samplePlainFill(texture2d<float> tex, sampler smp, float2 p, float aspect, float viewAspect) {
+        float s = max(viewAspect / aspect, 1.0);
+        float2 q = p / s;
+        return tex.sample(smp, float2(q.x / aspect + 0.5, 0.5 - q.y), level(0.0)).rgb;
+    }
 
     // Maps a screen point (centred, units of screen height) to a point in photo space.
     // `scale` is how many photo-space units one screen unit covers at this point (for the mip level).
@@ -383,6 +420,15 @@ enum Shaders {
         }
 
         float3 col = kaleidoColor(p, u, texA, texB, smp, 1.0);
+        if (u.trip < 0.999) {
+            float m = tripMask(p, u);
+            if (m < 0.999) {
+                float va = res.x / res.y;
+                float3 plain = samplePlainFill(texA, smp, p, u.aspectA, va);
+                if (u.hasB == 1) plain = mix(plain, samplePlainFill(texB, smp, p, u.aspectB, va), smoothstep(0.0, 1.0, u.mixAmount));
+                col = mix(plain, col, m);
+            }
+        }
 
         // Grade: hue rotation, saturation, vignette, a hair of dither against banding in soft areas.
         col = hueRotate(col, u.hue);
