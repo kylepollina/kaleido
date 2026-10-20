@@ -88,7 +88,15 @@ struct SceneEditor: View {
         VStack(spacing: 0) {
             PreviewPane(editor: true, transport: false).frame(maxWidth: 480).padding(16)
             if !app.isSceneAvailable(scene) {
-                Text("This scene's photo is no longer in your library.").foregroundStyle(.orange).padding(.bottom, 8)
+                VStack(spacing: 6) {
+                    Text("This scene's photo can't be found. Its look is kept: give it a photo by playing one (Photos, the ▶︎ on a photo), then come back here.")
+                        .foregroundStyle(.orange)
+                        .multilineTextAlignment(.center)
+                    Button("Use the photo on screen") { app.usePhotoOnScreen(for: scene.id) }
+                        .help("Attach the photo showing in the preview to this scene")
+                }
+                .frame(maxWidth: 480)
+                .padding(.bottom, 8)
             }
             if let draft = app.draft, draft.target == .scene(scene.id) {
                 Form {

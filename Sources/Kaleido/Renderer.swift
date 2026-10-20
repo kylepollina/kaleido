@@ -459,6 +459,8 @@ final class KaleidoRenderer {
 
     /// The photo on screen now (nil while the placeholder shows).
     var currentPhotoID: UUID? { currentID }
+    /// The photo on screen and where it comes from (nil while the placeholder shows).
+    var currentPhoto: PhotoRef? { currentRef }
 
     /// Show a specific photo next (used by "Show now").
     /// `refade`: fade even when it is the photo already showing (a scene putting a new pattern on it), so the

@@ -74,6 +74,11 @@ final class AppState: ObservableObject, PhotoProvider {
         libraryObserver = library.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
         presets.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         scenes.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        // Scenes saved before they remembered the photo itself: note it now, while the photo is still in the
+        // library, so unticking its album later doesn't lose it.
+        for s in scenes.scenes where s.photoKey == nil {
+            if let item = library.item(s.photoID) { scenes.setPhoto(s.id, photoID: s.photoID, key: item.key, name: item.name) }
+        }
         renderer?.didDrag = { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, case .scene = self.draft?.target else { return }
@@ -215,6 +220,12 @@ final class AppState: ObservableObject, PhotoProvider {
             return
         }
         plannedScene = nil
+        if let h = holdArriving, h == photoID {
+            // Play now: keep the look on screen and stay on this photo until Next or Back.
+            holdArriving = nil
+            markTweaked()
+            return
+        }
         // A new scene: this photo with a pattern from where Settings says (or the one being edited).
         var look = settings.look, id = settings.activePresetID
         var g = SystemRandomNumberGenerator()
@@ -316,11 +327,41 @@ final class AppState: ObservableObject, PhotoProvider {
         return library.resolveURL(for: id).map { PhotoRef(id: id, source: .file($0)) }
     }
 
-    func isSceneAvailable(_ s: SavedScene) -> Bool { library.item(s.photoID) != nil }
+    /// A scene's photo: through the library when it is there, otherwise straight from the Photos asset or file
+    /// the scene remembers. The ref always carries the scene's own photo id, so arrival matching stays simple.
+    private func sceneRef(_ s: SavedScene) -> PhotoRef? {
+        if let r = photoRef(s.photoID) { return r }
+        guard let key = s.photoKey, !key.isEmpty else { return nil }
+        if let item = library.items.first(where: { $0.key == key }), let r = photoRef(item.id) {
+            return PhotoRef(id: s.photoID, source: r.source)
+        }
+        if key.hasPrefix("/") {
+            return FileManager.default.fileExists(atPath: key) ? PhotoRef(id: s.photoID, source: .file(URL(fileURLWithPath: key))) : nil
+        }
+        return PhotoRef(id: s.photoID, source: .asset(key))
+    }
+
+    func isSceneAvailable(_ s: SavedScene) -> Bool { sceneRef(s) != nil }
+
+    /// What a scene should remember about the photo on screen.
+    private var currentPhotoIdentity: (id: UUID, key: String, name: String?)? {
+        guard let ref = renderer?.currentPhoto else { return nil }
+        let key: String
+        switch ref.source { case .asset(let a): key = a; case .file(let url): key = url.path }
+        return (ref.id, key, library.item(ref.id)?.name ?? library.items.first { $0.key == key }?.name)
+    }
+
+    /// Repairs a scene whose photo went missing: it takes the photo on screen and keeps its look.
+    func usePhotoOnScreen(for sceneID: UUID) {
+        guard let p = currentPhotoIdentity, scenes.scene(sceneID) != nil else { return }
+        scenes.setPhoto(sceneID, photoID: p.id, key: p.key, name: p.name)
+        if let s = scenes.scene(sceneID) { show(saved: s) }
+        writeSceneThumbnail(sceneID)
+    }
 
     /// Shows a saved scene: its photo with its pattern and position.
     func showScene(_ s: SavedScene) {
-        guard let renderer, let ref = photoRef(s.photoID) else { return }
+        guard let renderer, let ref = sceneRef(s) else { return }
         if renderer.currentPhotoID == s.photoID && activeSceneID == s.id {
             sceneArriving = nil
             show(saved: s)
@@ -337,9 +378,10 @@ final class AppState: ObservableObject, PhotoProvider {
     /// Freezes what is on screen (photo, look and where the photo sits) as a new scene.
     @discardableResult
     func saveScene() -> UUID? {
-        guard let renderer, let photo = renderer.currentPhotoID else { return nil }
+        guard let renderer, let photo = currentPhotoIdentity else { return nil }
         let base = presets.preset(settings.activePresetID).map { "\($0.name) scene" } ?? "Scene"
-        let id = scenes.add(name: base, photoID: photo, look: settings.look, panX: renderer.pan.x, panY: renderer.pan.y)
+        let id = scenes.add(name: base, photoID: photo.id, photoKey: photo.key, photoName: photo.name, look: settings.look,
+                            panX: renderer.pan.x, panY: renderer.pan.y)
         writeSceneThumbnail(id)
         activeSceneID = id
         clearTweaked()
@@ -449,7 +491,7 @@ final class AppState: ObservableObject, PhotoProvider {
         plannedScene = nil
         let saved = shuffleScenes.filter { $0.id != activeSceneID }
         if !isEditingPresets, settings.effectiveSceneShuffle.nextIsSaved(savedCount: saved.count, roll: Double.random(in: 0..<1)),
-           let s = saved.randomElement(), let ref = photoRef(s.photoID) {
+           let s = saved.randomElement(), let ref = sceneRef(s) {
             plannedScene = s
             return ref
         }
@@ -469,11 +511,15 @@ final class AppState: ObservableObject, PhotoProvider {
 
     // MARK: Syncing photo sources
 
+    /// Plays this photo or video now (selected or not) and stays on it until Next or Back.
     func showNow(_ id: UUID) {
-        guard let item = library.item(id) else { return }
-        if let a = item.assetID { renderer?.show(PhotoRef(id: id, source: .asset(a))) }
-        else if let url = library.resolveURL(for: id) { renderer?.show(PhotoRef(id: id, source: .file(url))) }
+        guard let ref = photoRef(id) else { return }
+        holdArriving = id
+        renderer?.show(ref, refade: true)
     }
+
+    /// The photo "Play now" asked for; when it fades in, the scene is held.
+    private var holdArriving: UUID?
 
     /// Card checkbox: put a whole album (or folder, or the hand-added photos) in or out of the rotation.
     func toggleWhole(_ card: SourceCard) {

@@ -510,6 +510,7 @@ struct PhotoTile: View {
     @Binding var anchor: UUID?
     @State private var image: NSImage?
     @State private var missing = false
+    @State private var hovering = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -530,6 +531,25 @@ struct PhotoTile: View {
                 .foregroundStyle(item.isEnabled ? Color.white : Color.white.opacity(0.8), item.isEnabled ? Color.accentColor : Color.black.opacity(0.35))
                 .padding(6)
         }
+        .overlay(alignment: .bottomLeading) {
+            HStack(spacing: 4) {
+                if hovering {
+                    // Play now: try this one photo or video, selected or not.
+                    Button { app.showNow(item.id) } label: {
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(.white, Color.black.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Play this now (stays until Next)")
+                }
+                if VideoFiles.isVideo(path: item.path) {
+                    Image(systemName: "video.fill").font(.caption2).foregroundStyle(.white).shadow(radius: 2)
+                }
+            }
+            .padding(6)
+        }
+        .onHover { hovering = $0 }
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(item.isEnabled ? Color.accentColor.opacity(0.7) : Color.clear, lineWidth: 2))
         .contentShape(Rectangle())
@@ -537,7 +557,7 @@ struct PhotoTile: View {
         .help(item.isAsset ? "Photos library" : item.name)
         .contextMenu {
             Button(item.isEnabled ? "Remove from rotation" : "Add to rotation") { app.library.toggle(item.id, in: source) }
-            Button("Show now") { app.showNow(item.id) }
+            Button("Play now") { app.showNow(item.id) }
             if !item.isAsset {
                 Button("Reveal in Finder") {
                     if let url = app.library.resolveURL(for: item.id) { NSWorkspace.shared.activateFileViewerSelecting([url]) }

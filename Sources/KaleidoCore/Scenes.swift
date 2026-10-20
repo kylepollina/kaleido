@@ -8,6 +8,10 @@ public struct SavedScene: Codable, Identifiable, Equatable, Sendable {
     public var name: String
     /// The photo's id in the photo library.
     public var photoID: UUID
+    /// The photo itself (Photos asset id or file path), so the scene still plays when the photo has left the
+    /// library (its album unticked, say). Missing in scenes saved before this existed.
+    public var photoKey: String?
+    public var photoName: String?
     public var look: Look
     /// How far the photo was dragged inside the mirrors (photo space).
     public var panX: Double
@@ -37,11 +41,23 @@ public final class SceneLibrary: ObservableObject {
 
     /// Adds a scene (hearted) and returns its id.
     @discardableResult
-    public func add(name: String, photoID: UUID, look: Look, panX: Double = 0, panY: Double = 0) -> UUID {
-        let s = SavedScene(name: uniqueName(name), photoID: photoID, look: look, panX: panX, panY: panY)
+    public func add(name: String, photoID: UUID, photoKey: String? = nil, photoName: String? = nil, look: Look,
+                    panX: Double = 0, panY: Double = 0) -> UUID {
+        var s = SavedScene(name: uniqueName(name), photoID: photoID, look: look, panX: panX, panY: panY)
+        s.photoKey = photoKey
+        s.photoName = photoName
         scenes.append(s)
         save()
         return s.id
+    }
+
+    /// Gives a scene a different photo (e.g. to repair one whose photo went missing).
+    public func setPhoto(_ id: UUID, photoID: UUID, key: String?, name: String?) {
+        guard let i = index(id) else { return }
+        scenes[i].photoID = photoID
+        scenes[i].photoKey = key
+        scenes[i].photoName = name
+        save()
     }
 
     public func update(_ id: UUID, name: String, look: Look, pan: (Double, Double)?) {
@@ -61,7 +77,8 @@ public final class SceneLibrary: ObservableObject {
     @discardableResult
     public func duplicate(_ id: UUID) -> UUID? {
         guard let s = scene(id) else { return nil }
-        return add(name: s.name + " copy", photoID: s.photoID, look: s.look, panX: s.panX, panY: s.panY)
+        return add(name: s.name + " copy", photoID: s.photoID, photoKey: s.photoKey, photoName: s.photoName,
+                   look: s.look, panX: s.panX, panY: s.panY)
     }
 
     public func delete(_ id: UUID) {

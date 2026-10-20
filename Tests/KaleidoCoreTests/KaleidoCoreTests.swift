@@ -890,6 +890,24 @@ final class SceneTests: XCTestCase {
         XCTAssertNil(SceneLibrary(fileURL: file).scene(id))
     }
 
+    func testScenesRememberTheirPhotoAndCanBeRepaired() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("scenes.json")
+        let lib = SceneLibrary(fileURL: file)
+        let id = lib.add(name: "Lake", photoID: UUID(), photoKey: "ABC/L0/001", photoName: "IMG_1.HEIC", look: Look())
+        XCTAssertEqual(SceneLibrary(fileURL: file).scene(id)?.photoKey, "ABC/L0/001", "the photo itself is saved")
+        XCTAssertEqual(lib.duplicate(id).flatMap { lib.scene($0)?.photoKey }, "ABC/L0/001")
+        let newPhoto = UUID()
+        lib.setPhoto(id, photoID: newPhoto, key: "/p/new.jpg", name: "new.jpg")
+        let back = SceneLibrary(fileURL: file).scene(id)
+        XCTAssertEqual(back?.photoID, newPhoto); XCTAssertEqual(back?.photoKey, "/p/new.jpg")
+        // Scenes saved before keys existed still load.
+        let old = #"[{"id": "\#(UUID().uuidString)", "name": "Old", "photoID": "\#(UUID().uuidString)", "look": {}, "panX": 0, "panY": 0, "isFavorite": true, "created": 0}]"#
+        XCTAssertNil(try JSONDecoder().decode([SavedScene].self, from: Data(old.utf8)).first?.photoKey)
+    }
+
     func testDraftTracksUnsavedChanges() {
         var d = EditDraft(target: .preset(UUID()), name: "Mandala", look: Look())
         XCTAssertFalse(d.hasChanges)

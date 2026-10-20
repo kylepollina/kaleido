@@ -95,7 +95,7 @@ Run the tests with `swift test`.
 3. Tune the look in the sidebar, or try a pattern or Surprise me.
 4. **Stop** or quit to get your wallpaper back.
 
-Right-click a thumbnail for "Show now", "Reveal in Finder" and "Remove from library".
+Hover a thumbnail and press ▶︎ to play that photo or video right now, selected or not; it stays until Next or Back. Right-click a thumbnail for "Play now", "Reveal in Finder" and "Remove from library". Saved scenes remember the photo itself, so they still play when its album is unticked; a scene whose photo is gone keeps its look and can take the photo on screen ("Use the photo on screen" in Scenes).
 
 ## How it works
 
