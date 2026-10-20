@@ -77,7 +77,7 @@ struct PlayButton: View {
                 .frame(maxWidth: .infinity)
         }
         .controlSize(.large)
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.glassProminent)
         .tint(app.isPlaying ? .red : .accentColor)
         .keyboardShortcut("p", modifiers: .command)
     }
@@ -102,58 +102,84 @@ struct HomeView: View {
     @State private var editing = false
 
     var body: some View {
-        VStack(spacing: 12) {
-            PreviewPane().frame(maxWidth: 560)
-            transport
+        VStack(spacing: 16) {
+            // The scene is the hero; its playback controls float over it in glass.
+            PreviewPane(controls: AnyView(transport)).frame(maxWidth: 980)
+            motion
+            if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 620) }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 12)
+        // Edit scene is an inspector: it slides in from the right with every setting of the scene on screen.
+        .inspector(isPresented: $editing) {
             Form {
                 Section {
-                    LabeledContent("Speed") { SpeedControl().frame(maxWidth: 260) }
-                    Picker("Zoom", selection: $app.settings.zoomMotion) {
-                        ForEach(ZoomMotion.allCases) { Text($0.label).tag($0) }
+                    HStack {
+                        sceneRow
+                        Spacer()
+                        Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
+                            .buttonStyle(.glass)
+                            .help("A random pattern and settings for this photo")
                     }
-                    .pickerStyle(.segmented)
-                    .help("Push or pull: the photo keeps sliding through the mirrors one way or the other. Drift: only the look's own slow wandering and breathing.")
-                    if app.library.enabledItems.isEmpty { photosRow }
+                    if !app.library.enabledItems.isEmpty { photosRow }
                 }
-                if editing {
-                    Section("Edit scene") {
-                        HStack {
-                            sceneRow
-                            Spacer()
-                            Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
-                                .help("A random pattern and settings for this photo")
-                        }
-                        if !app.library.enabledItems.isEmpty { photosRow }
-                    }
-                    LookControls(look: app.settings.look, edit: app.tweakScene)
-                }
+                LookControls(look: app.settings.look, edit: app.tweakScene)
             }
             .formStyle(.grouped)
+            .inspectorColumnWidth(min: 320, ideal: 360, max: 460)
         }
-        .padding(.top, 16)
     }
 
+    /// Back · Play · Next · Surprise me · Save scene · Edit scene, as one floating glass bar.
     private var transport: some View {
-        HStack(spacing: 14) {
-            Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 30) }
-                .help("The scene before")
-            PlayButton().frame(width: 150)
-            Button { app.nextPhoto() } label: { Image(systemName: "forward.fill").frame(width: 30) }
-                .help("Next scene")
-            Toggle(isOn: $app.settings.surprise) { Label("Surprise me", systemImage: "dice") }
-                .toggleStyle(.button)
-                .help(app.settings.surprise
-                      ? "On: as scenes change, Kaleido mixes your saved scenes with new ones it makes up"
-                      : "Off: plays through your saved scenes (or, with none saved, your photos with this look)")
-            let saved = app.scenes.scene(app.activeSceneID) != nil
-            Button { app.saveScene() } label: { Label(saved ? "Saved" : "Save scene", systemImage: saved ? "bookmark.fill" : "bookmark") }
-                .disabled(saved)
-                .help(saved ? "This is one of your saved scenes" : "Keep this photo with these settings and where the photo sits")
-            Toggle(isOn: $editing.animation(.easeInOut(duration: 0.2))) { Label("Edit scene", systemImage: "slider.horizontal.3") }
-                .toggleStyle(.button)
-                .help("Show the pattern and every setting of this scene")
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
+                Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 20) }
+                    .buttonStyle(.glass)
+                    .help("The scene before")
+                PlayButton().frame(width: 170)
+                Button { app.nextPhoto() } label: { Image(systemName: "forward.fill").frame(width: 20) }
+                    .buttonStyle(.glass)
+                    .help("Next scene")
+                GlassToggle(isOn: $app.settings.surprise, title: "Surprise me", icon: "dice", tint: .purple)
+                    .help(app.settings.surprise
+                          ? "On: as scenes change, Kaleido mixes your saved scenes with new ones it makes up"
+                          : "Off: plays through your saved scenes (or, with none saved, your photos with this look)")
+                let saved = app.scenes.scene(app.activeSceneID) != nil
+                Button { app.saveScene() } label: { Label(saved ? "Saved" : "Save scene", systemImage: saved ? "bookmark.fill" : "bookmark") }
+                    .buttonStyle(.glass)
+                    .disabled(saved)
+                    .help(saved ? "This is one of your saved scenes" : "Keep this photo with these settings and where the photo sits")
+                GlassToggle(isOn: $editing.animation(.easeInOut(duration: 0.25)), title: "Edit scene", icon: "slider.horizontal.3", tint: .accentColor)
+                    .help("Show the pattern and every setting of this scene")
+            }
+            .controlSize(.large)
         }
-        .controlSize(.large)
+    }
+
+    /// Speed and Zoom, in one glass capsule under the scene.
+    private var motion: some View {
+        HStack(spacing: 18) {
+            HStack(spacing: 8) {
+                Text("Speed").foregroundStyle(.secondary)
+                SpeedControl().frame(width: 200)
+            }
+            Divider().frame(height: 18)
+            HStack(spacing: 8) {
+                Text("Zoom").foregroundStyle(.secondary)
+                Picker("Zoom", selection: $app.settings.zoomMotion) {
+                    ForEach(ZoomMotion.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .help("Push or pull: the photo keeps sliding through the mirrors one way or the other. Drift: only the look's own slow wandering and breathing.")
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .glassEffect(.regular, in: .capsule)
     }
 
     /// Which scene this is.
@@ -190,6 +216,23 @@ struct HomeView: View {
     }
 }
 
+
+/// An on/off button in Liquid Glass: tinted glass when on, clear glass when off.
+struct GlassToggle: View {
+    @Binding var isOn: Bool
+    let title: String
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        let button = Button { isOn.toggle() } label: { Label(title, systemImage: icon) }
+        if isOn {
+            button.buttonStyle(.glassProminent).tint(tint)
+        } else {
+            button.buttonStyle(.glass)
+        }
+    }
+}
 
 /// The one speed control: five stops from turtle to rabbit, like the trackpad speed setting.
 struct SpeedControl: View {
@@ -352,7 +395,7 @@ struct DraftHeader<Extra: View>: View {
                 .help("Throw away the changes since the last save")
             Button("Save") { app.saveDraft() }
                 .keyboardShortcut("s", modifiers: .command)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
                 .disabled(!draft.hasChanges)
         }
     }

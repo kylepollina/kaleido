@@ -77,7 +77,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 
 ## Install
 
-Requires macOS 14 or later and Xcode (or the Swift toolchain).
+Requires macOS 26 or later (it uses Liquid Glass) and Xcode (or the Swift toolchain).
 
 ```sh
 cd ~/Projects/kaleido

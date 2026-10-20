@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Kaleido",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS("26.0")],
     targets: [
         // Everything that does not need a window or a GPU: settings, photo library, bookmarks, shuffle.
         .target(name: "KaleidoCore", path: "Sources/KaleidoCore"),

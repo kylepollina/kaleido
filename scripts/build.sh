@@ -21,9 +21,9 @@ fi
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Kaleido"
-# SwiftPM records the deployment target (macOS 14) as the SDK version, which makes AppKit run
+# SwiftPM records the deployment target (macOS 26) as the SDK version, which makes AppKit run
 # the app in compatibility mode with no Liquid Glass. Record the real SDK it was built with.
-vtool -set-build-version macos 14.0 "$(xcrun --show-sdk-version)" -replace \
+vtool -set-build-version macos 26.0 "$(xcrun --show-sdk-version)" -replace \
     -output "$APP/Contents/MacOS/Kaleido" "$APP/Contents/MacOS/Kaleido"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"

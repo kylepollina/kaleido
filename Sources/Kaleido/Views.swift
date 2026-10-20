@@ -83,26 +83,13 @@ struct PreviewPane: View {
     var editor = false
     /// The editor's previous / play / next (a scene keeps its own photo, so its editor leaves them out).
     var transport = true
+    /// Controls that float in glass over the bottom of the preview (Home's playback bar).
+    var controls: AnyView? = nil
     @AppStorage("previewShowsOriginal") private var showOriginal = false
     @AppStorage("previewShowsPatternLines") private var showLines = false
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 16) {
-                Picker("Preview", selection: $showOriginal) {
-                    Text("Kaleidoscope").tag(false)
-                    Text("Original").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                if editor {
-                    Toggle("Pattern lines", isOn: $showLines)
-                        .toggleStyle(.checkbox)
-                        .disabled(showOriginal)
-                        .help("Trace the mirrors and tile edges in red, to see the shape of the pattern itself")
-                }
-            }
+        VStack(spacing: 10) {
             Group {
                 if let renderer = app.renderer {
                     PreviewView(renderer: renderer, showOriginal: showOriginal, showOutlines: editor && showLines)
@@ -112,25 +99,57 @@ struct PreviewPane: View {
             }
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .background(.black)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .help(showOriginal ? "The photo as it is" : "Drag to move the photo inside the mirrors; flick it to let it glide")
-            if showOriginal {
+            // Liquid Glass: the controls float over the picture instead of sitting in rows around it.
+            .overlay(alignment: .top) {
                 HStack(spacing: 10) {
-                    Button { app.removeCurrentFromRotation() } label: { Label("Remove from selected photos", systemImage: "minus.circle") }
-                        .help("Take this photo out of the rotation and move on to the next one")
-                    Button { app.revealCurrentPhoto() } label: { Label("Show in library", systemImage: "photo") }
-                        .help("Open it in Finder, or in Photos for photos from your Photos library")
+                    Picker("Preview", selection: $showOriginal) {
+                        Text("Kaleidoscope").tag(false)
+                        Text("Original").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                    if editor && !showOriginal {
+                        Toggle(isOn: $showLines) { Label("Pattern lines", systemImage: "line.3.crossed.swirl.circle") }
+                            .toggleStyle(.button)
+                            .help("Trace the mirrors and tile edges in red, to see the shape of the pattern itself")
+                    }
                 }
-                .controlSize(.small)
+                .padding(6)
+                .glassEffect(.regular, in: .capsule)
+                .padding(12)
+            }
+            .overlay(alignment: .bottom) {
+                Group {
+                    if showOriginal {
+                        GlassEffectContainer(spacing: 8) {
+                            HStack(spacing: 8) {
+                                Button { app.removeCurrentFromRotation() } label: { Label("Remove from selected photos", systemImage: "minus.circle") }
+                                    .help("Take this photo out of the rotation and move on to the next one")
+                                Button { app.revealCurrentPhoto() } label: { Label("Show in library", systemImage: "photo") }
+                                    .help("Open it in Finder, or in Photos for photos from your Photos library")
+                            }
+                            .buttonStyle(.glass)
+                        }
+                    } else if let controls {
+                        controls
+                    }
+                }
+                .padding(14)
             }
             if editor && transport {
-                HStack(spacing: 12) {
-                    Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 26) }
-                        .help("Previous photo")
-                    PlayButton(compact: true).frame(width: 120)
-                    Button { app.nextPhotoKeepingPreset() } label: { Image(systemName: "forward.fill").frame(width: 26) }
-                        .help("Next photo (keeps this pattern)")
+                GlassEffectContainer(spacing: 10) {
+                    HStack(spacing: 10) {
+                        Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 22) }
+                            .buttonStyle(.glass)
+                            .help("Previous photo")
+                        PlayButton(compact: true).frame(width: 120)
+                        Button { app.nextPhotoKeepingPreset() } label: { Image(systemName: "forward.fill").frame(width: 22) }
+                            .buttonStyle(.glass)
+                            .help("Next photo (keeps this pattern)")
+                    }
                 }
             }
         }
@@ -348,7 +367,7 @@ struct LibraryHomeView: View {
             Button(button, action: action)
         }
         .padding(12)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var emptyHint: some View {
@@ -398,8 +417,8 @@ struct AlbumCardView: View {
                     .aspectRatio(4.0 / 3.0, contentMode: .fit)
                     .overlay { CoverImage(card: card) }
                     .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(borderColor, lineWidth: card.state == .none ? 1 : 2))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(borderColor, lineWidth: card.state == .none ? 1 : 2))
                     .overlay(alignment: .bottomTrailing) { badge.padding(8) }
                 Button { app.toggleWhole(card) } label: {
                     Image(systemName: icon)
