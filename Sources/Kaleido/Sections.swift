@@ -109,7 +109,6 @@ struct HomeView: View {
         VStack(spacing: 12) {
             // The scene is the hero, as big as the window allows; its playback controls float over it in glass.
             PreviewPane(controls: AnyView(transport), linesAllowed: editing)
-            motion
             if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 620) }
         }
         .padding(.horizontal, 10)
@@ -190,8 +189,23 @@ struct HomeView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .frame(width: 150, alignment: .leading)
-            .padding(.horizontal, 10)
+            .frame(width: 140, alignment: .leading)
+            .padding(.horizontal, 8)
+            playerDivider
+            zoomMenu
+            // Speed sits where a music player puts its volume slider.
+            HStack(spacing: 6) {
+                Image(systemName: "tortoise.fill").font(.system(size: 12)).foregroundStyle(.secondary)
+                Slider(value: Binding(get: { Double(app.settings.speedStep) },
+                                      set: { app.settings.speedStep = Int($0.rounded()) }),
+                       in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
+                    .controlSize(.small)
+                    .frame(width: 96)
+                Image(systemName: "hare.fill").font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 6)
+            .help("Speed: how fast everything moves")
+            playerDivider
             PlayerIcon(name: saved == nil ? "bookmark" : "bookmark.fill", active: saved != nil, tint: .accentColor) {
                 if saved == nil { app.saveScene() }
             }
@@ -206,28 +220,28 @@ struct HomeView: View {
         .glassEffect(.regular, in: .capsule)
     }
 
-    /// Speed and Zoom, in one glass capsule under the scene.
-    private var motion: some View {
-        HStack(spacing: 18) {
-            HStack(spacing: 8) {
-                Text("Speed").foregroundStyle(.secondary)
-                SpeedControl().frame(width: 200)
+    private var playerDivider: some View {
+        Rectangle().fill(.primary.opacity(0.12)).frame(width: 1, height: 22).padding(.horizontal, 4)
+    }
+
+    /// Zoom as one icon (showing the current mode) with a small menu of Drift / Push / Pull.
+    private var zoomMenu: some View {
+        Menu {
+            Picker("Zoom", selection: $app.settings.zoomMotion) {
+                ForEach(ZoomMotion.allCases) { Label($0.label, systemImage: $0.icon).tag($0) }
             }
-            Divider().frame(height: 18)
-            HStack(spacing: 8) {
-                Text("Zoom").foregroundStyle(.secondary)
-                Picker("Zoom", selection: $app.settings.zoomMotion) {
-                    ForEach(ZoomMotion.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                .help("Push or pull: the photo keeps sliding through the mirrors one way or the other. Drift: only the look's own slow wandering and breathing.")
-            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: app.settings.zoomMotion.icon)
+                .font(.system(size: 16, weight: .semibold))
+                .frame(width: 38, height: 38)
+                .contentShape(Circle())
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .glassEffect(.regular, in: .capsule)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Zoom: \(app.settings.zoomMotion.label). Drift wanders slowly; Push and Pull keep sliding the photo through the mirrors one way or the other.")
     }
 
     /// Which scene this is.
@@ -264,6 +278,17 @@ struct HomeView: View {
     }
 }
 
+
+extension ZoomMotion {
+    /// Drift: a breeze. Push: arrows pointing in. Pull: arrows pointing out.
+    var icon: String {
+        switch self {
+        case .drift: return "wind"
+        case .push: return "arrow.down.right.and.arrow.up.left"
+        case .pull: return "arrow.up.left.and.arrow.down.right"
+        }
+    }
+}
 
 /// A plain icon button for the mini-player capsule. An "active" toggle gets a tinted icon on a soft tinted disc, like
 /// Shuffle in Apple Music.
