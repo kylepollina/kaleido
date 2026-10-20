@@ -718,7 +718,9 @@ final class KaleidoView: NSView {
         self.preferredFramesPerSecond = fps
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.contentsGravity = .resize
+        // While the view is being resized (e.g. sliding into full window) the last frame fills and crops until
+        // the next one is drawn at the new size, instead of stretching.
+        layer?.contentsGravity = .resizeAspectFill
         layer?.backgroundColor = NSColor.black.cgColor
         layer?.isOpaque = true
     }

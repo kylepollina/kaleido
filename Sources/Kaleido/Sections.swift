@@ -32,6 +32,7 @@ struct ContentView: View {
                 Label(s.rawValue, systemImage: s.icon).tag(s)
             }
             .navigationSplitViewColumnWidth(min: 160, ideal: 170, max: 200)
+            .opacity(immersive ? 0 : 1)   // fades as it slides away for full window
             .safeAreaInset(edge: .bottom) {
                 VStack(alignment: .leading, spacing: 6) {
                     if section != .home { PlayButton(compact: true) }
@@ -54,7 +55,7 @@ struct ContentView: View {
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar(immersive ? .hidden : .automatic, for: .windowToolbar)
         .onChange(of: immersive) { _, on in
-            withAnimation(.easeInOut(duration: 0.3)) { columns = on ? .detailOnly : .all }
+            withAnimation(HomeView.fullWindowAnimation) { columns = on ? .detailOnly : .all }
         }
         .onChange(of: section) { _, s in if s != .home { immersive = false } }
         .onAppear {
@@ -115,35 +116,34 @@ struct HomeView: View {
     @State private var editing = false
     @AppStorage("previewShowsPatternLines") private var showLines = false
 
-    var body: some View {
-        if immersive {
-            // Like Portal: just the scene, filling the window. Click it (or press Escape) to come back; dragging
-            // still moves the photo.
-            PreviewPane(immersive: true, onClick: { immersive = false })
-                .ignoresSafeArea()
-                .background {
-                    Button("Leave full window") { immersive = false }
-                        .keyboardShortcut(.cancelAction)
-                        .hidden()
-                }
-        } else {
-            standard
+    /// Going in and out of full window: one slow, smooth ease for the scene, the controls and the sidebar.
+    static let fullWindowAnimation = Animation.smooth(duration: 0.55)
+
+    private func setImmersive(_ on: Bool) {
+        withAnimation(Self.fullWindowAnimation) {
+            if on { editing = false }
+            immersive = on
         }
     }
 
-    private var standard: some View {
+    var body: some View {
         VStack(spacing: 12) {
             // The scene is the hero, as big as the window allows; its playback controls float over it in glass.
-            // A plain click on it fills the window.
-            PreviewPane(controls: AnyView(transport), linesAllowed: editing, onClick: {
-                editing = false
-                immersive = true
-            })
-            if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 620) }
+            // A plain click on it slides it out to fill the whole window, like Portal; another click (or Escape)
+            // brings it back. Dragging still moves the photo either way.
+            PreviewPane(controls: AnyView(transport), linesAllowed: editing, immersive: immersive,
+                        onClick: { setImmersive(!immersive) })
+            if app.library.enabledItems.isEmpty && !immersive { photosRow.frame(maxWidth: 620) }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
+        .padding(immersive ? 0 : 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            if immersive {
+                Button("Leave full window") { setImmersive(false) }
+                    .keyboardShortcut(.cancelAction)
+                    .hidden()
+            }
+        }
         // A click on empty space closes Edit scene. It sits behind the content, so the kaleidoscope still takes
         // its own clicks and drags (moving the photo keeps the panel open) and the buttons still work.
         .background {
@@ -154,7 +154,7 @@ struct HomeView: View {
             }
         }
         // Run up under the (hidden) title bar too.
-        .ignoresSafeArea(.container, edges: .top)
+        .ignoresSafeArea(.container, edges: immersive ? .all : .top)
         // Edit scene floats over the right side in a glass panel, so nothing underneath moves. (Not an
         // .inspector: inside the window's split view one fed the preview's 16:9 sizing back into the split
         // view's minimum sizes until AppKit gave up, a crash.)

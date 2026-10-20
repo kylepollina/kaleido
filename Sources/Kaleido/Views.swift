@@ -105,20 +105,15 @@ struct PreviewPane: View {
         }
     }
 
+    // One view in both modes (only its frame, corners and overlays animate), so going full window never swaps in a
+    // fresh, momentarily black preview.
     var body: some View {
-        if immersive {
-            picture.background(.black)
-        } else {
-            framed
-        }
-    }
-
-    private var framed: some View {
         VStack(spacing: 10) {
             picture
-            .aspectRatio(16.0 / 9.0, contentMode: .fit)
+            .aspectRatio(immersive ? nil : 16.0 / 9.0, contentMode: immersive ? .fill : .fit)
+            .frame(maxWidth: immersive ? .infinity : nil, maxHeight: immersive ? .infinity : nil)
             .background(.black)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: immersive ? 0 : 22, style: .continuous))
             .help(showOriginal ? "The photo as it is" : "Drag to move the photo inside the mirrors; flick it to let it glide")
             // Liquid Glass: the controls float over the picture instead of sitting in rows around it.
             .overlay(alignment: .top) {
@@ -131,6 +126,8 @@ struct PreviewPane: View {
                     }
                 }
                 .padding(12)
+                .opacity(immersive ? 0 : 1)
+                .allowsHitTesting(!immersive)
             }
             .overlay(alignment: .bottom) {
                 Group {
@@ -149,6 +146,8 @@ struct PreviewPane: View {
                     }
                 }
                 .padding(14)
+                .opacity(immersive ? 0 : 1)
+                .allowsHitTesting(!immersive)
             }
             if editor && transport {
                 GlassEffectContainer(spacing: 10) {
