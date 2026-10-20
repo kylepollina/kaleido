@@ -85,6 +85,8 @@ struct PreviewPane: View {
     var transport = true
     /// Controls that float in glass over the bottom of the preview (Home's playback bar).
     var controls: AnyView? = nil
+    /// Home: draw the pattern lines (when switched on) while Edit scene is open.
+    var linesAllowed = false
     @AppStorage("previewShowsOriginal") private var showOriginal = false
     @AppStorage("previewShowsPatternLines") private var showLines = false
 
@@ -92,7 +94,7 @@ struct PreviewPane: View {
         VStack(spacing: 10) {
             Group {
                 if let renderer = app.renderer {
-                    PreviewView(renderer: renderer, showOriginal: showOriginal, showOutlines: editor && showLines)
+                    PreviewView(renderer: renderer, showOriginal: showOriginal, showOutlines: (editor || linesAllowed) && showLines)
                 } else {
                     Text("Metal is not available on this Mac.").foregroundStyle(.secondary)
                 }

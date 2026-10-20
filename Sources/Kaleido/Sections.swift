@@ -46,6 +46,9 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 900, idealWidth: 1100, minHeight: 640, idealHeight: 800)
+        // No "Kaleido" header: the title and its bar go, and content runs up under where they were.
+        .toolbar(removing: .title)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .onAppear {
             // The action stays valid after this window closes, so the app delegate can reopen it.
             let open = openWindow
@@ -100,21 +103,33 @@ struct HomeView: View {
     let go: (AppSection) -> Void
     /// Edit scene starts closed every time the window opens.
     @State private var editing = false
+    @AppStorage("previewShowsPatternLines") private var showLines = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            // The scene is the hero; its playback controls float over it in glass.
-            PreviewPane(controls: AnyView(transport)).frame(maxWidth: 980)
+        VStack(spacing: 12) {
+            // The scene is the hero, as big as the window allows; its playback controls float over it in glass.
+            PreviewPane(controls: AnyView(transport), linesAllowed: editing)
             motion
             if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 620) }
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 12)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Run up under the (hidden) title bar too.
+        .ignoresSafeArea(.container, edges: .top)
         // Edit scene floats over the right side in a glass panel, so nothing underneath moves. (Not an
         // .inspector: inside the window's split view one fed the preview's 16:9 sizing back into the split
         // view's minimum sizes until AppKit gave up, a crash.)
+        .overlay(alignment: .trailing) {
+            if editing {
+                // A click anywhere outside the panel closes it.
+                Color.black.opacity(0.001)
+                    .contentShape(Rectangle())
+                    .onTapGesture { withAnimation(.easeInOut(duration: 0.25)) { editing = false } }
+                    .ignoresSafeArea()
+                    .transition(.identity)
+            }
+        }
         .overlay(alignment: .trailing) {
             if editing {
                 Form {
@@ -133,6 +148,8 @@ struct HomeView: View {
                             .keyboardShortcut(.cancelAction)
                             .help("Close Edit scene")
                         }
+                        Toggle("Pattern lines (trace the mirrors in red)", isOn: $showLines)
+                            .help("Shows the shape of the pattern itself on the preview while this panel is open")
                         if !app.library.enabledItems.isEmpty { photosRow }
                     }
                     LookControls(look: app.settings.look, edit: app.tweakScene)
