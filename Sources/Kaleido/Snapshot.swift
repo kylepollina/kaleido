@@ -38,7 +38,6 @@ enum Snapshot {
                 renderer.forceMorph(to: to, progress: value("--morph").flatMap(Double.init) ?? 0.5)
             }
             let seconds = value("--time").flatMap(Double.init) ?? 0
-            defer { if let t = value("--trip").flatMap(Double.init) { renderer.forceTrip(t) } }
             if photo2 == nil {
                 var t = 0.0
                 while t < seconds { renderer.advance(1.0 / 30); t += 1.0 / 30 }

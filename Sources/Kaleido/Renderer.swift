@@ -7,7 +7,7 @@ import MetalKit
 import UniformTypeIdentifiers
 import os
 
-/// Must match `Uniforms` in the shader: 18 floats, then 9 int32s.
+/// Must match `Uniforms` in the shader: 17 floats, then 9 int32s.
 struct GPUUniforms {
     var width: Float = 0, height: Float = 0
     var rotation: Float = 0, sourceRotation: Float = 0
@@ -16,7 +16,7 @@ struct GPUUniforms {
     var hue: Float = 0, saturation: Float = 1, vignette: Float = 0
     var time: Float = 0
     var aspectA: Float = 1, aspectB: Float = 1
-    var mixAmount: Float = 0, morph: Float = 0, outline: Float = 0, trip: Float = 1
+    var mixAmount: Float = 0, morph: Float = 0, outline: Float = 0
     var segments: Int32 = 8, mode: Int32 = 0, transition: Int32 = 0, hasB: Int32 = 0
     var segmentsB: Int32 = 8, modeB: Int32 = 0, original: Int32 = 0, segmentsMorph: Int32 = 8
     var outlines: Int32 = 0
@@ -139,18 +139,13 @@ final class KaleidoRenderer {
     var secondsPerPhoto: Double = 20
     var transitionSeconds: Double = 2.5
     var transitionStyle: TransitionStyle = .random
-    /// +1 "zooms in", -1 "zooms out", 0 neither: the photo keeps sliding as if dragged from a corner toward the
+    /// +1 push, -1 pull, 0 neither: the photo keeps sliding as if dragged from a corner toward the
     /// centre (or back out), so the pattern pours into the middle or spreads out of it.
     var zoomFlow = 0
     /// The current slide, easing toward the wanted one so starting and stopping are gentle.
     private var flowVelocity = SIMD2<Double>(0, 0)
     /// Photo heights per second at speed 1 (scaled by the speed control like every other motion).
     private let flowSpeed = 0.008
-    /// Trip: the kaleidoscope breathes in and out of the plain photo through symmetric patches.
-    var tripEnabled = false
-    private var tripPhase = 0.0, tripAmount = 1.0
-    /// Seconds per trip breath at speed 1.
-    private let tripBreathSeconds = 240.0
 
     private(set) var look = Look()
     private var current: PhotoTexture
@@ -250,7 +245,7 @@ final class KaleidoRenderer {
         huePhase += look.hueSpeed * m * .pi / 180 * dt
         breathPhase += m * dt * (2 * .pi / 600)   // one breath per ten minutes at full motion
         swirlPhase += m * dt * (2 * .pi / 480)    // a swaying swirl swings through once every eight minutes at speed 1
-        // "Zoom in" slides the photo along the mirror wedge's own axis: whatever the photo shows at the wedge's
+        // Push slides the photo along the mirror wedge's own axis: whatever the photo shows at the wedge's
         // outer edge then travels toward its point, so the pattern pours into the centre (of the screen for the
         // mandalas, of each cell for hex). The wedge turns with `sourceRotation`, so the slide follows it; a
         // fixed direction would flip between in and out as the pattern turns. Plain tilings have no centre and
@@ -264,13 +259,6 @@ final class KaleidoRenderer {
         let a = sourceRotation + axis
         let wanted = SIMD2<Double>(cos(a), sin(a)) * Double(zoomFlow) * flowSpeed * m
         flowVelocity += (wanted - flowVelocity) * (1 - exp(-dt * 0.5))
-        // Trip breathing: each breath rises from the plain photo and sinks back to it; the peaks vary (a slower
-        // wave), so some breaths open a few patches and others go all the way.
-        tripPhase += m * dt * (2 * .pi / tripBreathSeconds)
-        let breath = 0.5 - 0.5 * cos(tripPhase)
-        let peak = 0.6 + 0.4 * sin(tripPhase * 0.383 + 1.0)
-        let tripTarget = tripEnabled ? breath * peak : 1
-        tripAmount += (tripTarget - tripAmount) * (1 - exp(-dt * 0.8))
         if !dragging, panGoal == nil { userPan += flowVelocity * dt }
         if targetLook.hueSpeed == 0 {
             // Cycling is off: let the colour it built up ease back out, so the photo returns to its own colours.
@@ -463,9 +451,6 @@ final class KaleidoRenderer {
         incomingShape = currentShape
     }
 
-    /// Offscreen snapshots only: a fixed trip amount (0 plain photo ... 1 all kaleidoscope).
-    func forceTrip(_ amount: Double) { tripAmount = amount }
-
     /// Offscreen snapshots only: freeze a mirror-count cross-fade part way.
     func forceMorph(to count: Int, progress: Double) {
         morphTo = count
@@ -527,7 +512,6 @@ final class KaleidoRenderer {
 
     func makeUniforms(width: Double, height: Double, original: Bool = false, outlines: Bool = false) -> GPUUniforms {
         var u = GPUUniforms()
-        u.trip = Float(tripAmount)
         u.width = Float(width); u.height = Float(height)
         u.original = original ? 1 : 0
         u.outlines = outlines ? 1 : 0
@@ -788,8 +772,7 @@ final class KaleidoView: NSView {
         inFlight += 1
         let debug = renderer.debug
         MainActor.assumeIsolated {
-            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight), original: showOriginal,
-                            outlines: showOutlines && !showOriginal) { [weak self] cb in
+            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight), original: showOriginal, outlines: showOutlines && !showOriginal) { [weak self] cb in
                 if debug, cb.status == .error { FileHandle.standardError.write(Data("kaleido: GPU error \(String(describing: cb.error))\n".utf8)) }
                 if debug {
                     var px = [UInt8](repeating: 0, count: 4)

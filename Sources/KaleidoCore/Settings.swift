@@ -29,23 +29,32 @@ public enum SceneShuffle: String, Codable, CaseIterable, Identifiable, Sendable 
 }
 
 /// How the view zooms, for every scene. Infinite zooms loop seamlessly (each doubling cross-fades into the next).
+/// Push and Pull keep sliding the photo through the mirrors one way or the other. Whether that reads as zooming in
+/// or out depends on the pattern, hence the neutral names. Still leaves only the look's own gentle zoom breathing.
 public enum ZoomMotion: String, Codable, CaseIterable, Identifiable, Sendable {
-    case breathe, zoomIn, zoomOut, still
+    case still, push, pull
     public var id: String { rawValue }
     public var label: String {
         switch self {
-        case .breathe: return "In and out"
-        case .zoomIn: return "Zoom in"
-        case .zoomOut: return "Zoom out"
         case .still: return "Still"
+        case .push: return "Push"
+        case .pull: return "Pull"
         }
     }
-    /// +1 zooms in forever, -1 out forever, 0 neither.
+    /// +1 push, -1 pull, 0 neither.
     public var direction: Int {
         switch self {
-        case .zoomIn: return 1
-        case .zoomOut: return -1
-        case .breathe, .still: return 0
+        case .push: return 1
+        case .pull: return -1
+        case .still: return 0
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        switch try decoder.singleValueContainer().decode(String.self) {
+        case "push", "zoomIn": self = .push
+        case "pull", "zoomOut": self = .pull
+        default: self = .still   // "still", the old "breathe", or anything unknown
         }
     }
 }
@@ -107,10 +116,7 @@ public struct Settings: Codable, Equatable, Sendable {
     /// 0...4, an index into `speedMultipliers`.
     public var speedStep = Settings.defaultSpeedStep
     /// Movement, on top of any look: how the view zooms.
-    public var zoomMotion: ZoomMotion = .breathe
-    /// Experimental "Trip": the kaleidoscope breathes in and out of the plain photo in symmetric patches, and
-    /// moving the mouse makes it bloom around the pointer.
-    public var trip = false
+    public var zoomMotion: ZoomMotion = .still
     /// Surprise me: as scenes change, mix saved scenes with brand-new ones (a photo with an invented pattern).
     /// Off: play through the saved scenes (or, with none saved, the photos with the pattern on screen).
     public var surprise = true
@@ -150,7 +156,7 @@ public struct Settings: Codable, Equatable, Sendable {
         if !allowSwirl { r.twist = 0 }
         if !allowDynamicMirrors { r.dynamicMirrors = false }
         if !allowOutlines { r.outline = 0 }
-        if zoomMotion != .breathe { r.breathing = 0 }
+        if zoomMotion != .still { r.breathing = 0 }
         r.motion = l.motion * speedMultiplier
         return r
     }
@@ -172,7 +178,6 @@ public struct Settings: Codable, Equatable, Sendable {
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
         zoomMotion = (try? c.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion)) ?? d.zoomMotion
         surprise = try c.decodeIfPresent(Bool.self, forKey: .surprise) ?? d.surprise
-        trip = try c.decodeIfPresent(Bool.self, forKey: .trip) ?? d.trip
         sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
         patternSource = (try? c.decodeIfPresent(PatternSource.self, forKey: .patternSource)) ?? d.patternSource
         excludedShapes = (try? c.decodeIfPresent([MirrorMode].self, forKey: .excludedShapes)) ?? []

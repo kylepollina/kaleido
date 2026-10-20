@@ -46,14 +46,10 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   (the wedges make room while an extra one grows from nothing), or one closes; tilings grow denser or sparser. A
   change comes about every 3 minutes, whatever the speed, and takes about 40 seconds to open up. See the "Shifting Mandala" pattern.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
-- **Trip (experimental, a switch on Home).** The kaleidoscope breathes in and out of the plain photo: from the
-  photo as it is, small openings appear, then more, then it sinks back, and some breaths go all the way. The
-  openings are radial like the mirrors: rays at the pattern's mirror count crossed with rings that ripple outward,
-  so it starts as dots in mandala positions, grows into rays, rings and petals, then fills the screen.
-- **Zoom.** On top of any look, Home picks how the view moves: in and out (a slow breath), zoom in, zoom out, or
-  still. Zoom in is what dragging the preview from a corner to the centre does, done continuously: the photo keeps
-  sliding along the mirrors' own axis (which turns with the pattern), so the pattern always pours into the middle;
-  zoom out spreads it outward. It eases in and out when switched.
+- **Zoom: Still, Push, Pull.** Push and Pull are what dragging the preview does, done continuously: the photo keeps
+  sliding through the mirrors one way or the other (along the mirrors' own axis, which turns with the pattern).
+  Whether that reads as zooming in or out depends on the pattern, hence the neutral names. Still leaves only the
+  look's own slow zoom breathing (set in Edit scene). Changes ease in and out.
 - **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every pattern.
 - **macOS Aerials (video).** The slow-motion aerial films macOS downloads for its moving wallpapers and screen
   saver (Yosemite, Iceland, Hong Kong, Palau Jellies...) appear as a built-in card, named from Apple's manifest with

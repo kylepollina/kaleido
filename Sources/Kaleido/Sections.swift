@@ -112,9 +112,7 @@ struct HomeView: View {
                         ForEach(ZoomMotion.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .help("For every scene: breathe in and out, zoom in or out, or hold still")
-                    Toggle("Trip (experimental): the kaleidoscope breathes in and out of the photo",
-                           isOn: $app.settings.trip)
+                    .help("Push or pull: the photo keeps sliding through the mirrors one way or the other. Still: only the look's own gentle breathing.")
                     if app.library.enabledItems.isEmpty { photosRow }
                 }
                 if editing {

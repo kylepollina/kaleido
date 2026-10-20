@@ -255,23 +255,23 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).surprise)
     }
 
-    func testTripIsOffByDefaultAndSaved() throws {
-        var s = Settings()
-        XCTAssertFalse(s.trip, "experimental, off until chosen")
-        s.trip = true
-        XCTAssertTrue(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).trip)
-    }
-
     func testMovementSwitches() throws {
         var s = Settings()
-        XCTAssertEqual(s.zoomMotion, .breathe)
+        XCTAssertEqual(s.zoomMotion, .still)
         var l = Look(); l.breathing = 0.7
-        XCTAssertEqual(s.effectiveLook(l).breathing, 0.7)
-        s.zoomMotion = .zoomIn
-        XCTAssertEqual(s.effectiveLook(l).breathing, 0, "a steady zoom replaces the breathing")
-        XCTAssertEqual(ZoomMotion.zoomOut.direction, -1)
+        XCTAssertEqual(s.effectiveLook(l).breathing, 0.7, "Still keeps the look's own breathing")
+        s.zoomMotion = .push
+        XCTAssertEqual(s.effectiveLook(l).breathing, 0, "push or pull replaces the breathing")
+        XCTAssertEqual(ZoomMotion.push.direction, 1); XCTAssertEqual(ZoomMotion.pull.direction, -1)
         let back = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s))
-        XCTAssertEqual(back.zoomMotion, .zoomIn)
+        XCTAssertEqual(back.zoomMotion, .push)
+        // The old names carry over.
+        func old(_ raw: String) throws -> ZoomMotion {
+            try JSONDecoder().decode(Settings.self, from: Data(#"{"version": 5, "zoomMotion": "\#(raw)"}"#.utf8)).zoomMotion
+        }
+        XCTAssertEqual(try old("zoomIn"), .push)
+        XCTAssertEqual(try old("zoomOut"), .pull)
+        XCTAssertEqual(try old("breathe"), .still)
     }
 
     func testOldPresetShuffleBecomesSceneShuffle() throws {
