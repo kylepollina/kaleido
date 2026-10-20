@@ -257,9 +257,9 @@ final class SettingsTests: XCTestCase {
 
     func testMovementSwitches() throws {
         var s = Settings()
-        XCTAssertEqual(s.zoomMotion, .still)
+        XCTAssertEqual(s.zoomMotion, .drift)
         var l = Look(); l.breathing = 0.7
-        XCTAssertEqual(s.effectiveLook(l).breathing, 0.7, "Still keeps the look's own breathing")
+        XCTAssertEqual(s.effectiveLook(l).breathing, 0.7, "Drift keeps the look's own breathing")
         s.zoomMotion = .push
         XCTAssertEqual(s.effectiveLook(l).breathing, 0, "push or pull replaces the breathing")
         XCTAssertEqual(ZoomMotion.push.direction, 1); XCTAssertEqual(ZoomMotion.pull.direction, -1)
@@ -271,7 +271,8 @@ final class SettingsTests: XCTestCase {
         }
         XCTAssertEqual(try old("zoomIn"), .push)
         XCTAssertEqual(try old("zoomOut"), .pull)
-        XCTAssertEqual(try old("breathe"), .still)
+        XCTAssertEqual(try old("breathe"), .drift)
+        XCTAssertEqual(try old("still"), .drift)
     }
 
     func testOldPresetShuffleBecomesSceneShuffle() throws {

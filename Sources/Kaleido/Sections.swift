@@ -112,7 +112,7 @@ struct HomeView: View {
                         ForEach(ZoomMotion.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .help("Push or pull: the photo keeps sliding through the mirrors one way or the other. Still: only the look's own gentle breathing.")
+                    .help("Push or pull: the photo keeps sliding through the mirrors one way or the other. Drift: only the look's own slow wandering and breathing.")
                     if app.library.enabledItems.isEmpty { photosRow }
                 }
                 if editing {

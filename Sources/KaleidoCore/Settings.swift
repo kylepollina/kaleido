@@ -30,13 +30,13 @@ public enum SceneShuffle: String, Codable, CaseIterable, Identifiable, Sendable 
 
 /// How the view zooms, for every scene. Infinite zooms loop seamlessly (each doubling cross-fades into the next).
 /// Push and Pull keep sliding the photo through the mirrors one way or the other. Whether that reads as zooming in
-/// or out depends on the pattern, hence the neutral names. Still leaves only the look's own gentle zoom breathing.
+/// or out depends on the pattern, hence the neutral names. Drift leaves only the look's own drift and gentle zoom breathing.
 public enum ZoomMotion: String, Codable, CaseIterable, Identifiable, Sendable {
-    case still, push, pull
+    case drift, push, pull
     public var id: String { rawValue }
     public var label: String {
         switch self {
-        case .still: return "Still"
+        case .drift: return "Drift"
         case .push: return "Push"
         case .pull: return "Pull"
         }
@@ -46,7 +46,7 @@ public enum ZoomMotion: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .push: return 1
         case .pull: return -1
-        case .still: return 0
+        case .drift: return 0
         }
     }
 
@@ -54,7 +54,7 @@ public enum ZoomMotion: String, Codable, CaseIterable, Identifiable, Sendable {
         switch try decoder.singleValueContainer().decode(String.self) {
         case "push", "zoomIn": self = .push
         case "pull", "zoomOut": self = .pull
-        default: self = .still   // "still", the old "breathe", or anything unknown
+        default: self = .drift   // "drift", the old "still" and "breathe", or anything unknown
         }
     }
 }
@@ -116,7 +116,7 @@ public struct Settings: Codable, Equatable, Sendable {
     /// 0...4, an index into `speedMultipliers`.
     public var speedStep = Settings.defaultSpeedStep
     /// Movement, on top of any look: how the view zooms.
-    public var zoomMotion: ZoomMotion = .still
+    public var zoomMotion: ZoomMotion = .drift
     /// Surprise me: as scenes change, mix saved scenes with brand-new ones (a photo with an invented pattern).
     /// Off: play through the saved scenes (or, with none saved, the photos with the pattern on screen).
     public var surprise = true
@@ -156,7 +156,7 @@ public struct Settings: Codable, Equatable, Sendable {
         if !allowSwirl { r.twist = 0 }
         if !allowDynamicMirrors { r.dynamicMirrors = false }
         if !allowOutlines { r.outline = 0 }
-        if zoomMotion != .still { r.breathing = 0 }
+        if zoomMotion != .drift { r.breathing = 0 }
         r.motion = l.motion * speedMultiplier
         return r
     }
