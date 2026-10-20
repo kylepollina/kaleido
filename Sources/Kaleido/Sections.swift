@@ -102,22 +102,21 @@ struct HomeView: View {
     @State private var editing = false
 
     var body: some View {
-        HStack(spacing: 0) {
-            VStack(spacing: 16) {
-                // The scene is the hero; its playback controls float over it in glass.
-                PreviewPane(controls: AnyView(transport)).frame(maxWidth: 980)
-                motion
-                if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 620) }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-            .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
-            // Edit scene slides in from the right with every setting of the scene on screen. A plain panel, not
-            // an .inspector: inside the window's split view an inspector fed the preview's 16:9 sizing back into
-            // the split view's minimum sizes until AppKit gave up (a crash).
+        VStack(spacing: 16) {
+            // The scene is the hero; its playback controls float over it in glass.
+            PreviewPane(controls: AnyView(transport)).frame(maxWidth: 980)
+            motion
+            if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 620) }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Edit scene floats over the right side in a glass panel, so nothing underneath moves. (Not an
+        // .inspector: inside the window's split view one fed the preview's 16:9 sizing back into the split
+        // view's minimum sizes until AppKit gave up, a crash.)
+        .overlay(alignment: .trailing) {
             if editing {
-                Divider()
                 Form {
                     Section {
                         HStack {
@@ -126,14 +125,24 @@ struct HomeView: View {
                             Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
                                 .buttonStyle(.glass)
                                 .help("A random pattern and settings for this photo")
+                            // The panel covers the Edit scene button, so it closes from here (or with Escape).
+                            Button { withAnimation(.easeInOut(duration: 0.25)) { editing = false } } label: {
+                                Image(systemName: "xmark")
+                            }
+                            .buttonStyle(.glass)
+                            .keyboardShortcut(.cancelAction)
+                            .help("Close Edit scene")
                         }
                         if !app.library.enabledItems.isEmpty { photosRow }
                     }
                     LookControls(look: app.settings.look, edit: app.tweakScene)
                 }
                 .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
                 .frame(width: 360)
                 .frame(maxHeight: .infinity)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .padding(12)
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
@@ -225,6 +234,41 @@ struct HomeView: View {
     }
 }
 
+
+/// A Liquid Glass tab bar: the choices sit in one frosted glass capsule and the selected one rides on a tinted pill
+/// that slides between them. Readable over any photo, unlike a plain segmented control.
+struct GlassTabs<Value: Hashable>: View {
+    @Binding var selection: Value
+    let options: [(Value, String)]
+    @Namespace private var pill
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(options.indices, id: \.self) { i in
+                let (value, title) = options[i]
+                let selected = selection == value
+                Button {
+                    withAnimation(.snappy(duration: 0.25)) { selection = value }
+                } label: {
+                    Text(title)
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(selected ? Color.white : Color.primary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background {
+                            if selected {
+                                Capsule().fill(Color.accentColor).matchedGeometryEffect(id: "pill", in: pill)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .glassEffect(.regular, in: .capsule)
+    }
+}
 
 /// An on/off button in Liquid Glass: tinted glass when on, clear glass when off.
 struct GlassToggle: View {

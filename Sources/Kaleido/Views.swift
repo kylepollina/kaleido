@@ -104,13 +104,7 @@ struct PreviewPane: View {
             // Liquid Glass: the controls float over the picture instead of sitting in rows around it.
             .overlay(alignment: .top) {
                 HStack(spacing: 10) {
-                    Picker("Preview", selection: $showOriginal) {
-                        Text("Kaleidoscope").tag(false)
-                        Text("Original").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    GlassTabs(selection: $showOriginal, options: [(false, "Kaleidoscope"), (true, "Original")])
                     if editor && !showOriginal {
                         // The segmented control brings its own glass; this sits beside it as a glass toggle.
                         GlassToggle(isOn: $showLines, title: "Pattern lines", icon: "line.3.crossed.swirl.circle", tint: .red)
