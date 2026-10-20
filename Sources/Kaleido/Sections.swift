@@ -115,21 +115,20 @@ struct HomeView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // A click on empty space closes Edit scene. It sits behind the content, so the kaleidoscope still takes
+        // its own clicks and drags (moving the photo keeps the panel open) and the buttons still work.
+        .background {
+            if editing {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { withAnimation(.easeInOut(duration: 0.25)) { editing = false } }
+            }
+        }
         // Run up under the (hidden) title bar too.
         .ignoresSafeArea(.container, edges: .top)
         // Edit scene floats over the right side in a glass panel, so nothing underneath moves. (Not an
         // .inspector: inside the window's split view one fed the preview's 16:9 sizing back into the split
         // view's minimum sizes until AppKit gave up, a crash.)
-        .overlay(alignment: .trailing) {
-            if editing {
-                // A click anywhere outside the panel closes it.
-                Color.black.opacity(0.001)
-                    .contentShape(Rectangle())
-                    .onTapGesture { withAnimation(.easeInOut(duration: 0.25)) { editing = false } }
-                    .ignoresSafeArea()
-                    .transition(.identity)
-            }
-        }
         .overlay(alignment: .trailing) {
             if editing {
                 Form {
