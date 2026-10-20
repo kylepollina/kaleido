@@ -615,9 +615,10 @@ struct LookControls: View {
                             .monospacedDigit()
                         }
                     }
-                    SliderRow("Zoom", value: bind(\.zoom), range: 0.4...3) { String(format: "%.2f×", $0) }
-                    SliderRow("Zoom breathing", value: bind(\.breathing), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
-                    SliderRow("Drift amount", value: bind(\.drift), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
+                    // How big the photo looks inside the mirrors. (Movement is the mini-player's Zoom; the look's
+                    // breathing and drift amounts stay at their defaults and are no longer shown.)
+                    SliderRow("Scale", value: bind(\.zoom), range: 0.4...3) { String(format: "%.2f×", $0) }
+                        .help("How big the photo looks inside the mirrors: higher shows a small detail, lower shows more of the photo")
                     SliderRow("Swirl", value: bind(\.twist), range: -1...1, zeroTick: true) { $0 == 0 ? "none" : String(format: "%+.2f", $0) }
                         .disabled(!app.settings.allowSwirl)
                     Toggle("Sway (swing the swirl slowly back and forth)", isOn: bind(\.swayingSwirl))
