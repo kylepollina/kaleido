@@ -15,7 +15,7 @@ public enum SceneShuffle: String, Codable, CaseIterable, Identifiable, Sendable 
     }
 
     /// How often a saved scene comes up when saved and new scenes are mixed.
-    public static let savedShareWhenMixed = 0.4
+    public static let savedShareWhenMixed = 0.15
 
     /// Whether the next scene is one of the saved (hearted) ones.
     public func nextIsSaved(savedCount: Int, roll: Double) -> Bool {
