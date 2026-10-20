@@ -112,13 +112,11 @@ struct PreviewPane: View {
                     .labelsHidden()
                     .fixedSize()
                     if editor && !showOriginal {
-                        Toggle(isOn: $showLines) { Label("Pattern lines", systemImage: "line.3.crossed.swirl.circle") }
-                            .toggleStyle(.button)
+                        // The segmented control brings its own glass; this sits beside it as a glass toggle.
+                        GlassToggle(isOn: $showLines, title: "Pattern lines", icon: "line.3.crossed.swirl.circle", tint: .red)
                             .help("Trace the mirrors and tile edges in red, to see the shape of the pattern itself")
                     }
                 }
-                .padding(6)
-                .glassEffect(.regular, in: .capsule)
                 .padding(12)
             }
             .overlay(alignment: .bottom) {
