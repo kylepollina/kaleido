@@ -251,6 +251,31 @@ struct HomeView: View {
 }
 
 
+/// A whole number you can type, step with the arrows beside it, or nudge with the Up and Down keys while typing.
+struct CountField: View {
+    let title: String
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: 4) {
+                TextField(title, value: $value, format: .number)
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    .frame(width: 56)
+                    .onKeyPress(.upArrow) { step(1); return .handled }
+                    .onKeyPress(.downArrow) { step(-1); return .handled }
+                Stepper(title, value: $value, in: range).labelsHidden()
+            }
+        }
+    }
+
+    private func step(_ d: Int) { value = min(max(value + d, range.lowerBound), range.upperBound) }
+}
+
 /// A Liquid Glass tab bar: the choices sit in one frosted glass capsule and the selected one rides on a tinted pill
 /// that slides between them. Readable over any photo, unlike a plain segmented control.
 struct GlassTabs<Value: Hashable>: View {
@@ -480,9 +505,9 @@ struct LookControls: View {
         Group {
                 Section("Shape") {
                     PatternPicker(selection: bind(\.mode))
-                    SliderRow(look.mode.countLabel,
-                              value: Binding(get: { Double(look.segments) }, set: { v in edit { $0.segments = Int(v.rounded()) } }),
-                              range: 2...24, step: 1) { "\(Int($0))" }
+                    CountField(title: look.mode.countLabel,
+                               value: Binding(get: { look.segments }, set: { v in edit { $0.segments = v } }),
+                               range: Look.segmentRange)
                     Toggle("Dynamic mirrors (slowly change how many)", isOn: bind(\.dynamicMirrors))
                         .disabled(!app.settings.allowDynamicMirrors)
                     if look.dynamicMirrors {

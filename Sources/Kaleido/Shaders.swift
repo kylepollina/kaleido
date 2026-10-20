@@ -122,13 +122,14 @@ enum Shaders {
             scale = density;
         } else if (mode == 5) {
             // Spiral: mirror tiles laid out in log-polar space, so they shrink towards the centre like a tunnel.
-            // The arm count is even so the seam where the angle wraps is itself a mirror.
-            float n = max(2.0, floor(segments * 0.5 + 0.001) * 2.0);
+            // Around the circle each arm is mirrored about its own centre line (like the classic wedges), so the
+            // arms meet edge to edge with no seam where the angle wraps, whatever the count, odd or even.
+            float n = max(2.0, floor(segments + 0.001));
             float k = n / (2.0 * PI);
             float r = max(length(p), 1e-4);
             // Flows inward as the pattern turns; 2/pi keeps the wrap of `rotation` a whole number of tiles.
             float2 lp = float2(log(r) * k + u.rotation * (2.0 / PI), atan2(p.y, p.x) * k);
-            f = (triWave(lp) - 0.5) * 0.8;
+            f = (float2(triWave(lp).x, abs(fract(lp.y) - 0.5) * 2.0) - 0.5) * 0.8;
             scale = 0.8 * k / r;
         } else if (mode == 6) {
             // Triangle: the classic toy, three mirrors forming an equilateral triangle (p3m1). Move into one
@@ -222,12 +223,14 @@ enum Shaders {
             return min(fr.x / density, fr.y / (1.5 * density));
         }
         if (mode == 5) {
-            float n = max(2.0, floor(segments * 0.5 + 0.001) * 2.0);
+            float n = max(2.0, floor(segments + 0.001));
             float k = n / (2.0 * PI);
             float r = max(length(p), 1e-4);
             float2 lp = float2(log(r) * k + u.rotation * (2.0 / PI), atan2(p.y, p.x) * k);
-            float2 fr = abs(lp - round(lp));
-            return min(fr.x, fr.y) * r / k;
+            // Rings at every whole step out; around the circle, arm edges and each arm's centre mirror.
+            float fx = abs(lp.x - round(lp.x));
+            float fy = abs(lp.y * 2.0 - round(lp.y * 2.0)) * 0.5;
+            return min(fx, fy) * r / k;
         }
         if (mode == 6) {
             float density = 0.6 + 0.25 * segments;
@@ -314,7 +317,7 @@ enum Shaders {
         if (u.hasB == 0) {
             float e = smoothstep(0.0, 1.0, u.morph);
             if (u.mode == 5 && u.morph > 0.0) {
-                // The spiral needs a whole, even number of arms, so it cross-fades between counts.
+                // The spiral needs a whole number of arms, so it cross-fades between counts.
                 float2 q = kaleidoPoint(p, u, zoomMul, u.mode, float(u.segments), sA, hA);
                 float2 q2 = kaleidoPoint(p, u, zoomMul, u.mode, float(u.segmentsMorph), sB, hB);
                 col = mix(samplePhoto(texA, smp, q, u.aspectA, sA, u) * hA, samplePhoto(texA, smp, q2, u.aspectA, sB, u) * hB, e);

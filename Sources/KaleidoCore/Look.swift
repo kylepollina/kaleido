@@ -195,7 +195,7 @@ public struct Look: Codable, Equatable, Sendable {
         switch l.mode {
         case .hex, .square, .grid, .triangle, .cubes: l.segments = Int.random(in: 3...9, using: &g)
         case .fractal: l.segments = [3, 4, 5, 6, 8].randomElement(using: &g)!
-        case .spiral: l.segments = [2, 4, 6, 8].randomElement(using: &g)!
+        case .spiral: l.segments = Int.random(in: 3...8, using: &g)
         case .radial: l.segments = [3, 4, 5, 6, 6, 7, 8, 8, 9, 10, 12, 14, 16].randomElement(using: &g)!
         }
         l.rotationSpeed = Double.random(in: 0.02...0.15, using: &g) * (Bool.random(using: &g) ? 1 : -1)
