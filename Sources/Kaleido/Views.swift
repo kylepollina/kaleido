@@ -87,18 +87,35 @@ struct PreviewPane: View {
     var controls: AnyView? = nil
     /// Home: draw the pattern lines (when switched on) while Edit scene is open.
     var linesAllowed = false
+    /// Full window: just the picture, edge to edge, no controls (Home's click-to-fill, like Portal).
+    var immersive = false
+    /// A plain click on the picture (dragging still moves the photo).
+    var onClick: (() -> Void)? = nil
     @AppStorage("previewShowsOriginal") private var showOriginal = false
     @AppStorage("previewShowsPatternLines") private var showLines = false
 
-    var body: some View {
-        VStack(spacing: 10) {
-            Group {
-                if let renderer = app.renderer {
-                    PreviewView(renderer: renderer, showOriginal: showOriginal, showOutlines: (editor || linesAllowed) && showLines)
-                } else {
-                    Text("Metal is not available on this Mac.").foregroundStyle(.secondary)
-                }
+    private var picture: some View {
+        Group {
+            if let renderer = app.renderer {
+                PreviewView(renderer: renderer, showOriginal: showOriginal,
+                            showOutlines: (editor || linesAllowed) && showLines, onClick: onClick)
+            } else {
+                Text("Metal is not available on this Mac.").foregroundStyle(.secondary)
             }
+        }
+    }
+
+    var body: some View {
+        if immersive {
+            picture.background(.black)
+        } else {
+            framed
+        }
+    }
+
+    private var framed: some View {
+        VStack(spacing: 10) {
+            picture
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .background(.black)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -154,6 +171,7 @@ struct PreviewView: NSViewRepresentable {
     let renderer: KaleidoRenderer
     var showOriginal = false
     var showOutlines = false
+    var onClick: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> KaleidoView {
         let v = KaleidoView(renderer: renderer, fps: 30)
@@ -164,6 +182,7 @@ struct PreviewView: NSViewRepresentable {
     func updateNSView(_ nsView: KaleidoView, context: Context) {
         nsView.showOriginal = showOriginal
         nsView.showOutlines = showOutlines
+        nsView.onClick = onClick
         nsView.acceptsDrag = !showOriginal   // dragging only makes sense through the mirrors
         nsView.window?.invalidateCursorRects(for: nsView)
     }

@@ -19,8 +19,11 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   invents. Off, it plays through your saved scenes (or, with none saved, your photos with the look on screen).
   Invented looks use only the shapes ticked in Settings (untick Diamonds if it isn't for you). Next and Back fade
   in 3 seconds; Back brings back the scene before, look and all.
-- **Home** is kept simple: preview, Back / Play (or Space) / Next, Surprise me, Save scene and Edit scene, then
-  Speed and Zoom. Edit scene (closed whenever the window opens) reveals Randomize and every setting of the scene on screen.
+- **Home** is the scene, as big as the window allows, with one glass mini-player over it (like Apple Music's):
+  Surprise me, Back / Play (or Space) / Next, the scene's name, Zoom, Speed, Save scene and Edit scene. Edit scene
+  floats over the right side with Randomize and every setting of the scene. Click the scene to fill the whole
+  window with it (sidebar, toolbar and controls step aside, like Portal); click again or press Escape to come
+  back. Dragging still moves the photo either way.
 - **Sections.** Home, Photos (the album browser), Scenes and Settings. Patterns (saved looks, below) are hidden
   for now; the code is still there.
 - **Built-in patterns.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square

@@ -675,24 +675,37 @@ final class KaleidoView: NSView {
     var showOutlines = false
     /// Preview only: dragging moves the photo inside the mirrors (and keeps gliding after release).
     var acceptsDrag = false
+    /// Preview only: a plain click (no real drag) on the picture, e.g. to fill the window with it.
+    var onClick: (() -> Void)?
+    private var pressAt: (point: NSPoint, time: TimeInterval, travel: CGFloat)?
 
     override func mouseDown(with event: NSEvent) {
-        guard acceptsDrag else { return super.mouseDown(with: event) }
-        MainActor.assumeIsolated { renderer.beginDrag() }
-        NSCursor.closedHand.push()
+        guard acceptsDrag || onClick != nil else { return super.mouseDown(with: event) }
+        pressAt = (event.locationInWindow, event.timestamp, 0)
+        if acceptsDrag {
+            MainActor.assumeIsolated { renderer.beginDrag() }
+            NSCursor.closedHand.push()
+        }
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard acceptsDrag, bounds.height > 0 else { return super.mouseDragged(with: event) }
+        guard acceptsDrag || onClick != nil else { return super.mouseDragged(with: event) }
+        pressAt?.travel += hypot(event.deltaX, event.deltaY)
+        guard acceptsDrag, bounds.height > 0 else { return }
         // Points to screen heights; AppKit's y already points up, like the shader's.
         let d = SIMD2<Double>(event.deltaX, -event.deltaY) / Double(bounds.height)
         MainActor.assumeIsolated { renderer.drag(by: d) }
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard acceptsDrag else { return super.mouseUp(with: event) }
-        MainActor.assumeIsolated { renderer.endDrag() }
-        NSCursor.pop()
+        guard acceptsDrag || onClick != nil else { return super.mouseUp(with: event) }
+        if acceptsDrag {
+            MainActor.assumeIsolated { renderer.endDrag() }
+            NSCursor.pop()
+        }
+        // A click is a quick press that barely moved; anything more was a drag of the photo.
+        if let p = pressAt, p.travel < 4, event.timestamp - p.time < 0.4, event.clickCount <= 1 { onClick?() }
+        pressAt = nil
     }
 
     override func resetCursorRects() {

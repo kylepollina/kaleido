@@ -22,9 +22,12 @@ struct ContentView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.openWindow) private var openWindow
     @State private var section: AppSection? = AppSection.atLaunch
+    /// Home's full-window view (click the scene): the sidebar and toolbar step aside, the window keeps its size.
+    @State private var immersive = false
+    @State private var columns: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columns) {
             List(AppSection.visible, selection: $section) { s in
                 Label(s.rawValue, systemImage: s.icon).tag(s)
             }
@@ -38,7 +41,7 @@ struct ContentView: View {
             }
         } detail: {
             switch section ?? .home {
-            case .home: HomeView(go: { section = $0 })
+            case .home: HomeView(go: { section = $0 }, immersive: $immersive)
             case .photos: LibraryPane()
             case .presets: PresetsView()
             case .scenes: ScenesView()
@@ -49,7 +52,13 @@ struct ContentView: View {
         // No "Kaleido" header: the title and its bar go, and content runs up under where they were.
         .toolbar(removing: .title)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        .toolbar(immersive ? .hidden : .automatic, for: .windowToolbar)
+        .onChange(of: immersive) { _, on in
+            withAnimation(.easeInOut(duration: 0.3)) { columns = on ? .detailOnly : .all }
+        }
+        .onChange(of: section) { _, s in if s != .home { immersive = false } }
         .onAppear {
+            if CommandLine.arguments.contains("--full-window") { immersive = true }
             // The action stays valid after this window closes, so the app delegate can reopen it.
             let open = openWindow
             app.openMainWindow = { open(id: "main") }
@@ -101,14 +110,35 @@ extension AppState {
 struct HomeView: View {
     @EnvironmentObject var app: AppState
     let go: (AppSection) -> Void
+    @Binding var immersive: Bool
     /// Edit scene starts closed every time the window opens.
     @State private var editing = false
     @AppStorage("previewShowsPatternLines") private var showLines = false
 
     var body: some View {
+        if immersive {
+            // Like Portal: just the scene, filling the window. Click it (or press Escape) to come back; dragging
+            // still moves the photo.
+            PreviewPane(immersive: true, onClick: { immersive = false })
+                .ignoresSafeArea()
+                .background {
+                    Button("Leave full window") { immersive = false }
+                        .keyboardShortcut(.cancelAction)
+                        .hidden()
+                }
+        } else {
+            standard
+        }
+    }
+
+    private var standard: some View {
         VStack(spacing: 12) {
             // The scene is the hero, as big as the window allows; its playback controls float over it in glass.
-            PreviewPane(controls: AnyView(transport), linesAllowed: editing)
+            // A plain click on it fills the window.
+            PreviewPane(controls: AnyView(transport), linesAllowed: editing, onClick: {
+                editing = false
+                immersive = true
+            })
             if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 620) }
         }
         .padding(.horizontal, 10)
