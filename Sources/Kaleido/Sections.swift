@@ -102,33 +102,42 @@ struct HomeView: View {
     @State private var editing = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            // The scene is the hero; its playback controls float over it in glass.
-            PreviewPane(controls: AnyView(transport)).frame(maxWidth: 980)
-            motion
-            if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 620) }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 12)
-        // Edit scene is an inspector: it slides in from the right with every setting of the scene on screen.
-        .inspector(isPresented: $editing) {
-            Form {
-                Section {
-                    HStack {
-                        sceneRow
-                        Spacer()
-                        Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
-                            .buttonStyle(.glass)
-                            .help("A random pattern and settings for this photo")
-                    }
-                    if !app.library.enabledItems.isEmpty { photosRow }
-                }
-                LookControls(look: app.settings.look, edit: app.tweakScene)
+        HStack(spacing: 0) {
+            VStack(spacing: 16) {
+                // The scene is the hero; its playback controls float over it in glass.
+                PreviewPane(controls: AnyView(transport)).frame(maxWidth: 980)
+                motion
+                if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 620) }
+                Spacer(minLength: 0)
             }
-            .formStyle(.grouped)
-            .inspectorColumnWidth(min: 320, ideal: 360, max: 460)
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+            // Edit scene slides in from the right with every setting of the scene on screen. A plain panel, not
+            // an .inspector: inside the window's split view an inspector fed the preview's 16:9 sizing back into
+            // the split view's minimum sizes until AppKit gave up (a crash).
+            if editing {
+                Divider()
+                Form {
+                    Section {
+                        HStack {
+                            sceneRow
+                            Spacer()
+                            Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
+                                .buttonStyle(.glass)
+                                .help("A random pattern and settings for this photo")
+                        }
+                        if !app.library.enabledItems.isEmpty { photosRow }
+                    }
+                    LookControls(look: app.settings.look, edit: app.tweakScene)
+                }
+                .formStyle(.grouped)
+                .frame(width: 360)
+                .frame(maxHeight: .infinity)
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
         }
+        .onAppear { if CommandLine.arguments.contains("--edit-scene") { editing = true } }
     }
 
     /// Back · Play · Next · Surprise me · Save scene · Edit scene, as one floating glass bar.
