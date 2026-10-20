@@ -165,31 +165,45 @@ struct HomeView: View {
         .onAppear { if CommandLine.arguments.contains("--edit-scene") { editing = true } }
     }
 
-    /// Back · Play · Next · Surprise me · Save scene · Edit scene, as one floating glass bar.
+    /// One glass capsule, like Apple Music's mini player: Surprise me · Back · Play · Next · the scene · Save · Edit.
     private var transport: some View {
-        GlassEffectContainer(spacing: 8) {
-            HStack(spacing: 8) {
-                Button { app.previousPhoto() } label: { Image(systemName: "backward.fill").frame(width: 20) }
-                    .buttonStyle(.glass)
-                    .help("The scene before")
-                PlayButton().frame(width: 170)
-                Button { app.nextPhoto() } label: { Image(systemName: "forward.fill").frame(width: 20) }
-                    .buttonStyle(.glass)
-                    .help("Next scene")
-                GlassToggle(isOn: $app.settings.surprise, title: "Surprise me", icon: "dice", tint: .purple)
-                    .help(app.settings.surprise
-                          ? "On: as scenes change, Kaleido mixes your saved scenes with new ones it makes up"
-                          : "Off: plays through your saved scenes (or, with none saved, your photos with this look)")
-                let saved = app.scenes.scene(app.activeSceneID) != nil
-                Button { app.saveScene() } label: { Label(saved ? "Saved" : "Save scene", systemImage: saved ? "bookmark.fill" : "bookmark") }
-                    .buttonStyle(.glass)
-                    .disabled(saved)
-                    .help(saved ? "This is one of your saved scenes" : "Keep this photo with these settings and where the photo sits")
-                GlassToggle(isOn: $editing.animation(.easeInOut(duration: 0.25)), title: "Edit scene", icon: "slider.horizontal.3", tint: .accentColor)
-                    .help("Show the pattern and every setting of this scene")
+        let saved = app.scenes.scene(app.activeSceneID)
+        return HStack(spacing: 4) {
+            PlayerIcon(name: "dice", active: app.settings.surprise, tint: .pink) { app.settings.surprise.toggle() }
+                .help(app.settings.surprise
+                      ? "Surprise me is on: as scenes change, mostly new ones Kaleido makes up, sometimes your saved scenes"
+                      : "Surprise me is off: plays through your saved scenes (or, with none saved, your photos with this look)")
+            PlayerIcon(name: "backward.fill", size: 19) { app.previousPhoto() }
+                .help("The scene before")
+            PlayerIcon(name: app.isPlaying ? "stop.fill" : "play.fill", size: 26) { app.togglePlay() }
+                .keyboardShortcut("p", modifiers: .command)
+                .help(app.isPlaying ? "Stop: your normal wallpaper comes back (Space)" : "Play on the desktop (Space)")
+            PlayerIcon(name: "forward.fill", size: 19) { app.nextPhoto() }
+                .help("Next scene")
+            // Where a music player shows the song: which scene this is, and whether it is on the desktop.
+            VStack(alignment: .leading, spacing: 1) {
+                Text(saved?.name ?? (app.sceneTweaked ? "Your scene" : "New scene"))
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                Text(app.isPlaying ? (app.suspensionReason.map { "Paused: \($0.lowercased())" } ?? "On your desktop") : "Preview only")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            .controlSize(.large)
+            .frame(width: 150, alignment: .leading)
+            .padding(.horizontal, 10)
+            PlayerIcon(name: saved == nil ? "bookmark" : "bookmark.fill", active: saved != nil, tint: .accentColor) {
+                if saved == nil { app.saveScene() }
+            }
+            .help(saved == nil ? "Save scene: keep this photo with these settings and where the photo sits" : "This is one of your saved scenes")
+            PlayerIcon(name: "slider.horizontal.3", active: editing, tint: .accentColor) {
+                withAnimation(.easeInOut(duration: 0.25)) { editing.toggle() }
+            }
+            .help("Edit scene: the pattern and every setting of this scene")
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .glassEffect(.regular, in: .capsule)
     }
 
     /// Speed and Zoom, in one glass capsule under the scene.
@@ -250,6 +264,28 @@ struct HomeView: View {
     }
 }
 
+
+/// A plain icon button for the mini-player capsule. An "active" toggle gets a tinted icon on a soft tinted disc, like
+/// Shuffle in Apple Music.
+struct PlayerIcon: View {
+    let name: String
+    var size: CGFloat = 16
+    var active = false
+    var tint: Color = .accentColor
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: name)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(active ? tint : Color.primary)
+                .frame(width: 38, height: 38)
+                .background { if active { Circle().fill(tint.opacity(0.18)) } }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+    }
+}
 
 /// A whole number you can type, step with the arrows beside it, or nudge with the Up and Down keys while typing.
 struct CountField: View {
