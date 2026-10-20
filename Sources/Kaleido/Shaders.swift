@@ -20,8 +20,6 @@ enum Shaders {
         float morph;         // 0...1 cross-fade from `segments` to `segmentsMorph` (dynamic mirrors)
         float outline;       // 0...1 thickness of black lines along the pattern's mirrors and tile edges
         float trip;          // 0 = the plain photo, 1 = all kaleidoscope; in between, symmetric patches
-        float cursorX, cursorY;  // the mouse in this view (same units as p)
-        float cursorAmount;  // 0...1 how much the kaleidoscope blooms around the mouse (moving it builds this up)
         int segments;       // mirrors of the outgoing photo (A)
         int mode;            // 0 radial, 1 hex, 2 fractal (A)
         int transition;      // 0 dissolve 1 iris 3 zoom 4 segments
@@ -90,23 +88,20 @@ enum Shaders {
         return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
     }
 
-    // Trip mask: 1 where the kaleidoscope shows through the plain photo. The noise is read through mirror folds,
-    // so patches open in symmetric places; as `trip` rises they grow and merge until everything is kaleidoscope.
+    // Trip mask: 1 where the kaleidoscope shows through the plain photo. It is radial, like the mirrors: rays at
+    // the pattern's own mirror count crossed with rings that ripple slowly outward from the centre (and a touch of
+    // mirrored noise for soft edges). A low `trip` opens only where rays and rings cross, as small dots in mandala
+    // positions; rising, they join into rays and rings, then fill the screen.
     float tripMask(float2 p, constant Uniforms &u) {
-        float2 f = foldRadial(p, 6.0);
-        float2 drift = float2(u.time * 0.013, -u.time * 0.009);
-        float n = 0.6 * valueNoise(f * 3.6 + drift) + 0.4 * valueNoise(f * 8.3 - drift * 1.7);
-        float level = mix(0.12, 1.0, u.trip);                // 0 shows nothing, 1 covers everything
-        float m = smoothstep(n - 0.05, n + 0.05, level);
-        if (u.cursorAmount > 0.001) {
-            // Around the mouse: a symmetric bloom (its edge wobbles in a six-fold pattern) that grows as the
-            // mouse keeps moving and shrinks away when it rests.
-            float2 c = p - float2(u.cursorX, u.cursorY);
-            float d = length(c) + 0.09 * (valueNoise(foldRadial(c, 6.0) * 7.0 + u.time * 0.05) - 0.5);
-            float r = 0.04 + 0.3 * u.cursorAmount;
-            m = max(m, (1.0 - smoothstep(r - 0.05, r + 0.05, d)) * smoothstep(0.0, 0.15, u.cursorAmount));
-        }
-        return m;
+        float r = length(p);
+        float a = atan2(p.y, p.x) + u.rotation;                      // the rays turn with the pattern
+        float n = float(max(u.segments, 3));
+        float rays = 0.5 - 0.5 * cos(n * a);                         // 0 on each ray, 1 between them
+        float rings = 0.5 - 0.5 * cos(r * 15.0 - u.time * 0.35);     // 0 on each ring; rings travel outward
+        float grain = valueNoise(foldRadial(p, n) * 6.0 + u.time * 0.02);
+        float field = 0.45 * rings + 0.4 * rays + 0.15 * grain;      // 0...1
+        float level = mix(0.04, 1.05, u.trip);                      // 0 shows nothing, 1 covers everything
+        return smoothstep(field - 0.06, field + 0.06, level);
     }
 
     // The photo as it is, filling the screen (cropped, never letterboxed), for the "sober" parts of a trip.
