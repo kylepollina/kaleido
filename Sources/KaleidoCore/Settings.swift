@@ -121,6 +121,11 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Shapes invented patterns may not use (e.g. Diamonds, if you don't like it).
     public var excludedShapes: [MirrorMode] = []
     public var inventedShapes: Set<MirrorMode> { Set(MirrorMode.allCases).subtracting(excludedShapes) }
+    /// Albums and sources hidden from Photos (right-click > Hide), by source id. Hidden only from view: their
+    /// selected photos still play.
+    public var hiddenAlbums: [String] = []
+    /// Photos lists hidden albums too (dimmed), to bring one back.
+    public var showHiddenAlbums = false
     // Global switches that win over any look, scene or Surprise me.
     public var allowHueChanges = true
     public var allowSaturationChanges = true
@@ -172,6 +177,8 @@ public struct Settings: Codable, Equatable, Sendable {
         sharpness = (try? c.decodeIfPresent(Sharpness.self, forKey: .sharpness)) ?? d.sharpness
         sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
         excludedShapes = (try? c.decodeIfPresent([MirrorMode].self, forKey: .excludedShapes)) ?? []
+        hiddenAlbums = (try? c.decodeIfPresent([String].self, forKey: .hiddenAlbums)) ?? []
+        showHiddenAlbums = (try? c.decodeIfPresent(Bool.self, forKey: .showHiddenAlbums)) ?? false
         allowHueChanges = try c.decodeIfPresent(Bool.self, forKey: .allowHueChanges) ?? true
         allowSaturationChanges = try c.decodeIfPresent(Bool.self, forKey: .allowSaturationChanges) ?? true
         allowVignette = try c.decodeIfPresent(Bool.self, forKey: .allowVignette) ?? true

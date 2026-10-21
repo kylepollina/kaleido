@@ -202,6 +202,11 @@ struct LibraryPane: View {
                         app.library.filters.excludeScreenshots.toggle()
                     }
                     .modifier(CheckedModifier(on: app.library.filters.excludeScreenshots))
+                    Button("Show hidden albums (\(app.settings.hiddenAlbums.count))") {
+                        withAnimation { app.settings.showHiddenAlbums.toggle() }
+                    }
+                    .modifier(CheckedModifier(on: app.settings.showHiddenAlbums))
+                    .disabled(app.settings.hiddenAlbums.isEmpty && !app.settings.showHiddenAlbums)
                     Picker("Smallest photo", selection: Binding(get: { app.library.filters.minLongEdge }, set: { app.library.filters.minLongEdge = $0 })) {
                         Text("Any size").tag(0); Text("1600 px").tag(1600); Text("2400 px").tag(2400); Text("3200 px").tag(3200)
                     }
@@ -265,7 +270,9 @@ struct LibraryHomeView: View {
     private let columns = [GridItem(.adaptive(minimum: 170, maximum: 230), spacing: 14)]
 
     var body: some View {
-        let cards = makeCards(app)
+        // Hidden albums (right-click > Hide album) are left out, unless "Show hidden albums" is on.
+        let hidden = Set(app.settings.hiddenAlbums)
+        let cards = makeCards(app).filter { app.settings.showHiddenAlbums || !hidden.contains($0.id) }
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 photosBanner
@@ -275,7 +282,10 @@ struct LibraryHomeView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(group.rawValue).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                             LazyVGrid(columns: columns, spacing: 14) {
-                                ForEach(list) { card in AlbumCardView(card: card, open: { open(card) }) }
+                                ForEach(list) { card in
+                                    AlbumCardView(card: card, open: { open(card) })
+                                        .opacity(hidden.contains(card.id) ? 0.45 : 1)
+                                }
                             }
                         }
                     }
@@ -387,6 +397,13 @@ struct AlbumCardView: View {
             Button("Open") { open() }
             Button(card.state == .none ? "Include whole album" : "Remove from rotation") { app.toggleWhole(card) }
             if let f = card.folder { Button("Stop watching folder", role: .destructive) { app.library.removeFolder(f.id) } }
+            Divider()
+            let hidden = app.settings.hiddenAlbums.contains(card.id)
+            Button(hidden ? "Unhide album" : "Hide album") {
+                withAnimation {
+                    if hidden { app.settings.hiddenAlbums.removeAll { $0 == card.id } } else { app.settings.hiddenAlbums.append(card.id) }
+                }
+            }
         }
     }
 

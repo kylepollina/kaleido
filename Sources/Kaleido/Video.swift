@@ -21,15 +21,15 @@ final class VideoSource: @unchecked Sendable {
     static func load(url: URL, queue: MTLCommandQueue) async throws -> VideoSource {
         let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw TextureFactory.LoadError.unreadable }
-        let (natural, transform, fps) = try await track.load(.naturalSize, .preferredTransform, .nominalFrameRate)
+        let (natural, transform) = try await track.load(.naturalSize, .preferredTransform)
         let size = natural.applying(transform)
         let w0 = abs(size.width), h0 = abs(size.height)
         guard w0 > 0, h0 > 0 else { throw TextureFactory.LoadError.unreadable }
         let scale = min(1, Double(maxWidth) / Double(w0))
         let w = Int((Double(w0) * scale / 2).rounded()) * 2, h = Int((Double(h0) * scale / 2).rounded()) * 2
-        // High-frame-rate footage (Apple's aerials are 240 fps) plays in slow motion at about 30 decoded frames a
-        // second: smooth, calm, and far lighter than decoding every frame.
-        let rate = fps > 40 ? Float(30 / Double(fps)) : 1
+        // Real time, as macOS plays them (Apple's aerials are 240 fps clips of about five minutes; slowing them to
+        // 30 decoded frames a second made each loop last 40 minutes and looked sluggish).
+        let rate: Float = 1
         let source = try VideoSource(asset: asset, width: w, height: h, rate: rate, queue: queue)
         try await source.waitForFirstFrame(queue: queue)
         return source

@@ -21,6 +21,7 @@ enum Shaders {
         float outline;       // 0...1 thickness of black lines along the pattern's mirrors and tile edges
         float panBX, panBY;  // the incoming photo (B) keeps its own position, zoom and swirl during a fade, so
         float zoomB, twistB; // neither photo slides or zooms while one scene gives way to the next
+        float originalMix;   // 0...1 cross-fade from the kaleidoscope to the plain photo (the Original tab)
         int segments;       // mirrors of the outgoing photo (A)
         int mode;            // 0 radial, 1 hex, 2 fractal (A)
         int transition;      // 0 dissolve 1 iris 3 zoom 4 segments
@@ -337,7 +338,7 @@ enum Shaders {
                 // Zoom through: ease in and out (zero speed at both ends) and zoom geometrically, so the
                 // incoming photo settles instead of stopping dead.
                 float e = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
-                const float span = 0.9;   // ln of the total zoom travelled by each photo
+                const float span = 0.45;  // ln of the total zoom travelled by each photo (about 1.6x): a gentle glide
                 zoomA *= exp(span * e);
                 zoomB *= exp(-span * (1.0 - e));
             }
@@ -378,13 +379,15 @@ enum Shaders {
         float2 p = (in.position.xy - 0.5 * res) / u.height;   // centred, y down; screen height = 1
         p.y = -p.y;
 
+        // The Original tab: the photo itself, cross-faded with the kaleidoscope while switching.
+        float3 plain = float3(0.0);
         if (u.original == 1) {
-            float3 a = samplePlain(texA, smp, p, u.aspectA, res.x / res.y);
+            plain = samplePlain(texA, smp, p, u.aspectA, res.x / res.y);
             if (u.hasB == 1) {
                 float3 b = samplePlain(texB, smp, p, u.aspectB, res.x / res.y);
-                a = mix(a, b, smoothstep(0.0, 1.0, u.mixAmount));
+                plain = mix(plain, b, smoothstep(0.0, 1.0, u.mixAmount));
             }
-            return float4(a, 1.0);
+            if (u.originalMix >= 1.0) return float4(plain, 1.0);
         }
 
         float3 col = kaleidoColor(p, u, texA, texB, smp, 1.0);
@@ -413,6 +416,7 @@ enum Shaders {
             float line = 1.0 - smoothstep(px * 0.6, px * 1.8, d);
             col = mix(col * 0.45, float3(1.0, 0.18, 0.12), line);
         }
+        if (u.original == 1) col = mix(col, plain, smoothstep(0.0, 1.0, u.originalMix));
         return float4(saturate(col), 1.0);
     }
     """#

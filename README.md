@@ -54,12 +54,12 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   button (Kaleido fetches the video from Apple into its own folder, never macOS's). The slow-motion films macOS downloads for its moving wallpapers and screen
   saver (Yosemite, Iceland, Hong Kong, Palau Jellies...) appear as a built-in card, named from Apple's manifest with
   Apple's own thumbnails. They play through the kaleidoscope like any photo: decoded in hardware at screen size,
-  the 240 fps footage slowed to about 30 frames a second (an 8x slow motion), looping, muted, and paused whenever
+  playing in real time as macOS does, looping, muted, and paused whenever
   nothing is drawing. More arrive when you pick them in System Settings > Wallpaper; Kaleido never copies them.
 - **macOS Wallpapers.** No photos of your own? A built-in card offers Apple's desktop pictures that are on disk
   (skipping the plain solid colours). Scenic ones like Big Sur or The Lake are only downloaded when you pick them in
   System Settings > Wallpaper; once downloaded they join automatically on the next sync.
-- **Album browser.** Your Photos albums (smart, yours, shared), watched folders and hand-added photos show up as
+- **Album browser.** Right-click an album to hide it (the … menu can show hidden albums again). Your Photos albums (smart, yours, shared), watched folders and hand-added photos show up as
   cards with a cover photo, name, count and a badge (All / N of M). Tick a card's circle to include the whole
   album, or click the card to open it: click photos to toggle them, Shift-click for a range, plus Select All,
   Deselect All and Invert. Nothing is selected until you choose. Choices are remembered.
@@ -69,8 +69,8 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   day (and shortly after Photos reports a change). New photos join the rotation, vanished ones leave. "Sync now"
   does it on demand. Options skip screenshots and small photos; videos are always skipped.
 - **Slow by default.** Scenes last 90 seconds and cross-fade over 12, with dissolve, iris, zoom-through and
-  segment transitions (or random) for the slideshow's own changes; picking a scene, Next and Back always simply
-  dissolve. Each photo keeps its own position, zoom and swirl while they cross-fade, so a saved scene arrives
+  segment transitions (or random), for every change; Zoom through is a gentle glide (about 1.6x, at least 6 s).
+  Each photo keeps its own position, zoom and swirl while they cross-fade, so a saved scene arrives
   already in place instead of the old one sliding and zooming into it. Photos come in shuffled order (each once
   per round) or in order.
 - **Good citizen.** 30 or 60 fps cap, 30 fps in Low Power Mode, optional pause on battery, pauses while the

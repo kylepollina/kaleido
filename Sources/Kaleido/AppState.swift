@@ -403,11 +403,16 @@ final class AppState: ObservableObject, PhotoProvider {
     func playAlbum(_ id: String, title: String) {
         albumSlideshow = (id, title)
         clearTweaked()
-        renderer?.skip()
+        // The photo already loaded ahead came from the whole rotation: drop it and start on the album at once.
+        renderer?.discardPending()
+        if let ref = nextPhoto(after: renderer?.currentPhotoID) { renderer?.show(ref) }
     }
 
-    /// Back to the whole rotation.
-    func stopAlbumSlideshow() { albumSlideshow = nil }
+    /// Back to the whole rotation (the album photo loaded ahead is dropped too).
+    func stopAlbumSlideshow() {
+        albumSlideshow = nil
+        renderer?.discardPending()
+    }
 
     /// Plays this photo or video now (selected or not) and stays on it until Next or Back.
     func showNow(_ id: UUID) {

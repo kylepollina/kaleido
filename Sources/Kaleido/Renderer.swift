@@ -7,7 +7,7 @@ import MetalKit
 import UniformTypeIdentifiers
 import os
 
-/// Must match `Uniforms` in the shader: 21 floats, then 9 int32s.
+/// Must match `Uniforms` in the shader: 22 floats, then 9 int32s.
 struct GPUUniforms {
     var width: Float = 0, height: Float = 0
     var rotation: Float = 0, sourceRotation: Float = 0
@@ -18,6 +18,7 @@ struct GPUUniforms {
     var aspectA: Float = 1, aspectB: Float = 1
     var mixAmount: Float = 0, morph: Float = 0, outline: Float = 0
     var panBX: Float = 0, panBY: Float = 0, zoomB: Float = 1, twistB: Float = 0
+    var originalMix: Float = 0
     var segments: Int32 = 8, mode: Int32 = 0, transition: Int32 = 0, hasB: Int32 = 0
     var segmentsB: Int32 = 8, modeB: Int32 = 0, original: Int32 = 0, segmentsMorph: Int32 = 8
     var outlines: Int32 = 0
@@ -346,9 +347,9 @@ final class KaleidoRenderer {
                     incomingLook = targetLook
                     incomingPan = panGoal ?? userPan
                     panGoal = nil
-                    // Picking a scene, Next and Back simply dissolve; the slideshow's own changes use the chosen style.
-                    activeStyle = manual ? .dissolve
-                        : transitionStyle == .random ? TransitionStyle.concrete.randomElement()! : transitionStyle
+                    activeStyle = transitionStyle == .random ? TransitionStyle.concrete.randomElement()! : transitionStyle
+                    // Zoom through needs time to read as a gentle glide, even for a quick change like Next.
+                    if activeStyle == .zoom, manual { fadeSeconds = max(fadeSeconds, min(transitionSeconds, 6)) }
                     transitionClock = 0
                 }
             }
@@ -484,6 +485,13 @@ final class KaleidoRenderer {
     /// Show a specific photo next (used by "Show now").
     /// `refade`: fade even when it is the photo already showing (a scene putting a new pattern on it), so the
     /// pattern never jumps.
+    /// Forgets the photo loaded ahead (e.g. the rotation changed), so it never plays.
+    func discardPending() {
+        pending = nil
+        loadGeneration += 1   // and any load still under way
+        loading = false
+    }
+
     func show(_ photo: PhotoRef, refade: Bool = false) {
         refadeRequested = refade
         loadAsync(photo, force: true)
@@ -529,10 +537,12 @@ final class KaleidoRenderer {
 
     // MARK: Drawing
 
-    func makeUniforms(width: Double, height: Double, original: Bool = false, outlines: Bool = false) -> GPUUniforms {
+    /// `original`: 0 the kaleidoscope, 1 the plain photo, in between a cross-fade.
+    func makeUniforms(width: Double, height: Double, original: Double = 0, outlines: Bool = false) -> GPUUniforms {
         var u = GPUUniforms()
         u.width = Float(width); u.height = Float(height)
-        u.original = original ? 1 : 0
+        u.original = original > 0 ? 1 : 0
+        u.originalMix = Float(min(max(original, 0), 1))
         u.outlines = outlines ? 1 : 0
         u.rotation = Float(rotation.truncatingRemainder(dividingBy: 2 * .pi))
         u.sourceRotation = Float(sourceRotation.truncatingRemainder(dividingBy: 2 * .pi))
@@ -575,7 +585,7 @@ final class KaleidoRenderer {
         return u
     }
 
-    func encode(into pass: MTLRenderPassDescriptor, drawable: MTLDrawable?, width: Double, height: Double, original: Bool = false, outlines: Bool = false,
+    func encode(into pass: MTLRenderPassDescriptor, drawable: MTLDrawable?, width: Double, height: Double, original: Double = 0, outlines: Bool = false,
                 completion: (@Sendable (MTLCommandBuffer) -> Void)? = nil) {
         guard let cb = queue.makeCommandBuffer() else { return }
         refreshVideos(into: cb)
@@ -664,7 +674,7 @@ final class KaleidoRenderer {
         pass.colorAttachments[0].loadAction = .clear
         pass.colorAttachments[0].storeAction = .store
         let sem = DispatchSemaphore(value: 0)
-        encode(into: pass, drawable: nil, width: Double(width), height: Double(height), original: original, outlines: outlines) { _ in sem.signal() }
+        encode(into: pass, drawable: nil, width: Double(width), height: Double(height), original: original ? 1 : 0, outlines: outlines) { _ in sem.signal() }
         sem.wait()
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
         target.getBytes(&bytes, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
@@ -700,6 +710,9 @@ final class KaleidoView: NSView {
     var isPaused: Bool { link?.isPaused ?? true }
     /// Preview only: show the photo itself instead of the kaleidoscope.
     var showOriginal = false
+    /// How far the view has faded to the Original (0...1).
+    private var originalAmount = 0.0
+    private var lastTick: CFTimeInterval?
     /// Preview only: trace the pattern's mirror and tile lines in red.
     var showOutlines = false
     /// Preview only: dragging moves the photo inside the mirrors (and keeps gliding after release).
@@ -819,7 +832,13 @@ final class KaleidoView: NSView {
     @objc private func tick(_ link: CADisplayLink) {
         drawCount += 1
         guard inFlight < maxInFlight, ensureSurfaces() else { return }
-        MainActor.assumeIsolated { renderer.tick(now: CACurrentMediaTime()) }
+        let now = CACurrentMediaTime()
+        MainActor.assumeIsolated { renderer.tick(now: now) }
+        // Kaleidoscope <-> Original cross-fades over about 0.4 s instead of switching.
+        let step = min(now - (lastTick ?? now), 0.1) / 0.4
+        lastTick = now
+        let goal: Double = showOriginal ? 1 : 0
+        originalAmount += max(-step, min(step, goal - originalAmount))
         let entry = surfaces[nextSurface]
         nextSurface = (nextSurface + 1) % surfaces.count
         let pass = MTLRenderPassDescriptor()
@@ -829,7 +848,7 @@ final class KaleidoView: NSView {
         inFlight += 1
         let debug = renderer.debug
         MainActor.assumeIsolated {
-            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight), original: showOriginal, outlines: showOutlines && !showOriginal) { [weak self] cb in
+            renderer.encode(into: pass, drawable: nil, width: Double(pixelWidth), height: Double(pixelHeight), original: originalAmount, outlines: showOutlines && originalAmount == 0) { [weak self] cb in
                 if debug, cb.status == .error { FileHandle.standardError.write(Data("kaleido: GPU error \(String(describing: cb.error))\n".utf8)) }
                 if debug {
                     var px = [UInt8](repeating: 0, count: 4)
