@@ -147,10 +147,15 @@ public enum AerialScanner {
     public static let defaultRoot = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/com.apple.wallpaper/aerials")
 
-    /// Downloaded aerial videos, named from Apple's manifest ("Yosemite", "London", ...).
-    public static func scan(root: URL = defaultRoot) -> [SyncEntry] {
-        let videos = root.appendingPathComponent("videos")
-        guard let files = try? FileManager.default.contentsOfDirectory(at: videos, includingPropertiesForKeys: nil) else { return [] }
+    /// Downloaded aerial videos, named from Apple's manifest ("Yosemite", "London", ...): the ones macOS downloaded,
+    /// plus any Kaleido downloaded itself into `downloads` (its own folder; macOS's is never written to).
+    public static func scan(root: URL = defaultRoot, downloads: URL? = nil) -> [SyncEntry] {
+        let fm = FileManager.default
+        var files = (try? fm.contentsOfDirectory(at: root.appendingPathComponent("videos"), includingPropertiesForKeys: nil)) ?? []
+        let systemIDs = Set(files.map(stem))
+        if let downloads, let mine = try? fm.contentsOfDirectory(at: downloads, includingPropertiesForKeys: nil) {
+            files += mine.filter { !systemIDs.contains(stem($0)) }   // macOS's own copy wins
+        }
         let names = manifestNames(root: root)
         var used: [String: Int] = [:]
         return files.filter(VideoFiles.isVideo)
@@ -170,7 +175,51 @@ public enum AerialScanner {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
-    private static func stem(_ url: URL) -> String { url.deletingPathExtension().lastPathComponent }
+    static func stem(_ url: URL) -> String { url.deletingPathExtension().lastPathComponent }
+
+    /// One aerial in Apple's catalogue, downloaded or not.
+    public struct CatalogEntry: Identifiable, Equatable, Sendable {
+        public let id: String
+        public let name: String
+        /// Apple's copy of the video (4K, SDR).
+        public let remote: URL
+        /// A still: Apple's local thumbnail when macOS has one, else its web preview.
+        public let localThumbnail: URL?
+        public let previewImage: URL?
+        public let isDownloaded: Bool
+    }
+
+    /// Every aerial in Apple's manifest, sorted by place name, marking the ones already on this Mac.
+    public static func catalog(root: URL = defaultRoot, downloads: URL? = nil) -> [CatalogEntry] {
+        struct Manifest: Decodable {
+            struct Asset: Decodable {
+                let id: String
+                let accessibilityLabel: String?
+                let previewImage: String?
+                let url: String?
+                enum CodingKeys: String, CodingKey { case id, accessibilityLabel, previewImage, url = "url-4K-SDR-240FPS" }
+            }
+            let assets: [Asset]
+        }
+        guard let data = try? Data(contentsOf: root.appendingPathComponent("manifest/entries.json")),
+              let m = try? JSONDecoder().decode(Manifest.self, from: data) else { return [] }
+        let have = Set(scan(root: root, downloads: downloads).map { stem(URL(fileURLWithPath: $0.key)) })
+        let fm = FileManager.default
+        var used: [String: Int] = [:]
+        return m.assets
+            .compactMap { a -> (Manifest.Asset, URL)? in a.url.flatMap(URL.init(string:)).map { (a, $0) } }
+            .sorted { ($0.0.accessibilityLabel ?? "~").localizedStandardCompare($1.0.accessibilityLabel ?? "~") == .orderedAscending }
+            .map { a, remote in
+                var name = a.accessibilityLabel.flatMap { $0.isEmpty ? nil : $0 } ?? "Aerial"
+                used[name, default: 0] += 1
+                if used[name]! > 1 { name += " \(used[name]!)" }
+                let thumb = root.appendingPathComponent("thumbnails/\(a.id).png")
+                return CatalogEntry(id: a.id, name: name, remote: remote,
+                                    localThumbnail: fm.fileExists(atPath: thumb.path) ? thumb : nil,
+                                    previewImage: a.previewImage.flatMap(URL.init(string:)),
+                                    isDownloaded: have.contains(a.id))
+            }
+    }
 
     /// Video id to place name, from manifest/entries.json.
     static func manifestNames(root: URL) -> [String: String] {

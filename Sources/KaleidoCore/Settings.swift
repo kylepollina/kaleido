@@ -235,6 +235,8 @@ public enum Paths {
     public static var settingsFile: URL { dataDirectory.appendingPathComponent("settings.json") }
     public static var libraryFile: URL { dataDirectory.appendingPathComponent("library.json") }
     public static var scenesFile: URL { dataDirectory.appendingPathComponent("scenes.json") }
+    /// Aerial videos Kaleido downloaded itself (macOS's own aerials folder is only read).
+    public static var aerialDownloads: URL { dataDirectory.appendingPathComponent("Aerials", isDirectory: true) }
 }
 
 public enum JSONFile {

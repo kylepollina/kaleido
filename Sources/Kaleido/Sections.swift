@@ -60,6 +60,18 @@ struct HomeView: View {
     @State private var controlsHidden = CommandLine.arguments.contains("--hide-controls")
     /// The Photos tab filling the window.
     @State private var photosExpanded = CommandLine.arguments.contains("--expand-photos")
+    /// The photo grid fades out while the panel changes size (re-flowing it every frame looked jittery).
+    @State private var resizingPhotos = false
+
+    private func setPhotosExpanded(_ on: Bool) {
+        withAnimation(.easeOut(duration: 0.12)) { resizingPhotos = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(Self.panelAnimation) { photosExpanded = on }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                withAnimation(.easeIn(duration: 0.2)) { resizingPhotos = false }
+            }
+        }
+    }
     @AppStorage("previewShowsOriginal") private var showOriginal = false
     @AppStorage("previewShowsPatternLines") private var showLines = false
 
@@ -141,7 +153,7 @@ struct HomeView: View {
         }
         .toolbar(controlsHidden ? .hidden : .visible, for: .windowToolbar)
         // Expanded Photos takes the whole window, so Edit scene opening shrinks it back (and vice versa).
-        .onChange(of: editing) { _, on in if on, photosExpanded { withAnimation(Self.panelAnimation) { photosExpanded = false } } }
+        .onChange(of: editing) { _, on in if on, photosExpanded { setPhotosExpanded(false) } }
         .onChange(of: photosExpanded) { _, on in if on, editing { withAnimation(Self.panelAnimation) { editing = false } } }
     }
 
@@ -197,7 +209,7 @@ struct HomeView: View {
                 .overlay(alignment: .trailing) {
                     if s == .photos {
                         // Photos can take the whole window, for browsing; the scene still shows around it.
-                        Button { withAnimation(Self.panelAnimation) { photosExpanded.toggle() } } label: {
+                        Button { setPhotosExpanded(!photosExpanded) } label: {
                             Image(systemName: photosExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
                                 .font(.system(size: 13, weight: .semibold))
                                 .frame(width: 30, height: 30)
@@ -217,6 +229,7 @@ struct HomeView: View {
             }
             .scrollContentBackground(.hidden)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .opacity(resizingPhotos ? 0 : 1)
         }
         .frame(width: width)
         .frame(maxHeight: .infinity)
@@ -268,10 +281,23 @@ struct HomeView: View {
                 Text(saved?.name ?? (app.sceneTweaked ? "Your scene" : "New scene"))
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
-                Text(app.isPlaying ? (app.suspensionReason.map { "Paused: \($0.lowercased())" } ?? "On your desktop") : "Preview only")
+                if let album = app.albumSlideshow {
+                    // Playing one album: say which, with a way back to everything.
+                    HStack(spacing: 4) {
+                        Image(systemName: "photo.stack").font(.system(size: 10))
+                        Text(album.title).lineLimit(1)
+                        Button { app.stopAlbumSlideshow() } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.plain)
+                            .help("Stop playing this album: back to all your selected photos")
+                    }
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                } else {
+                    Text(app.isPlaying ? (app.suspensionReason.map { "Paused: \($0.lowercased())" } ?? "On your desktop") : "Preview only")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             .frame(width: 140, alignment: .leading)
             .padding(.horizontal, 8)

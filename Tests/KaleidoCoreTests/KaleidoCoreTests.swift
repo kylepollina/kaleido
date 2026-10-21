@@ -755,7 +755,9 @@ final class SceneTests: XCTestCase {
         let id = lib.add(name: "Lake", photoID: photo, look: look, panX: 0.3, panY: -0.2)
         XCTAssertEqual(lib.add(name: "Lake", photoID: photo, look: look), lib.scenes[1].id)
         XCTAssertEqual(lib.scenes[1].name, "Lake 2", "names stay unique")
-        XCTAssertTrue(lib.scene(id)!.isFavorite, "new scenes show on Home")
+        XCTAssertFalse(lib.scene(id)!.isFavorite, "stars are yours to give")
+        lib.toggleFavorite(lib.scenes[1].id)
+        XCTAssertEqual(lib.starredFirst.first?.id, lib.scenes[1].id, "starred scenes come first")
 
         look.segments = 11
         lib.update(id, name: "Lake at dusk", look: look, pan: nil)
@@ -811,6 +813,28 @@ final class AerialTests: XCTestCase {
         XCTAssertNotNil(AerialScanner.thumbnail(for: URL(fileURLWithPath: entries[2].key), root: root))
         XCTAssertNil(AerialScanner.thumbnail(for: URL(fileURLWithPath: entries[0].key), root: root))
         XCTAssertEqual(AerialScanner.scan(root: root.appendingPathComponent("missing")), [])
+    }
+
+    func testCatalogListsEveryAerialAndKaleidoDownloadsJoin() throws {
+        let root = try makeAerials()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let manifest = #"{"assets": [{"id": "AAA", "accessibilityLabel": "Yosemite", "url-4K-SDR-240FPS": "https://example.com/a.mov"}, {"id": "DDD", "accessibilityLabel": "Iceland", "url-4K-SDR-240FPS": "https://example.com/d.mov", "previewImage": "https://example.com/d.png"}, {"id": "EEE", "accessibilityLabel": "No video"}]}"#
+        try Data(manifest.utf8).write(to: root.appendingPathComponent("manifest/entries.json"))
+        let downloads = root.appendingPathComponent("mine")
+        var catalog = AerialScanner.catalog(root: root, downloads: downloads)
+        XCTAssertEqual(catalog.map(\.name), ["Iceland", "Yosemite"], "only aerials with a video, by name")
+        XCTAssertEqual(catalog.map(\.isDownloaded), [false, true])
+        XCTAssertNotNil(catalog[1].localThumbnail)
+        XCTAssertEqual(catalog[0].previewImage?.lastPathComponent, "d.png")
+
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        try Data().write(to: downloads.appendingPathComponent("DDD.mov"))
+        try Data().write(to: downloads.appendingPathComponent("AAA.mov"))   // macOS has it too: not listed twice
+        catalog = AerialScanner.catalog(root: root, downloads: downloads)
+        XCTAssertEqual(catalog.map(\.isDownloaded), [true, true])
+        let scanned = AerialScanner.scan(root: root, downloads: downloads)
+        XCTAssertEqual(scanned.filter { $0.key.hasSuffix("AAA.mov") }.count, 1)
+        XCTAssertTrue(scanned.contains { $0.name == "Iceland" && $0.key.hasPrefix(downloads.path) })
     }
 
     func testAerialsSourceJoinsAndLeavesTheLibrary() throws {

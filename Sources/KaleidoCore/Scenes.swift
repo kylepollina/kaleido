@@ -20,7 +20,7 @@ public struct SavedScene: Codable, Identifiable, Equatable, Sendable {
     public var created: Date
 
     public init(id: UUID = UUID(), name: String, photoID: UUID, look: Look, panX: Double = 0, panY: Double = 0,
-                isFavorite: Bool = true, created: Date = Date()) {
+                isFavorite: Bool = false, created: Date = Date()) {
         self.id = id; self.name = name; self.photoID = photoID; self.look = look
         self.panX = panX; self.panY = panY; self.isFavorite = isFavorite; self.created = created
     }
@@ -37,9 +37,19 @@ public final class SceneLibrary: ObservableObject {
     }
 
     public var favorites: [SavedScene] { scenes.filter(\.isFavorite) }
+    /// Starred scenes first, otherwise in the order they were saved.
+    public var starredFirst: [SavedScene] { favorites + scenes.filter { !$0.isFavorite } }
+
+    /// Stars used to be on for every new scene, which made them meaningless; this clears them once.
+    public func unstarAll() {
+        guard scenes.contains(where: \.isFavorite) else { return }
+        for i in scenes.indices { scenes[i].isFavorite = false }
+        save()
+    }
+
     public func scene(_ id: UUID?) -> SavedScene? { scenes.first { $0.id == id } }
 
-    /// Adds a scene (hearted) and returns its id.
+    /// Adds a scene (not starred) and returns its id.
     @discardableResult
     public func add(name: String, photoID: UUID, photoKey: String? = nil, photoName: String? = nil, look: Look,
                     panX: Double = 0, panY: Double = 0) -> UUID {

@@ -25,7 +25,8 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
     (Drift / Push / Pull), Speed, Save scene and Edit scene; each button lights up under the pointer;
   - the sidebar button (top left) opens a panel on the left with Photos, Scenes and Settings tabs (Photos can
     expand to fill the window, for browsing). Scenes lists your scenes as pictures: click to show one, star the
-    ones that should come up as scenes change, swipe or right-click to rename or delete;
+    ones you love (they move to the top and come up more often; new scenes start unstarred), swipe or
+    right-click to rename or delete;
   - Edit scene opens a panel on the right with Randomize, Debug lines (the mirrors traced in red) and every
     setting of the scene.
 
@@ -49,7 +50,8 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   Whether that reads as zooming in or out depends on the pattern, hence the neutral names. Drift leaves only the
   look's own slow zoom breathing (set in Edit scene). Changes ease in and out.
 - **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every scene.
-- **macOS Aerials (video).** The slow-motion aerial films macOS downloads for its moving wallpapers and screen
+- **macOS Aerials (video).** Every aerial in macOS's list shows up; the ones not on this Mac yet have a Download
+  button (Kaleido fetches the video from Apple into its own folder, never macOS's). The slow-motion films macOS downloads for its moving wallpapers and screen
   saver (Yosemite, Iceland, Hong Kong, Palau Jellies...) appear as a built-in card, named from Apple's manifest with
   Apple's own thumbnails. They play through the kaleidoscope like any photo: decoded in hardware at screen size,
   the 240 fps footage slowed to about 30 frames a second (an 8x slow motion), looping, muted, and paused whenever
@@ -96,7 +98,8 @@ Run the tests with `swift test`.
 3. Tune the scene with Edit scene, or let Surprise me invent new ones.
 4. **Stop** or quit to get your wallpaper back.
 
-Hover a thumbnail and press ▶︎ to play that photo or video right now, selected or not; it stays until Next or Back. Right-click a thumbnail for "Play now", "Reveal in Finder" and "Remove from library". Saved scenes remember the photo itself, so they still play when its album is unticked; a scene whose photo is gone keeps its look and can take the photo on screen ("Use the photo on screen" in Scenes).
+Open an album and press **Play album** to play only its selected photos as a slideshow (the mini-player shows
+which album, with ✕ to go back to everything). Hover a thumbnail and press ▶︎ to play that photo or video right now, selected or not; it stays until Next or Back. Right-click a thumbnail for "Play now", "Reveal in Finder" and "Remove from library". Saved scenes remember the photo itself, so they still play when its album is unticked; a scene whose photo is gone keeps its look and can take the photo on screen ("Use the photo on screen" in Scenes).
 
 ## How it works
 

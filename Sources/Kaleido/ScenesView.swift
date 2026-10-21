@@ -4,8 +4,8 @@ import SwiftUI
 
 // MARK: Scenes
 
-/// Your saved scenes as a list of pictures: click one to show it, star the ones that should come up as scenes
-/// change, swipe (or right-click) to rename or delete. Changing a scene's look happens in Edit scene, on screen.
+/// Your saved scenes as a list of pictures, starred ones on top: click one to show it, star your favourites (they
+/// come up more often), swipe (or right-click) to rename or delete. Changing a scene's look happens in Edit scene, on screen.
 struct ScenesView: View {
     @EnvironmentObject var app: AppState
     @State private var renaming: UUID?
@@ -25,7 +25,7 @@ struct ScenesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(app.scenes.scenes) { s in row(s) }
+                    ForEach(app.scenes.starredFirst) { s in row(s) }
                 }
                 .listStyle(.plain)
             }
@@ -67,14 +67,14 @@ struct ScenesView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
-            Button { app.scenes.toggleFavorite(s.id) } label: {
+            Button { withAnimation { app.scenes.toggleFavorite(s.id) } } label: {
                 Image(systemName: s.isFavorite ? "star.fill" : "star")
                     .foregroundStyle(s.isFavorite ? Color.yellow : Color.secondary)
                     .frame(width: 28, height: 28)
                     .hoverHighlight(Circle())
             }
             .buttonStyle(.plain)
-            .help(s.isFavorite ? "Starred: comes up as scenes change" : "Star it so it comes up as scenes change")
+            .help(s.isFavorite ? "Starred: at the top, and comes up more often as scenes change" : "Star it: to the top, and it comes up more often")
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
@@ -86,7 +86,7 @@ struct ScenesView: View {
                 .tint(.blue)
         }
         .swipeActions(edge: .leading) {
-            Button { app.scenes.toggleFavorite(s.id) } label: {
+            Button { withAnimation { app.scenes.toggleFavorite(s.id) } } label: {
                 Label(s.isFavorite ? "Unstar" : "Star", systemImage: s.isFavorite ? "star.slash" : "star.fill")
             }
             .tint(.yellow)
@@ -94,7 +94,7 @@ struct ScenesView: View {
         .contextMenu {
             Button("Show") { app.showScene(s) }.disabled(!available)
             Button("Rename…") { startRenaming(s) }
-            Button(s.isFavorite ? "Unstar" : "Star") { app.scenes.toggleFavorite(s.id) }
+            Button(s.isFavorite ? "Unstar" : "Star") { withAnimation { app.scenes.toggleFavorite(s.id) } }
             Button("Duplicate") { _ = app.scenes.duplicate(s.id) }
             if !available {
                 Button("Use the photo on screen") { app.usePhotoOnScreen(for: s.id) }

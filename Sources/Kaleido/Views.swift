@@ -103,7 +103,7 @@ struct PreviewView: NSViewRepresentable {
 /// One card on the library home screen: a Photos album, a watched folder, or the hand-added photos.
 struct SourceCard: Identifiable {
     enum Group: String, CaseIterable {
-        case smart = "Smart albums", user = "My albums", shared = "Shared albums", folders = "Folders", builtIn = "Built-in"
+        case builtIn = "Built-in", smart = "Smart albums", user = "My albums", shared = "Shared albums", folders = "Folders"
     }
     let id: String
     let title: String
@@ -146,10 +146,10 @@ func makeCards(_ app: AppState) -> [SourceCard] {
                             state: inUse ? state(wid) : .none,
                             coverItemID: inUse ? lib.itemIDs(in: wid).first : nil,
                             coverURL: BuiltInWallpapers.available.first.map { URL(fileURLWithPath: $0.key) }))
-    // Shown once macOS has downloaded at least one aerial.
+    // Shown when macOS has its aerials list (downloaded or not).
     let aid = AerialScanner.sourceID
     let aerialsInUse = lib.aerials != nil
-    if aerialsInUse || !BuiltInWallpapers.aerials.isEmpty {
+    if aerialsInUse || !BuiltInWallpapers.aerials.isEmpty || BuiltInWallpapers.aerialCatalogExists {
         cards.append(SourceCard(id: aid, title: "macOS Aerials", group: .builtIn,
                                 count: aerialsInUse ? lib.itemIDs(in: aid).count : BuiltInWallpapers.aerials.count,
                                 state: aerialsInUse ? state(aid) : .none,
@@ -162,7 +162,9 @@ func makeCards(_ app: AppState) -> [SourceCard] {
 /// What the built-in cards can offer before they are switched on (scanned once).
 enum BuiltInWallpapers {
     static let available: [SyncEntry] = WallpaperScanner.scan()
-    static let aerials: [SyncEntry] = AerialScanner.scan()
+    static let aerials: [SyncEntry] = AerialScanner.scan(downloads: Paths.aerialDownloads)
+    /// Apple's manifest is on this Mac (so aerials can be listed and downloaded, even if none are yet).
+    static let aerialCatalogExists = !AerialScanner.catalog().isEmpty
 }
 
 struct LibraryPane: View {
@@ -417,26 +419,53 @@ struct AlbumDetailView: View {
         let ids = app.library.itemIDs(in: card.id)
         let lib = app.library
         let selected = ids.filter { lib.item($0)?.isEnabled == true }.count
+        let playing = app.albumSlideshow?.id == card.id
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Button { back() } label: { Label("Library", systemImage: "chevron.left") }
-                Text(card.title).font(.title3.weight(.semibold)).lineLimit(1)
-                Text("\(selected) of \(ids.count) selected").foregroundStyle(.secondary).monospacedDigit()
-                Spacer()
-                Button("Select All") { lib.selectAll(in: card.id) }
-                Button("Deselect All") { lib.deselectAll(in: card.id) }
-                Button("Invert") { lib.invertSelection(in: card.id) }
+            HStack(spacing: 4) {
+                Button { back() } label: {
+                    Image(systemName: "chevron.left").frame(width: 30, height: 30).hoverHighlight(Circle())
+                }
+                .help("Back to all albums")
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(card.title).font(.headline).lineLimit(1)
+                    Text("\(selected) of \(ids.count) selected").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                }
+                Spacer(minLength: 8)
+                // A slideshow of just this album's selected photos (until stopped).
+                Button {
+                    if playing { app.stopAlbumSlideshow() } else { app.playAlbum(card.id, title: card.title) }
+                } label: {
+                    Label(playing ? "Stop album" : "Play album", systemImage: playing ? "stop.fill" : "play.fill")
+                        .font(.callout.weight(.medium))
+                        .padding(.horizontal, 10).frame(height: 30)
+                        .hoverHighlight(Capsule())
+                }
+                .disabled(selected == 0 && !playing)
+                .help(playing ? "Back to all your selected photos" : "Play only this album's selected photos, as a slideshow")
+                Menu {
+                    Button("Select All") { lib.selectAll(in: card.id) }
+                    Button("Deselect All") { lib.deselectAll(in: card.id) }
+                    Button("Invert Selection") { lib.invertSelection(in: card.id) }
+                } label: {
+                    Image(systemName: "checklist").frame(width: 30, height: 30).hoverHighlight(Circle())
+                }
+                .menuStyle(.button)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Select all, none, or invert")
             }
-            .padding(.horizontal, 16).padding(.bottom, 6)
+            .buttonStyle(.plain)
+            .font(.system(size: 14, weight: .medium))
+            .padding(.horizontal, 12).padding(.bottom, 6)
             if card.album != nil || card.folder != nil {
                 HStack {
                     Toggle(isOn: Binding(get: { lib.autoInclude(card.id) },
                                          set: { $0 ? lib.selectAll(in: card.id) : lib.setAutoInclude(card.id, false) })) {
-                        Text(card.folder != nil ? "Whole folder: include new photos automatically" : "Whole album: include new photos automatically")
+                        Text("Include new photos automatically").font(.callout)
                     }
                     .toggleStyle(.checkbox)
+                    .help(card.folder != nil ? "Whole folder: new photos in it join the rotation" : "Whole album: new photos in it join the rotation")
                     Spacer()
-                    Text("Click a photo to toggle it. Shift-click selects a range.").font(.caption).foregroundStyle(.tertiary)
                 }
                 .padding(.horizontal, 16).padding(.bottom, 8)
             }
@@ -456,6 +485,9 @@ struct AlbumDetailView: View {
                         }
                     }
                     .padding(.horizontal, 16).padding(.bottom, 16)
+                }
+                if card.id == AerialScanner.sourceID {
+                    AerialCatalogSection(downloads: app.aerialDownloads)
                 }
             }
         }

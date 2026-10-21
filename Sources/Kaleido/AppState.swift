@@ -25,6 +25,9 @@ final class AppState: ObservableObject, PhotoProvider {
     let library: PhotoLibrary
     let scenes = SceneLibrary(fileURL: Paths.scenesFile)
     let photos = PhotosService()
+    let aerialDownloads = AerialDownloads()
+    /// Playing one album as a slideshow: only its selected photos, no saved scenes (nil: the whole rotation).
+    @Published private(set) var albumSlideshow: (id: String, title: String)?
     /// The scene on screen, if any. A scene holds its photo until Next or Previous.
     @Published private(set) var activeSceneID: UUID?
     /// Bumped whenever a scene's thumbnail is rewritten, so cards reload it.
@@ -68,6 +71,12 @@ final class AppState: ObservableObject, PhotoProvider {
         applySettings()
         libraryObserver = library.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
         scenes.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        // Stars were on for every scene until they became yours to give: clear them once.
+        let starsReset = Paths.dataDirectory.appendingPathComponent(".stars-reset")
+        if !FileManager.default.fileExists(atPath: starsReset.path) {
+            scenes.unstarAll()
+            FileManager.default.createFile(atPath: starsReset.path, contents: nil)
+        }
         // Scenes saved before they remembered the photo itself: note it now, while the photo is still in the
         // library, so unticking its album later doesn't lose it.
         for s in scenes.scenes where s.photoKey == nil {
@@ -75,6 +84,8 @@ final class AppState: ObservableObject, PhotoProvider {
         }
         photos.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         photos.onLibraryChange = { [weak self] in self?.scheduleSync(after: 20) }
+        library.aerialDownloads = Paths.aerialDownloads
+        aerialDownloads.onFinished = { [weak self] in self?.syncNow() }
         filterObserver = library.$filters.dropFirst().removeDuplicates().sink { [weak self] _ in self?.scheduleSync(after: 1) }
         startSyncSchedule()
         observeSystem()
@@ -142,7 +153,7 @@ final class AppState: ObservableObject, PhotoProvider {
     func togglePlay() { isPlaying ? stop() : play() }
     /// The next scene (saved or new, as Shuffle says; a new one even when Shuffle is off).
     func nextPhoto() {
-        if library.enabledItems.count <= 1 && scenes.favorites.isEmpty {
+        if library.enabledItems.count <= 1 && scenes.scenes.isEmpty {
             // No fade will come: keep the photo, change the pattern.
             sceneWillStart(photoID: renderer?.currentPhotoID, back: false)
         }
@@ -314,8 +325,10 @@ final class AppState: ObservableObject, PhotoProvider {
         }
     }
 
-    /// Saved scenes Shuffle can pick: hearted, with their photo still in the library.
-    private var shuffleScenes: [SavedScene] { scenes.favorites.filter(isSceneAvailable) }
+    /// Saved scenes Shuffle can pick: any whose photo is still there, starred ones twice as likely.
+    private var shuffleScenes: [SavedScene] {
+        scenes.scenes.filter(isSceneAvailable).flatMap { $0.isFavorite ? [$0, $0] : [$0] }
+    }
 
     /// Freezes what is on screen (photo, look and where the photo sits) as a new scene.
     @discardableResult
@@ -361,13 +374,17 @@ final class AppState: ObservableObject, PhotoProvider {
     func nextPhoto(after current: UUID?) -> PhotoRef? {
         plannedScene = nil
         let saved = shuffleScenes.filter { $0.id != activeSceneID }
-        if settings.effectiveSceneShuffle.nextIsSaved(savedCount: saved.count, roll: Double.random(in: 0..<1)),
+        if albumSlideshow == nil, settings.effectiveSceneShuffle.nextIsSaved(savedCount: saved.count, roll: Double.random(in: 0..<1)),
            let s = saved.randomElement(), let ref = sceneRef(s) {
             plannedScene = s
             return ref
         }
         queue.shuffle = settings.shuffle
-        let items = library.enabledItems
+        var items = library.enabledItems
+        if let album = albumSlideshow {
+            let inAlbum = Set(library.itemIDs(in: album.id))
+            items = items.filter { inAlbum.contains($0.id) }
+        }
         let ids = items.map(\.id)
         var cur = current
         // Skip photos whose file has gone missing instead of stalling on them.
@@ -381,6 +398,16 @@ final class AppState: ObservableObject, PhotoProvider {
     }
 
     // MARK: Syncing photo sources
+
+    /// Plays only this album's selected photos (as new scenes, no saved ones) until stopped.
+    func playAlbum(_ id: String, title: String) {
+        albumSlideshow = (id, title)
+        clearTweaked()
+        renderer?.skip()
+    }
+
+    /// Back to the whole rotation.
+    func stopAlbumSlideshow() { albumSlideshow = nil }
 
     /// Plays this photo or video now (selected or not) and stays on it until Next or Back.
     func showNow(_ id: UUID) {
@@ -433,14 +460,14 @@ final class AppState: ObservableObject, PhotoProvider {
         isSyncing = true
         let albums = library.albums, folders = library.folders, filters = library.filters
         let wallpaperRoots = library.wallpapers != nil ? library.wallpaperRoots : nil
-        let aerialRoot = library.aerials != nil ? library.aerialRoot : nil
+        let aerialRoot = library.aerials != nil ? library.aerialRoot : nil, aerialDownloads = library.aerialDownloads
         let authorized = photos.isAuthorized
         Task {
             let listings = await Task.detached(priority: .utility) { () -> [String: [SyncEntry]] in
                 var out: [String: [SyncEntry]] = [:]
                 for f in folders { if let l = FolderScanner.scan(f) { out[f.id] = l } }
                 if let wallpaperRoots { out[WallpaperScanner.sourceID] = WallpaperScanner.scan(roots: wallpaperRoots) }
-                if let aerialRoot { out[AerialScanner.sourceID] = AerialScanner.scan(root: aerialRoot) }
+                if let aerialRoot { out[AerialScanner.sourceID] = AerialScanner.scan(root: aerialRoot, downloads: aerialDownloads) }
                 if authorized {
                     for a in albums { if let l = PhotosService.listing(albumID: a.localID, filters: filters) { out[a.id] = l } }
                 }

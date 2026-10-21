@@ -114,6 +114,8 @@ public final class PhotoLibrary: ObservableObject {
     /// macOS Aerials (videos): nil = not in use; true = whole source; false = hand-picked.
     @Published public private(set) var aerials: Bool?
     public var aerialRoot = AerialScanner.defaultRoot
+    /// Kaleido's own folder of aerials it downloaded (nil in tests).
+    public var aerialDownloads: URL?
     private var dismissed: Set<String> = []
     private let fileURL: URL?
 
@@ -162,14 +164,14 @@ public final class PhotoLibrary: ObservableObject {
     /// Turns the built-in macOS Aerials source on (every downloaded video included) or off.
     public func setAerials(_ on: Bool) {
         aerials = on ? true : nil
-        applySync(listings: on ? [AerialScanner.sourceID: AerialScanner.scan(root: aerialRoot)] : [:])
+        applySync(listings: on ? [AerialScanner.sourceID: AerialScanner.scan(root: aerialRoot, downloads: aerialDownloads)] : [:])
     }
 
     /// Scan results for whichever built-in sources are in use.
     public func builtInListings() -> [String: [SyncEntry]] {
         var out: [String: [SyncEntry]] = [:]
         if wallpapers != nil { out[WallpaperScanner.sourceID] = WallpaperScanner.scan(roots: wallpaperRoots) }
-        if aerials != nil { out[AerialScanner.sourceID] = AerialScanner.scan(root: aerialRoot) }
+        if aerials != nil { out[AerialScanner.sourceID] = AerialScanner.scan(root: aerialRoot, downloads: aerialDownloads) }
         return out
     }
     public var dismissedCount: Int { dismissed.count }

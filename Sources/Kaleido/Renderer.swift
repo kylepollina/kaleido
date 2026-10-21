@@ -710,6 +710,11 @@ final class KaleidoView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         guard acceptsDrag || onClick != nil else { return super.mouseDown(with: event) }
+        // The strip under the (hidden) title bar moves the window, as in any Mac app, not the photo.
+        if let window, event.locationInWindow.y > window.contentLayoutRect.maxY {
+            pressAt = nil
+            return window.performDrag(with: event)
+        }
         pressAt = (event.locationInWindow, event.timestamp, 0)
         if acceptsDrag {
             MainActor.assumeIsolated { renderer.beginDrag() }
@@ -719,6 +724,7 @@ final class KaleidoView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         guard acceptsDrag || onClick != nil else { return super.mouseDragged(with: event) }
+        guard pressAt != nil else { return }
         pressAt?.travel += hypot(event.deltaX, event.deltaY)
         guard acceptsDrag, bounds.height > 0 else { return }
         // Points to screen heights; AppKit's y already points up, like the shader's.
@@ -728,6 +734,7 @@ final class KaleidoView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         guard acceptsDrag || onClick != nil else { return super.mouseUp(with: event) }
+        guard pressAt != nil else { return }
         if acceptsDrag {
             MainActor.assumeIsolated { renderer.endDrag() }
             NSCursor.pop()
@@ -738,7 +745,13 @@ final class KaleidoView: NSView {
     }
 
     override func resetCursorRects() {
-        if acceptsDrag { addCursorRect(bounds, cursor: .openHand) }
+        guard acceptsDrag else { return }
+        var r = bounds
+        if let window {   // not over the title bar strip, which moves the window
+            let top = convert(NSPoint(x: 0, y: window.contentLayoutRect.maxY), from: nil).y
+            if isFlipped { r.origin.y = max(r.origin.y, top) } else { r.size.height = min(r.height, top - r.minY) }
+        }
+        addCursorRect(r, cursor: .openHand)
     }
 
     @MainActor
