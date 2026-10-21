@@ -606,12 +606,15 @@ final class KaleidoRenderer {
 
     private var lastDraw = 0.0
     private var idleTimer: Timer?
+    /// How fast videos play (1 = real time).
+    var videoRate: Float = 1
 
     /// Videos on screen play and copy in their newest frame; a preloaded one waits paused until its fade.
     /// When nothing has drawn for a second (desktop hidden, window closed, display asleep) they all pause.
     private func refreshVideos(into cb: MTLCommandBuffer) {
         lastDraw = CACurrentMediaTime()
         for v in [current.video, incoming?.video].compactMap({ $0 }) {
+            v.setRate(videoRate)
             v.setPaused(false)
             v.update(into: cb)
         }

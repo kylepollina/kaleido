@@ -45,7 +45,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   (the wedges make room while an extra one grows from nothing), or one closes; tilings grow denser or sparser. A
   change comes about every 3 minutes, whatever the speed, and takes about 40 seconds to open up. Turn it on in Edit scene.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting. Click the tortoise for
-  super slow motion: every movement at a quarter of the slowest stop (videos keep their own speed).
+  super slow motion: every movement at an eighth of the slowest stop, and videos at an eighth of real time.
 - **Zoom: Drift, Push, Pull.** Push and Pull are what dragging the preview does, done continuously: the photo keeps
   sliding through the mirrors one way or the other (along the mirrors' own axis, which turns with the pattern).
   Whether that reads as zooming in or out depends on the pattern, hence the neutral names. Drift leaves only the

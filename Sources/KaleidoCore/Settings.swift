@@ -107,10 +107,11 @@ public struct Settings: Codable, Equatable, Sendable {
     public var keepScreenAwake = false
     /// 0...4, an index into `speedMultipliers`.
     public var speedStep = Settings.defaultSpeedStep
-    /// Super slow motion (the tortoise in the mini-player): every movement at a quarter of the slowest stop,
-    /// whatever the slider says. Videos still play at their own speed.
+    /// Super slow motion (the tortoise in the mini-player): every movement at an eighth of the slowest stop,
+    /// whatever the slider says, and videos at an eighth of real time.
     public var superSlow = false
-    public static let superSlowMultiplier = 0.5
+    public static let superSlowMultiplier = 0.25
+    public static let superSlowVideoRate: Float = 0.125
     /// Movement, on top of any look: how the view zooms.
     public var zoomMotion: ZoomMotion = .drift
     /// Desktop drawing resolution (the preview always draws sharp).

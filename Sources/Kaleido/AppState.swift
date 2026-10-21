@@ -517,6 +517,7 @@ final class AppState: ObservableObject, PhotoProvider {
         renderer.secondsPerPhoto = settings.secondsPerPhoto
         renderer.transitionSeconds = settings.transitionSeconds
         renderer.transitionStyle = settings.transition
+        renderer.videoRate = settings.superSlow ? Settings.superSlowVideoRate : 1
         renderer.zoomFlow = settings.zoomMotion.direction
         queue.shuffle = settings.shuffle
         updateHold()

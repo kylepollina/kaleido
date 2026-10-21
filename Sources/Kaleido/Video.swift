@@ -13,7 +13,7 @@ final class VideoSource: @unchecked Sendable {
     private let cache: CVMetalTextureCache
     private var endObserver: NSObjectProtocol?
     private(set) var isPaused = false
-    private let playRate: Float
+    private var playRate: Float
 
     static let maxWidth = 1920
 
@@ -69,6 +69,13 @@ final class VideoSource: @unchecked Sendable {
     deinit {
         player.pause()
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+    }
+
+    /// Playback speed (1 = real time; super slow motion plays videos at a fraction).
+    func setRate(_ rate: Float) {
+        guard rate != playRate else { return }
+        playRate = rate
+        if !isPaused { player.rate = rate }
     }
 
     func setPaused(_ paused: Bool) {

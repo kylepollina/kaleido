@@ -115,6 +115,7 @@ struct HomeView: View {
                     VStack(spacing: 10) {
                         if middle >= 260 {
                             GlassTabs(selection: $showOriginal, options: [(false, "Kaleidoscope"), (true, "Original")])
+                                .help("Kaleidoscope, or the photo itself as it is (drag the scene to move the photo inside the mirrors)")
                                 .padding(.leading, left > 0 ? left + 12 : 0)
                                 .padding(.trailing, right > 0 ? right + 12 : 0)
                         }
@@ -162,7 +163,7 @@ struct HomeView: View {
             if let renderer = app.renderer {
                 PreviewView(renderer: renderer, showOriginal: showOriginal,
                             showOutlines: editing && showLines, onClick: sceneClicked)
-                    .help(showOriginal ? "The photo as it is" : "Drag to move the photo inside the mirrors; flick it to let it glide")
+                    // No .help here: an AppKit view's tooltip covers the whole window and would hide every button's.
             } else {
                 Text("Metal is not available on this Mac.").foregroundStyle(.secondary)
             }
@@ -305,7 +306,7 @@ struct HomeView: View {
             zoomMenu
             // Speed sits where a music player puts its volume slider.
             HStack(spacing: 6) {
-                // The tortoise toggles super slow motion: a quarter of the slowest stop, for footage that moves a lot.
+                // The tortoise toggles super slow motion: an eighth of the slowest stop, videos too.
                 let slow = app.settings.superSlow
                 Button { app.settings.superSlow.toggle() } label: {
                     Image(systemName: "tortoise.fill")
@@ -317,7 +318,7 @@ struct HomeView: View {
                 }
                 .buttonStyle(.plain)
                 .help(slow ? "Super slow motion is on: click to go back to the slider's speed"
-                           : "Super slow motion: everything moves at a quarter of the slowest speed")
+                           : "Super slow motion: movement at an eighth of the slowest speed, videos at an eighth of real time")
                 Slider(value: Binding(get: { Double(app.settings.speedStep) },
                                       set: { app.settings.speedStep = Int($0.rounded()); app.settings.superSlow = false }),
                        in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
