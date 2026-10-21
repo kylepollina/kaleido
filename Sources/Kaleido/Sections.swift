@@ -87,7 +87,7 @@ struct HomeView: View {
                 let middle: CGFloat = room - left - right - gaps
                 // Room for the mini-player between the panels: it sits there, centred. Otherwise it spans the
                 // bottom and the panels stop above it, so nothing is ever cut off.
-                let playerBetween = middle >= Self.playerWidth
+                let playerBetween = middle >= playerWidth
                 ZStack {
                     HStack(alignment: .top, spacing: 0) {
                         if let panel {
@@ -109,12 +109,13 @@ struct HomeView: View {
                         Spacer(minLength: 0)
                         Group {
                             if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 560) }
-                            bottomControls
+                            bottomControls.onGeometryChange(for: CGFloat.self) { $0.size.width } action: { playerWidth = $0 }
                         }
                         .padding(.leading, playerBetween && left > 0 ? left + 12 : 0)
                         .padding(.trailing, playerBetween && right > 0 ? right + 12 : 0)
                     }
                 }
+                .frame(width: geo.size.width, height: geo.size.height)   // never wider than the window
             }
             .padding(12)
             .opacity(controlsHidden ? 0 : 1)
@@ -174,8 +175,8 @@ struct HomeView: View {
         }
     }
 
-    /// The mini-player's width, kept clear in the middle so the left panel never pushes it off screen.
-    private static let playerWidth: CGFloat = 660
+    /// The mini-player's measured width, kept clear between the panels.
+    @State private var playerWidth: CGFloat = 720
     private static let playerHeight: CGFloat = 50
     private static let editWidth: CGFloat = 360
 
@@ -184,7 +185,7 @@ struct HomeView: View {
     private func panelWidth(_ s: AppSection, room: CGFloat, right: CGFloat) -> CGFloat {
         let beside = right > 0 ? right + 12 : 0
         if s == .photos && photosExpanded { return room - beside }
-        return min(s.panelWidth, max(360, room - beside - Self.playerWidth - 12), room - beside)
+        return min(s.panelWidth, max(360, room - beside - playerWidth - 12), room - beside)
     }
 
     /// Photos, Scenes and Settings, one glass panel with its tabs on top.
