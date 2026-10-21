@@ -1,7 +1,7 @@
 import KaleidoCore
 import SwiftUI
 
-/// The pattern (mirror mode) chooser in the preset editor: a grid of buttons, each with a small line drawing
+/// The pattern (mirror mode) chooser in Edit scene and the scene editor: a grid of buttons, each with a small line drawing
 /// of the pattern's mirrors and its name.
 struct PatternPicker: View {
     @Binding var selection: MirrorMode

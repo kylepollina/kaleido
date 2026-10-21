@@ -20,20 +20,12 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   Invented looks use only the shapes ticked in Settings (untick Diamonds if it isn't for you). Next and Back fade
   in 3 seconds; Back brings back the scene before, look and all.
 - **Home** is the scene, as big as the window allows, with one glass mini-player over it (like Apple Music's):
-  Surprise me, Back / Play (or Space) / Next, the scene's name, Zoom, Speed, Save scene and Edit scene. Edit scene
-  floats over the right side with Randomize and every setting of the scene. Click the scene to fill the whole
+  Surprise me, Back / Play (or Space) / Next, the scene's name, Zoom (Drift / Push / Pull), Speed, Save scene and
+  Edit scene; each button lights up under the pointer. Edit scene floats over the right side with Randomize, Debug
+  lines (the mirrors traced in red) and every setting of the scene; a click outside it, on the scene too, or Escape
+  closes it. Otherwise a click on the scene fills the whole
   window with it (sidebar, toolbar and controls step aside, like Portal); click again or press Escape to come
   back. Dragging still moves the photo either way.
-- **Sections.** Home, Photos (the album browser), Scenes and Settings. Patterns (saved looks, below) are hidden
-  for now; the code is still there.
-- **Built-in patterns.** Mandala, Shifting Mandala, Ink Mandala, Whirlpool, Prism, Fractal Bloom, Hex Garden, Square
-  Tiles, Hall of Mirrors, Triangle Toy, Diamonds and Spiral Tunnel: at least one per shape.
-- **Pattern editor.** Pick the shape from a grid of drawn buttons. Swirl has a zero mark (and snaps to it) and can sway back and forth, Hue shift shows a before/after colour strip, Outlines
-  is a switch, Hue cycling is Off / Slow / Medium / Fast, and Saturation runs 50–150% with a boost that lifts dull
-  colours without clipping bright ones. Reset puts a built-in pattern back to its original (or one you
-  made back to how you created it). Hearted patterns appear on Home and are the ones new scenes pick from.
-- **Save or throw away.** In the pattern and scene editors every change shows at once, on the preview and the
-  desktop, but is kept only when you press Save (⌘S). Revert, or leaving the editor, puts the saved version back.
 - **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
   Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
 - **Eight shapes.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror
@@ -41,19 +33,17 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   classic three-mirror toy) and Diamonds (Escher's rhombille tiling, kept flat: each diamond holds its own slowly turning mandala).
 - **Outlines.** Any pattern can draw black lines along its mirrors and tile edges (an Outlines switch); they bend
   with swirl and follow dynamic mirrors. Settings > Effects can turn them off everywhere.
-- **Pattern lines.** In the pattern editor, a toggle traces every mirror and tile edge in red over the dimmed
-  photo, so you can see the shape of the pattern itself. The editor preview has its own previous / play / next.
 - **Keep the screen awake** while playing (Settings > Performance), and a flower in the menu bar. Switching back
   to Kaleido (Cmd-Tab or the Dock) reopens its window if you closed it.
 - **Dynamic mirrors.** A pattern can let its mirror count wander slowly between two numbers. A new mirror opens up
   (the wedges make room while an extra one grows from nothing), or one closes; tilings grow denser or sparser. A
-  change comes about every 3 minutes, whatever the speed, and takes about 40 seconds to open up. See the "Shifting Mandala" pattern.
+  change comes about every 3 minutes, whatever the speed, and takes about 40 seconds to open up. Turn it on in Edit scene.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting.
-- **Zoom: Still, Push, Pull.** Push and Pull are what dragging the preview does, done continuously: the photo keeps
+- **Zoom: Drift, Push, Pull.** Push and Pull are what dragging the preview does, done continuously: the photo keeps
   sliding through the mirrors one way or the other (along the mirrors' own axis, which turns with the pattern).
-  Whether that reads as zooming in or out depends on the pattern, hence the neutral names. Still leaves only the
+  Whether that reads as zooming in or out depends on the pattern, hence the neutral names. Drift leaves only the
   look's own slow zoom breathing (set in Edit scene). Changes ease in and out.
-- **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every pattern.
+- **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every scene.
 - **macOS Aerials (video).** The slow-motion aerial films macOS downloads for its moving wallpapers and screen
   saver (Yosemite, Iceland, Hong Kong, Palau Jellies...) appear as a built-in card, named from Apple's manifest with
   Apple's own thumbnails. They play through the kaleidoscope like any photo: decoded in hardware at screen size,
@@ -95,14 +85,14 @@ Run the tests with `swift test`.
 
 1. Click **Add Folder…** or **Add Photos…** (or drop files on the window).
 2. Press **Play on Desktop** (⌘P). Move to an empty desktop, or use Mission Control's show-desktop, to see it.
-3. Tune the look in the sidebar, or try a pattern or Surprise me.
+3. Tune the scene with Edit scene, or let Surprise me invent new ones.
 4. **Stop** or quit to get your wallpaper back.
 
 Hover a thumbnail and press ▶︎ to play that photo or video right now, selected or not; it stays until Next or Back. Right-click a thumbnail for "Play now", "Reveal in Finder" and "Remove from library". Saved scenes remember the photo itself, so they still play when its album is unticked; a scene whose photo is gone keeps its look and can take the photo on screen ("Use the photo on screen" in Scenes).
 
 ## How it works
 
-- `Sources/KaleidoCore`: settings, patterns, scenes, the photo library (bookmarks plus path fallback), the shuffle
+- `Sources/KaleidoCore`: settings, looks, scenes, the photo library (bookmarks plus path fallback), the shuffle
   queue. No UI, fully unit tested.
 - `Sources/Kaleido/Shaders.swift`: one fragment shader. It rotates and twists the screen, folds it into a mirrored
   wedge (radial), a hex-lattice cell (tiled) or iterated abs-folds (fractal), then samples the photo with a mirrored

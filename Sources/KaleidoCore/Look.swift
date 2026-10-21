@@ -75,7 +75,7 @@ public enum TransitionStyle: String, Codable, CaseIterable, Identifiable, Sendab
 }
 
 /// Everything that shapes how the kaleidoscope looks. Cheap to copy; the renderer eases toward a new
-/// `Look` so slider drags and preset changes glide instead of jumping.
+/// `Look` so slider drags and scene changes glide instead of jumping.
 public struct Look: Codable, Equatable, Sendable {
     public var mode: MirrorMode = .radial
     /// Mirror segments around the center (radial/fractal) or tile density (hex).
@@ -230,67 +230,4 @@ public struct Look: Codable, Equatable, Sendable {
         var g = SystemRandomNumberGenerator()
         return random(using: &g)
     }
-}
-
-public struct Preset: Identifiable, Equatable, Sendable {
-    public let name: String
-    public let look: Look
-    public var id: String { name }
-
-    /// A preset other than the one currently showing (when there is a choice).
-    public static func random<G: RandomNumberGenerator>(excluding current: Look?, using g: inout G) -> Preset {
-        let choices = all.filter { $0.look != current }
-        return (choices.isEmpty ? all : choices).randomElement(using: &g)!
-    }
-
-    public static func random(excluding current: Look?) -> Preset {
-        var g = SystemRandomNumberGenerator()
-        return random(excluding: current, using: &g)
-    }
-
-    public static let all: [Preset] = {
-        func make(_ name: String, _ edit: (inout Look) -> Void) -> Preset {
-            var l = Look()
-            edit(&l)
-            l.clamp()
-            return Preset(name: name, look: l)
-        }
-        return [
-            // One or two per pattern. Zoom, drift and zoom breathing stay at 100% (the defaults) throughout.
-            make("Mandala") { _ in },
-            make("Shifting Mandala") {
-                $0.segments = 8; $0.dynamicMirrors = true; $0.mirrorsMin = 6; $0.mirrorsMax = 14; $0.vignette = 0.3
-            },
-            make("Ink Mandala") {
-                $0.segments = 10; $0.outline = Look.outlineSteps[1]; $0.rotationSpeed = 0.05; $0.vignette = 0.2
-            },
-            make("Whirlpool") {
-                $0.segments = 7; $0.twist = 0.6; $0.swayingSwirl = true; $0.rotationSpeed = -0.08
-            },
-            make("Prism") {
-                $0.segments = 16; $0.hueSpeed = Look.hueCycleSteps[1]; $0.saturation = 1.3; $0.rotationSpeed = 0.08
-            },
-            make("Fractal Bloom") {
-                $0.mode = .fractal; $0.segments = 5; $0.saturation = 1.2; $0.rotationSpeed = 0.08
-            },
-            make("Hex Garden") {
-                $0.mode = .hex; $0.segments = 5; $0.rotationSpeed = 0.03
-            },
-            make("Square Tiles") {
-                $0.mode = .square; $0.segments = 4; $0.rotationSpeed = 0.03
-            },
-            make("Hall of Mirrors") {
-                $0.mode = .grid; $0.segments = 4; $0.rotationSpeed = 0.02; $0.vignette = 0.25
-            },
-            make("Triangle Toy") {
-                $0.mode = .triangle; $0.segments = 4; $0.rotationSpeed = 0.04
-            },
-            make("Diamonds") {
-                $0.mode = .cubes; $0.segments = 4; $0.rotationSpeed = 0.02
-            },
-            make("Spiral Tunnel") {
-                $0.mode = .spiral; $0.segments = 6; $0.vignette = 0.45; $0.rotationSpeed = 0.06
-            },
-        ]
-    }()
 }

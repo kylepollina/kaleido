@@ -79,7 +79,7 @@ struct ScaledSliderRow: View {
 
 struct PreviewPane: View {
     @EnvironmentObject var app: AppState
-    /// The preset editor's preview adds pattern lines and its own previous / play / next controls.
+    /// The scene editor's preview adds pattern lines and its own previous / play / next controls.
     var editor = false
     /// The editor's previous / play / next (a scene keeps its own photo, so its editor leaves them out).
     var transport = true
@@ -156,7 +156,7 @@ struct PreviewPane: View {
                             .buttonStyle(.glass)
                             .help("Previous photo")
                         PlayButton(compact: true).frame(width: 120)
-                        Button { app.nextPhotoKeepingPreset() } label: { Image(systemName: "forward.fill").frame(width: 22) }
+                        Button { app.nextPhotoKeepingLook() } label: { Image(systemName: "forward.fill").frame(width: 22) }
                             .buttonStyle(.glass)
                             .help("Next photo (keeps this pattern)")
                     }

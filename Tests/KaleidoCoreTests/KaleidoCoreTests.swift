@@ -147,7 +147,6 @@ final class SettingsTests: XCTestCase {
         wild.clamp()
         XCTAssertEqual(wild.rotationSpeed, 0.6); XCTAssertEqual(wild.hueSpeed, 0.4, "hue cycling snaps to its fastest step")
         XCTAssertEqual(wild.driftSpeed, 0.5); XCTAssertEqual(wild.twist, 1); XCTAssertEqual(wild.motion, 2)
-        for p in Preset.all { XCTAssertLessThanOrEqual(abs(p.look.rotationSpeed), 0.15, p.name); XCTAssertLessThanOrEqual(p.look.driftSpeed, 0.15, p.name); XCTAssertLessThanOrEqual(p.look.hueSpeed, 0.2, p.name) }
         var g = SplitMix64(seed: 9)
         for _ in 0..<300 {
             let l = Look.random(using: &g)
@@ -208,7 +207,6 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.3}"#.utf8)).outline, 0.25, "snaps to off or on")
         XCTAssertEqual(try JSONDecoder().decode(Look.self, from: Data(#"{"outline": 0.1}"#.utf8)).outline, 0)
         XCTAssertFalse(try JSONDecoder().decode(Look.self, from: Data("{}".utf8)).swayingSwirl, "swirl holds still unless asked")
-        XCTAssertTrue(Preset.all.first { $0.name == "Whirlpool" }!.look.swayingSwirl)
         var on = Look(); on.outline = 1
         XCTAssertEqual(on.eased(toward: Look(), by: 0.3).outline, 0, "turning outlines off is immediate, no leftover hairline")
         s.allowHueChanges = false; s.allowSaturationChanges = false; s.allowVignette = false; s.allowSwirl = false
@@ -230,28 +228,18 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(SceneShuffle.mixed.nextIsSaved(savedCount: 1, roll: 0.1))
         XCTAssertFalse(SceneShuffle.mixed.nextIsSaved(savedCount: 1, roll: 0.9))
 
-        let lib = PresetLibrary(fileURL: nil)
         var g = SplitMix64(seed: 9)
-        var current = Look(); current.segments = 13
-        let kept = PatternSource.current.pick(current: current, currentID: nil, patterns: lib, inventedShapes: [], using: &g)
-        XCTAssertEqual(kept.0, current)
         for _ in 0..<50 {
-            let (look, id) = PatternSource.invented.pick(current: current, currentID: nil, patterns: lib,
-                                                         inventedShapes: [.hex, .spiral], using: &g)
-            XCTAssertNil(id, "invented patterns are unsaved")
-            XCTAssertTrue([.hex, .spiral].contains(look.mode), "only the allowed shapes")
-            let mine = PatternSource.mine.pick(current: current, currentID: nil, patterns: lib, inventedShapes: [], using: &g)
-            XCTAssertNotNil(mine.1)
+            XCTAssertTrue([.hex, .spiral].contains(Look.random(shapes: [.hex, .spiral], using: &g).mode), "only the allowed shapes")
         }
     }
 
     func testSurpriseMeChoosesTheMix() throws {
         var s = Settings()
         XCTAssertTrue(s.surprise, "on by default")
-        XCTAssertEqual(s.effectiveSceneShuffle, .mixed); XCTAssertEqual(s.effectivePatternSource, .invented)
+        XCTAssertEqual(s.effectiveSceneShuffle, .mixed)
         s.surprise = false
         XCTAssertEqual(s.effectiveSceneShuffle, .saved, "saved scenes only")
-        XCTAssertEqual(s.effectivePatternSource, .current, "with none saved, photos keep the look on screen")
         XCTAssertFalse(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).surprise)
     }
 
@@ -288,21 +276,12 @@ final class SettingsTests: XCTestCase {
 
     func testOldPresetShuffleBecomesSceneShuffle() throws {
         let on = try JSONDecoder().decode(Settings.self, from: Data(#"{"version": 4, "lookShuffle": "sometimes"}"#.utf8))
-        XCTAssertEqual(on.sceneShuffle, .new); XCTAssertEqual(on.patternSource, .mine)
-        let off = try JSONDecoder().decode(Settings.self, from: Data(#"{"version": 4, "lookShuffle": "off"}"#.utf8))
-        XCTAssertEqual(off.patternSource, .current, "same pattern, new photos, as before")
+        XCTAssertEqual(on.sceneShuffle, .new)
         XCTAssertEqual(Settings().sceneShuffle, .mixed)
         XCTAssertEqual(Settings().inventedShapes, Set(MirrorMode.allCases))
         var s = Settings(); s.excludedShapes = [.cubes]
         let back = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s))
         XCTAssertFalse(back.inventedShapes.contains(.cubes))
-    }
-
-    func testRandomPresetDiffers() {
-        var g = SplitMix64(seed: 5)
-        for p in Preset.all {
-            for _ in 0..<20 { XCTAssertNotEqual(Preset.random(excluding: p.look, using: &g).look, p.look) }
-        }
     }
 
     func testCorruptFileIsMovedAsideAndReportedAsMissing() {
@@ -331,15 +310,6 @@ final class SettingsTests: XCTestCase {
             let before = l
             l.clamp()
             XCTAssertEqual(l, before)
-        }
-    }
-
-    func testPresetsAreValidAndUnique() {
-        XCTAssertEqual(Set(Preset.all.map(\.name)).count, Preset.all.count)
-        for p in Preset.all {
-            var l = p.look
-            l.clamp()
-            XCTAssertEqual(l, p.look)
         }
     }
 
@@ -702,77 +672,6 @@ final class SelectionTests: XCTestCase {
     }
 }
 
-final class PresetLibraryTests: XCTestCase {
-    func testStartsWithHeartedBuiltInsAndPersistsEdits() throws {
-        let dir = tempDir()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let file = dir.appendingPathComponent("presets.json")
-        let lib = PresetLibrary(fileURL: file)
-        XCTAssertEqual(lib.presets.map(\.name), Preset.all.map(\.name))
-        XCTAssertEqual(lib.favorites.count, Preset.all.count)
-
-        let first = lib.presets[0].id
-        var l = lib.presets[0].look
-        l.segments = 5
-        lib.update(first, look: l)
-        lib.rename(first, to: "Mine")
-        lib.toggleFavorite(first)
-        let id = lib.add(name: "Calm", look: Look())
-
-        let back = PresetLibrary(fileURL: file)
-        XCTAssertEqual(back.preset(first)?.look.segments, 5)
-        XCTAssertEqual(back.preset(first)?.name, "Mine")
-        XCTAssertEqual(back.preset(first)?.isFavorite, false)
-        XCTAssertTrue(back.preset(first)!.isModified)
-        XCTAssertEqual(back.preset(id)?.name, "Calm")
-        XCTAssertEqual(back.preset(id)?.isFavorite, true, "new presets start hearted")
-    }
-
-    func testResetRestoresTheOriginal() {
-        let lib = PresetLibrary(fileURL: nil)
-        let p = lib.presets[1]
-        var l = p.look
-        l.zoom = 2.9; l.saturation = 0.2
-        lib.update(p.id, look: l)
-        lib.rename(p.id, to: "Changed")
-        lib.reset(p.id)
-        XCTAssertEqual(lib.preset(p.id)?.look, Preset.all[1].look)
-        XCTAssertEqual(lib.preset(p.id)?.name, Preset.all[1].name)
-        XCTAssertFalse(lib.preset(p.id)!.isModified)
-
-        let mine = lib.add(name: "Mine", look: l)
-        var l2 = l; l2.segments = 3
-        lib.update(mine, look: l2)
-        lib.reset(mine)
-        XCTAssertEqual(lib.preset(mine)?.look, l, "user presets reset to how they were created")
-    }
-
-    func testDuplicateDeleteAndUniqueNames() {
-        let lib = PresetLibrary(fileURL: nil)
-        let builtIn = lib.presets[0].id
-        let copy = lib.duplicate(builtIn)!
-        let copy2 = lib.duplicate(builtIn)!
-        XCTAssertNotEqual(lib.preset(copy)?.name, lib.preset(copy2)?.name)
-        lib.delete(builtIn)
-        XCTAssertNotNil(lib.preset(builtIn), "built-ins are un-hearted, not deleted")
-        lib.delete(copy)
-        XCTAssertNil(lib.preset(copy))
-    }
-
-    func testShufflePicksHeartedPresetsOnly() {
-        let lib = PresetLibrary(fileURL: nil)
-        for p in lib.presets.dropFirst(2) { lib.toggleFavorite(p.id) }   // only the first two stay hearted
-        let a = lib.presets[0].id, b = lib.presets[1].id
-        var g = SplitMix64(seed: 1)
-        for _ in 0..<30 {
-            XCTAssertEqual(lib.randomFavorite(excluding: a, using: &g)?.id, b)
-            XCTAssertEqual(lib.randomFavorite(excluding: b, using: &g)?.id, a)
-        }
-        for p in lib.presets.prefix(2) { lib.toggleFavorite(p.id) }
-        XCTAssertNotNil(lib.randomFavorite(excluding: nil, using: &g), "no hearts falls back to every preset")
-    }
-}
-
 final class DynamicMirrorTests: XCTestCase {
     func testWalkStaysInRangeAndMovesOneStep() {
         var g = SplitMix64(seed: 2)
@@ -801,7 +700,6 @@ final class DynamicMirrorTests: XCTestCase {
         let swapped = try JSONDecoder().decode(Look.self, from: Data(#"{"dynamicMirrors": true, "mirrorsMin": 30, "mirrorsMax": 1}"#.utf8))
         XCTAssertEqual(swapped.mirrorsMin, 2)
         XCTAssertEqual(swapped.mirrorsMax, 24)
-        XCTAssertTrue(Preset.all.contains { $0.look.dynamicMirrors }, "there is a built-in dynamic preset")
     }
 }
 
@@ -843,45 +741,6 @@ final class WallpaperSourceTests: XCTestCase {
         back.setWallpapers(false)
         XCTAssertNil(back.wallpapers)
         XCTAssertTrue(back.items.isEmpty)
-    }
-}
-
-final class PresetRefreshTests: XCTestCase {
-    func testRetiredBuiltInsGoUnlessEditedAndNewOnesArrive() throws {
-        let dir = tempDir()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let file = dir.appendingPathComponent("presets.json")
-        let retiredUntouched = SavedPreset(name: "Dream Blur", look: Look(), isBuiltIn: true)
-        var retiredEdited = SavedPreset(name: "Mirror Hall", look: Look(), isBuiltIn: true)
-        retiredEdited.look.segments = 5
-        var mine = SavedPreset(name: "Mine", look: Look())
-        mine.isFavorite = false
-        try JSONEncoder().encode([retiredUntouched, retiredEdited, mine]).write(to: file)
-
-        let lib = PresetLibrary(fileURL: file)
-        XCTAssertNil(lib.preset(retiredUntouched.id), "an unedited preset that no longer ships is removed")
-        XCTAssertEqual(lib.preset(retiredEdited.id)?.isBuiltIn, false, "an edited one stays, as the user's own")
-        XCTAssertEqual(lib.preset(retiredEdited.id)?.look.segments, 5)
-        XCTAssertEqual(lib.preset(mine.id)?.isFavorite, false)
-        XCTAssertEqual(Array(lib.presets.prefix(Preset.all.count)).map(\.name), Preset.all.map(\.name), "today's built-ins come first, in order")
-        XCTAssertEqual(PresetLibrary(fileURL: file).presets.map(\.id), lib.presets.map(\.id), "the refreshed list is saved")
-    }
-
-    func testUneditedBuiltInsTakeTheNewFactoryLook() throws {
-        let dir = tempDir()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let file = dir.appendingPathComponent("presets.json")
-        var stale = Look(); stale.zoom = 1.4; stale.drift = 0.25
-        let unedited = SavedPreset(name: "Mandala", look: stale, isBuiltIn: true)
-        var edited = SavedPreset(name: "Spiral Tunnel", look: stale, isBuiltIn: true)
-        edited.look.segments = 9
-        try JSONEncoder().encode([unedited, edited]).write(to: file)
-
-        let lib = PresetLibrary(fileURL: file)
-        XCTAssertEqual(lib.preset(unedited.id)?.look, Preset.all.first { $0.name == "Mandala" }!.look)
-        XCTAssertEqual(lib.preset(edited.id)?.look.segments, 9, "edits are kept")
-        lib.reset(edited.id)
-        XCTAssertEqual(lib.preset(edited.id)?.look, Preset.all.first { $0.name == "Spiral Tunnel" }!.look, "Reset gives today's factory look")
     }
 }
 
@@ -928,7 +787,7 @@ final class SceneTests: XCTestCase {
     }
 
     func testDraftTracksUnsavedChanges() {
-        var d = EditDraft(target: .preset(UUID()), name: "Mandala", look: Look())
+        var d = EditDraft(target: .scene(UUID()), name: "Lake", look: Look())
         XCTAssertFalse(d.hasChanges)
         d.look.segments = 9
         XCTAssertTrue(d.hasChanges)

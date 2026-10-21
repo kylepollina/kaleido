@@ -27,7 +27,7 @@ enum Shaders {
         int modeB;
         int original;        // 1 = show the photo itself, uncut (the preview's "Original" tab)
         int segmentsMorph;   // the mirror count being faded towards
-        int outlines;        // 1 = draw the pattern's mirror and tile lines in red (preset editor preview)
+        int outlines;        // 1 = draw the pattern's mirror and tile lines in red (editor previews)
     };
 
     struct VOut { float4 position [[position]]; };

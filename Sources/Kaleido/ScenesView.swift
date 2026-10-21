@@ -28,13 +28,13 @@ struct ScenesView: View {
             }
         }
         .onAppear {
-            app.isEditingPresets = true
+            app.isEditingScenes = true
             if selection == nil { selection = app.activeSceneID ?? app.scenes.scenes.first?.id }
             if let id = selection { app.beginEditing(scene: id) }
         }
         .onDisappear {
             app.discardDraft()
-            app.isEditingPresets = false
+            app.isEditingScenes = false
         }
         .onChange(of: selection) { _, id in if let id { app.beginEditing(scene: id) } else { app.discardDraft() } }
     }

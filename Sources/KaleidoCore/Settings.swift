@@ -1,7 +1,7 @@
 import Foundation
 
 /// What comes on screen next. A scene is a photo with a pattern; saved scenes are ones you kept, new scenes are
-/// a fresh photo with a pattern picked by `PatternSource`.
+/// a fresh photo with an invented pattern (or the one on screen, with Surprise me off).
 public enum SceneShuffle: String, Codable, CaseIterable, Identifiable, Sendable {
     case off, saved, mixed, new
     public var id: String { rawValue }
@@ -81,36 +81,6 @@ public enum Sharpness: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Where a new scene's pattern comes from.
-public enum PatternSource: String, Codable, CaseIterable, Identifiable, Sendable {
-    case current, mine, invented, both
-    public var id: String { rawValue }
-    public var label: String {
-        switch self {
-        case .current: return "Keep the current pattern"
-        case .mine: return "My hearted patterns"
-        case .invented: return "Invented patterns"
-        case .both: return "Hearted and invented"
-        }
-    }
-
-    /// The pattern for a new scene: a look and, when it is a saved pattern, its id.
-    public func pick<G: RandomNumberGenerator>(current: Look, currentID: UUID?, patterns: PresetLibrary,
-                                              inventedShapes: Set<MirrorMode>, using g: inout G) -> (Look, UUID?) {
-        func mine() -> (Look, UUID?)? {
-            patterns.randomFavorite(excluding: currentID, using: &g).map { ($0.look, $0.id) }
-        }
-        switch self {
-        case .current: return (current, currentID)
-        case .mine: return mine() ?? (Look.random(shapes: inventedShapes, using: &g), nil)
-        case .invented: return (Look.random(shapes: inventedShapes, using: &g), nil)
-        case .both:
-            if Bool.random(using: &g), let m = mine() { return m }
-            return (Look.random(shapes: inventedShapes, using: &g), nil)
-        }
-    }
-}
-
 public struct Settings: Codable, Equatable, Sendable {
     /// 5 = scene shuffling. 4 = speed is a 5-stop global control and looks carry no speed of their own.
     /// 3 = barely-moving ranges, 2 = calm ranges. Older files (no version) had much faster ranges and are
@@ -144,17 +114,14 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Surprise me: as scenes change, mix saved scenes with brand-new ones (a photo with an invented pattern).
     /// Off: play through the saved scenes (or, with none saved, the photos with the pattern on screen).
     public var surprise = true
-    /// The scene shuffle and pattern source Surprise me stands for.
+    /// The scene shuffle Surprise me stands for. New scenes get an invented pattern when it is on, and keep the
+    /// pattern on screen when it is off.
     public var effectiveSceneShuffle: SceneShuffle { surprise ? .mixed : .saved }
-    public var effectivePatternSource: PatternSource { surprise ? .invented : .current }
     public var sceneShuffle: SceneShuffle = .mixed
-    public var patternSource: PatternSource = .both
     /// Shapes invented patterns may not use (e.g. Diamonds, if you don't like it).
     public var excludedShapes: [MirrorMode] = []
     public var inventedShapes: Set<MirrorMode> { Set(MirrorMode.allCases).subtracting(excludedShapes) }
-    /// The pattern `look` came from (nil for an invented one, which is unsaved).
-    public var activePresetID: UUID?
-    // Global switches that win over any look, preset or Surprise me.
+    // Global switches that win over any look, scene or Surprise me.
     public var allowHueChanges = true
     public var allowSaturationChanges = true
     public var allowVignette = true
@@ -204,9 +171,7 @@ public struct Settings: Codable, Equatable, Sendable {
         surprise = try c.decodeIfPresent(Bool.self, forKey: .surprise) ?? d.surprise
         sharpness = (try? c.decodeIfPresent(Sharpness.self, forKey: .sharpness)) ?? d.sharpness
         sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
-        patternSource = (try? c.decodeIfPresent(PatternSource.self, forKey: .patternSource)) ?? d.patternSource
         excludedShapes = (try? c.decodeIfPresent([MirrorMode].self, forKey: .excludedShapes)) ?? []
-        activePresetID = try? c.decodeIfPresent(UUID.self, forKey: .activePresetID)
         allowHueChanges = try c.decodeIfPresent(Bool.self, forKey: .allowHueChanges) ?? true
         allowSaturationChanges = try c.decodeIfPresent(Bool.self, forKey: .allowSaturationChanges) ?? true
         allowVignette = try c.decodeIfPresent(Bool.self, forKey: .allowVignette) ?? true
@@ -214,12 +179,8 @@ public struct Settings: Codable, Equatable, Sendable {
         allowDynamicMirrors = try c.decodeIfPresent(Bool.self, forKey: .allowDynamicMirrors) ?? true
         allowOutlines = try c.decodeIfPresent(Bool.self, forKey: .allowOutlines) ?? true
         if fileVersion < 5 {
-            // Preset shuffling became scene shuffling: keep doing what it did (new photos, with the same
-            // pattern when shuffling was off, or with hearted patterns when it was on).
-            let legacy = try decoder.container(keyedBy: LegacyKeys.self)
-            let was = (try? legacy.decodeIfPresent(String.self, forKey: .lookShuffle)) ?? "sometimes"
+            // Pattern shuffling became scene shuffling: keep showing new photos.
             sceneShuffle = .new
-            patternSource = was == "off" ? .current : .mine
         }
         if fileVersion < 4 {
             // Speed moved from each look's "Motion" slider to the global 5-stop control.
@@ -242,7 +203,6 @@ public struct Settings: Codable, Equatable, Sendable {
         clamp()
     }
 
-    private enum LegacyKeys: String, CodingKey { case lookShuffle }
 
     public mutating func clamp() {
         secondsPerPhoto = min(max(secondsPerPhoto, 10), 3600)
@@ -274,7 +234,6 @@ public enum Paths {
     }
     public static var settingsFile: URL { dataDirectory.appendingPathComponent("settings.json") }
     public static var libraryFile: URL { dataDirectory.appendingPathComponent("library.json") }
-    public static var presetsFile: URL { dataDirectory.appendingPathComponent("presets.json") }
     public static var scenesFile: URL { dataDirectory.appendingPathComponent("scenes.json") }
 }
 

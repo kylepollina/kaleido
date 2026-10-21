@@ -1,8 +1,8 @@
 import Combine
 import Foundation
 
-/// A scene: one photo frozen together with a look and where the photo sat inside the mirrors. Unlike a preset it
-/// keeps its own copy of the look, so editing a preset later never changes a scene.
+/// A scene: one photo frozen together with a look and where the photo sat inside the mirrors. It keeps its own
+/// copy of the look.
 public struct SavedScene: Codable, Identifiable, Equatable, Sendable {
     public var id: UUID
     public var name: String
@@ -101,10 +101,10 @@ public final class SceneLibrary: ObservableObject {
     }
 }
 
-/// Unsaved edits to a preset or a scene. They show on screen right away, but nothing is written until Save;
+/// Unsaved edits to a scene. They show on screen right away, but nothing is written until Save;
 /// leaving the editor throws them away.
 public struct EditDraft: Equatable, Sendable {
-    public enum Target: Equatable, Sendable { case preset(UUID), scene(UUID) }
+    public enum Target: Equatable, Sendable { case scene(UUID) }
     public let target: Target
     public var name: String
     public var look: Look

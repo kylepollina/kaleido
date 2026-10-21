@@ -3,19 +3,17 @@ import KaleidoCore
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case home = "Home", photos = "Photos", presets = "Patterns", scenes = "Scenes", settings = "Settings"
+    case home = "Home", photos = "Photos", scenes = "Scenes", settings = "Settings"
     var id: String { rawValue }
     var icon: String {
         switch self {
         case .home: return "house"
         case .photos: return "photo.on.rectangle"
-        case .presets: return "sparkles.rectangle.stack"
         case .scenes: return "photo.artframe"
         case .settings: return "gearshape"
         }
     }
-    /// Patterns (presets) are hidden for now; the section still exists and `--section patterns` opens it.
-    static let visible: [AppSection] = [.home, .photos, .scenes, .settings]
+    static let visible = allCases
 }
 
 struct ContentView: View {
@@ -44,7 +42,6 @@ struct ContentView: View {
             switch section ?? .home {
             case .home: HomeView(go: { section = $0 }, immersive: $immersive)
             case .photos: LibraryPane()
-            case .presets: PresetsView()
             case .scenes: ScenesView()
             case .settings: SettingsView()
             }
@@ -106,8 +103,7 @@ extension AppState {
 
 // MARK: Home
 
-/// Home is the editor for the scene on screen: pick a pattern to load its settings, adjust them, save the scene.
-/// Changes here never touch the pattern itself (that's the Patterns section).
+/// Home is the editor for the scene on screen: adjust its settings, save the scene.
 struct HomeView: View {
     @EnvironmentObject var app: AppState
     let go: (AppSection) -> Void
@@ -118,6 +114,10 @@ struct HomeView: View {
 
     /// Going in and out of full window: one slow, smooth ease for the scene, the controls and the sidebar.
     static let fullWindowAnimation = Animation.smooth(duration: 0.55)
+
+    private func closeEditing() {
+        withAnimation(.easeInOut(duration: 0.25)) { editing = false }
+    }
 
     private func setImmersive(_ on: Bool) {
         withAnimation(Self.fullWindowAnimation) {
@@ -130,9 +130,10 @@ struct HomeView: View {
         VStack(spacing: 12) {
             // The scene is the hero, as big as the window allows; its playback controls float over it in glass.
             // A plain click on it slides it out to fill the whole window, like Portal; another click (or Escape)
-            // brings it back. Dragging still moves the photo either way.
+            // brings it back. With Edit scene open, the first click only closes the panel. Dragging still moves
+            // the photo either way.
             PreviewPane(controls: AnyView(transport), linesAllowed: editing, immersive: immersive,
-                        onClick: { setImmersive(!immersive) })
+                        onClick: { if editing { closeEditing() } else { setImmersive(!immersive) } })
             if app.library.enabledItems.isEmpty && !immersive { photosRow.frame(maxWidth: 620) }
         }
         .padding(immersive ? 0 : 10)
@@ -150,7 +151,11 @@ struct HomeView: View {
             if editing {
                 Color.clear
                     .contentShape(Rectangle())
-                    .onTapGesture { withAnimation(.easeInOut(duration: 0.25)) { editing = false } }
+                    .onTapGesture { closeEditing() }
+                // Escape closes it too.
+                Button("Close Edit scene") { closeEditing() }
+                    .keyboardShortcut(.cancelAction)
+                    .hidden()
             }
         }
         // Run up under the (hidden) title bar too.
@@ -168,16 +173,9 @@ struct HomeView: View {
                             Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
                                 .buttonStyle(.glass)
                                 .help("A random pattern and settings for this photo")
-                            // The panel covers the Edit scene button, so it closes from here (or with Escape).
-                            Button { withAnimation(.easeInOut(duration: 0.25)) { editing = false } } label: {
-                                Image(systemName: "xmark")
-                            }
-                            .buttonStyle(.glass)
-                            .keyboardShortcut(.cancelAction)
-                            .help("Close Edit scene")
                         }
-                        Toggle("Pattern lines (trace the mirrors in red)", isOn: $showLines)
-                            .help("Shows the shape of the pattern itself on the preview while this panel is open")
+                        Toggle("Debug lines", isOn: $showLines)
+                            .help("Traces the pattern's mirrors and tile edges in red on the preview while this panel is open")
                         if !app.library.enabledItems.isEmpty { photosRow }
                     }
                     LookControls(look: app.settings.look, edit: app.tweakScene)
@@ -254,7 +252,7 @@ struct HomeView: View {
         Rectangle().fill(.primary.opacity(0.12)).frame(width: 1, height: 22).padding(.horizontal, 4)
     }
 
-    /// Zoom as one icon (showing the current mode) with a small menu of Drift / Push / Pull.
+    /// Zoom as the current mode's icon and name, with a small menu of Drift / Push / Pull.
     private var zoomMenu: some View {
         Menu {
             Picker("Zoom", selection: $app.settings.zoomMotion) {
@@ -262,10 +260,14 @@ struct HomeView: View {
             }
             .pickerStyle(.inline)
         } label: {
-            Image(systemName: app.settings.zoomMotion.icon)
-                .font(.system(size: 16, weight: .semibold))
-                .frame(width: 38, height: 38)
-                .contentShape(Circle())
+            HStack(spacing: 6) {
+                Image(systemName: app.settings.zoomMotion.icon)
+                    .font(.system(size: 15, weight: .semibold))
+                Text(app.settings.zoomMotion.label)
+                    .font(.callout.weight(.medium))
+            }
+            .frame(width: 84, height: 38)   // wide enough for "Drift", "Push" and "Pull" so nothing shifts
+            .hoverHighlight(Capsule())
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -336,9 +338,29 @@ struct PlayerIcon: View {
                 .foregroundStyle(active ? tint : Color.primary)
                 .frame(width: 38, height: 38)
                 .background { if active { Circle().fill(tint.opacity(0.18)) } }
-                .contentShape(Circle())
+                .hoverHighlight(Circle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+extension View {
+    /// A soft disc (or capsule) under the pointer, like the hover on toolbar buttons, so plain icons read as
+    /// clickable. Liquid Glass's own `.interactive()` reacts only on glass shapes, and glass inside the glass
+    /// capsule looks doubled, so the mini-player draws its own.
+    func hoverHighlight<S: Shape>(_ shape: S) -> some View { modifier(HoverHighlight(shape: shape)) }
+}
+
+private struct HoverHighlight<S: Shape>: ViewModifier {
+    let shape: S
+    @State private var hovering = false
+    @Environment(\.isEnabled) private var enabled
+
+    func body(content: Content) -> some View {
+        content
+            .background { shape.fill(Color.primary.opacity(hovering && enabled ? 0.1 : 0)) }
+            .contentShape(shape)
+            .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hovering = h } }
     }
 }
 
@@ -434,128 +456,29 @@ struct SpeedControl: View {
     }
 }
 
-/// A hearted pattern on Home: click to put it on the photo showing.
-struct PatternCard: View {
-    @EnvironmentObject var app: AppState
-    let preset: SavedPreset
-
-    var body: some View {
-        let active = app.settings.activePresetID == preset.id
-        Button { app.choosePattern(preset) } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(preset.name).font(.callout.weight(.medium)).lineLimit(1)
-                Text(preset.look.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
-            .background(active ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(active ? Color.accentColor : Color.clear, lineWidth: 2))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help("Put \(preset.name) on this photo")
-    }
-}
-
 extension Look {
     var summary: String { "\(mode.label), \(mode.countLabel.lowercased()) \(segments)" }
 }
 
-// MARK: Presets
+/// Hue cycling's Off / Slow / Medium / Fast. Equatable on what it shows, so dragging another slider (every step
+/// rebuilds the look controls) leaves the segmented control alone instead of making it twitch.
+struct HueCyclingPicker: View, Equatable {
+    let step: Int
+    let enabled: Bool
+    let set: (Int) -> Void
 
-struct PresetsView: View {
-    @EnvironmentObject var app: AppState
-    @State private var selection: UUID?
-
-    var body: some View {
-        HStack(spacing: 0) {
-            list.frame(width: 240)
-            Divider()
-            if let id = selection ?? app.settings.activePresetID, let preset = app.presets.preset(id) {
-                PresetEditor(preset: preset)
-            } else {
-                VStack(spacing: 10) {
-                    Text("Pick a pattern to edit it.").foregroundStyle(.secondary)
-                    if app.settings.activePresetID == nil {
-                        Button("Save the pattern on screen") { selection = app.saveCurrentPattern() }
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .onAppear {
-            app.isEditingPresets = true
-            if selection == nil { selection = app.settings.activePresetID ?? app.presets.presets.first?.id }
-            if let id = selection { app.beginEditing(preset: id) }
-        }
-        .onDisappear {
-            app.discardDraft()
-            app.isEditingPresets = false
-        }
-        .onChange(of: selection) { _, id in if let id { app.beginEditing(preset: id) } else { app.discardDraft() } }
-    }
-
-    private var list: some View {
-        VStack(spacing: 0) {
-            List(selection: $selection) {
-                ForEach(app.presets.presets) { p in
-                    HStack {
-                        Button { app.presets.toggleFavorite(p.id) } label: {
-                            Image(systemName: p.isFavorite ? "heart.fill" : "heart")
-                                .foregroundStyle(p.isFavorite ? Color.pink : Color.secondary)
-                        }
-                        .buttonStyle(.borderless)
-                        .help(p.isFavorite ? "Shown on Home and used when shuffling" : "Heart to show it on Home and shuffle it")
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(p.name).lineLimit(1)
-                            Text(p.isModified ? "Edited" : p.look.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                    }
-                    .tag(p.id)
-                }
-            }
-            Divider()
-            HStack(spacing: 4) {
-                Button { selection = app.saveCurrentPattern() } label: { Image(systemName: "plus") }
-                    .help("New pattern from what's on screen")
-                Button { if let s = selection, let id = app.presets.duplicate(s) { selection = id } } label: { Image(systemName: "plus.square.on.square") }
-                    .help("Duplicate")
-                    .disabled(selection == nil)
-                Button {
-                    if let s = selection { app.presets.delete(s); selection = app.presets.presets.first?.id }
-                } label: { Image(systemName: "minus") }
-                    .help("Delete (built-in patterns can only be un-hearted)")
-                    .disabled(app.presets.preset(selection)?.isBuiltIn ?? true)
-                Spacer()
-            }
-            .buttonStyle(.borderless)
-            .padding(8)
-        }
-    }
-}
-
-struct PresetEditor: View {
-    @EnvironmentObject var app: AppState
-    let preset: SavedPreset
+    static func == (a: Self, b: Self) -> Bool { a.step == b.step && a.enabled == b.enabled }
 
     var body: some View {
-        VStack(spacing: 0) {
-            PreviewPane(editor: true).frame(maxWidth: 480).padding(16)
-            if let draft = app.draft, draft.target == .preset(preset.id) {
-                Form {
-                    Section {
-                        DraftHeader(draft: draft) {
-                            Button("Reset") { app.resetDraftToOriginal() }
-                                .disabled(draft.look == preset.originalLook && draft.name == preset.originalName)
-                                .help(preset.isBuiltIn ? "Back to the original pattern (then Save to keep it)"
-                                                       : "Back to how it was when you created it (then Save to keep it)")
-                        }
-                    }
-                    LookControls(look: draft.look, edit: app.edit)
-                }
-                .formStyle(.grouped)
-            }
+        Picker("Hue cycling", selection: Binding(get: { step }, set: set)) {
+            Text("Off").tag(0)
+            Text("Slow").tag(1)
+            Text("Medium").tag(2)
+            Text("Fast").tag(3)
         }
+        .pickerStyle(.segmented)
+        .disabled(!enabled)
+        .help("Slowly cycles the colours around the colour wheel")
     }
 }
 
@@ -586,7 +509,7 @@ struct DraftHeader<Extra: View>: View {
     }
 }
 
-/// The look controls shared by Home and the pattern and scene editors. `edit` says where a change goes.
+/// The look controls shared by Home and the scene editor. `edit` says where a change goes.
 struct LookControls: View {
     @EnvironmentObject var app: AppState
     let look: Look
@@ -635,17 +558,11 @@ struct LookControls: View {
                     HueShiftStrip(degrees: look.hueShift)
                         .opacity(app.settings.allowHueChanges ? 1 : 0.4)
                         .help("Top: the original colours. Bottom: what each one becomes with this hue shift.")
-                    Picker("Hue cycling", selection: Binding(
-                        get: { Look.hueCycleSteps.min { abs($0 - look.hueSpeed) < abs($1 - look.hueSpeed) }! },
-                        set: { v in edit { $0.hueSpeed = v } })) {
-                        Text("Off").tag(Look.hueCycleSteps[0])
-                        Text("Slow").tag(Look.hueCycleSteps[1])
-                        Text("Medium").tag(Look.hueCycleSteps[2])
-                        Text("Fast").tag(Look.hueCycleSteps[3])
-                    }
-                    .pickerStyle(.segmented)
-                    .disabled(!app.settings.allowHueChanges)
-                    .help("Slowly cycles the colours around the colour wheel")
+                    HueCyclingPicker(step: Look.hueCycleSteps.firstIndex(of: Look.hueCycleSteps.min {
+                                         abs($0 - look.hueSpeed) < abs($1 - look.hueSpeed) }!)!,
+                                     enabled: app.settings.allowHueChanges,
+                                     set: { i in edit { $0.hueSpeed = Look.hueCycleSteps[i] } })
+                        .equatable()
                     SliderRow("Saturation", value: bind(\.saturation), range: 0.5...1.5) { String(format: "%.0f%%", $0 * 100) }
                         .disabled(!app.settings.allowSaturationChanges)
                     SliderRow("Vignette", value: bind(\.vignette), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
@@ -653,7 +570,7 @@ struct LookControls: View {
                 } header: {
                     Text("Color")
                 } footer: {
-                    Text("Effects switched off in Settings stay off for every pattern and scene.").font(.caption).foregroundStyle(.secondary)
+                    Text("Effects switched off in Settings stay off for every scene.").font(.caption).foregroundStyle(.secondary)
                 }
         }
     }
@@ -739,7 +656,7 @@ struct SettingsView: View {
 }
 
 extension AppSection {
-    /// `--section presets` (etc.) opens the window on that section; handy for checking a screen.
+    /// `--section scenes` (etc.) opens the window on that section; handy for checking a screen.
     static var atLaunch: AppSection {
         let args = CommandLine.arguments
         guard let i = args.firstIndex(of: "--section"), i + 1 < args.count else { return .home }
