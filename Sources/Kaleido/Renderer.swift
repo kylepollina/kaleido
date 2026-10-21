@@ -7,7 +7,7 @@ import MetalKit
 import UniformTypeIdentifiers
 import os
 
-/// Must match `Uniforms` in the shader: 17 floats, then 9 int32s.
+/// Must match `Uniforms` in the shader: 21 floats, then 9 int32s.
 struct GPUUniforms {
     var width: Float = 0, height: Float = 0
     var rotation: Float = 0, sourceRotation: Float = 0
@@ -17,6 +17,7 @@ struct GPUUniforms {
     var time: Float = 0
     var aspectA: Float = 1, aspectB: Float = 1
     var mixAmount: Float = 0, morph: Float = 0, outline: Float = 0
+    var panBX: Float = 0, panBY: Float = 0, zoomB: Float = 1, twistB: Float = 0
     var segments: Int32 = 8, mode: Int32 = 0, transition: Int32 = 0, hasB: Int32 = 0
     var segmentsB: Int32 = 8, modeB: Int32 = 0, original: Int32 = 0, segmentsMorph: Int32 = 8
     var outlines: Int32 = 0
@@ -192,6 +193,9 @@ final class KaleidoRenderer {
     private var lastDragTime: CFTimeInterval = 0
     /// Where a scene wants the photo to sit; the pan glides there and then stays.
     private var panGoal: SIMD2<Double>?
+    /// The incoming photo's own position and look while it fades in.
+    private var incomingPan: SIMD2<Double>?
+    private var incomingLook: Look?
     /// A scene is showing: keep this photo until asked to move on.
     var holdPhoto = false
 
@@ -235,7 +239,11 @@ final class KaleidoRenderer {
 
     func advance(_ dt: Double) {
         clock += dt
-        look = look.eased(toward: targetLook, by: 1 - exp(-dt * 0.6))
+        // During a fade the outgoing photo holds its zoom and swirl (the incoming one already has its own), so
+        // a new scene never zooms or swirls into place. Colours and the rest still glide.
+        var goal = targetLook
+        if incomingLook != nil { goal.zoom = look.zoom; goal.twist = look.twist; goal.swayingSwirl = look.swayingSwirl }
+        look = look.eased(toward: goal, by: 1 - exp(-dt * 0.6))
         let m = look.motion   // master multiplier: 0 is perfectly still
         rotation += look.rotationSpeed * m * .pi / 180 * dt
         sourceRotation += (look.rotationSpeed * .pi / 180 * -0.4 + look.driftSpeed * 0.008) * m * dt
@@ -258,6 +266,7 @@ final class KaleidoRenderer {
         let wanted = SIMD2<Double>(cos(a), sin(a)) * Double(zoomFlow) * flowSpeed * m
         flowVelocity += (wanted - flowVelocity) * (1 - exp(-dt * 0.5))
         if !dragging, panGoal == nil { userPan += flowVelocity * dt }
+        if let p = incomingPan { incomingPan = p + flowVelocity * dt }
         if targetLook.hueSpeed == 0 {
             // Cycling is off: let the colour it built up ease back out, so the photo returns to its own colours.
             huePhase = remainder(huePhase, 2 * .pi) * exp(-dt * 1.2)
@@ -287,6 +296,7 @@ final class KaleidoRenderer {
             t -= dt * 3
             if t <= 0 {
                 incoming = nil; incomingID = nil; incomingRef = nil
+                incomingLook = nil; incomingPan = nil
                 transitionClock = nil
                 reversing = false
                 shownFor = 0
@@ -301,8 +311,12 @@ final class KaleidoRenderer {
                     goingBack = false
                     current = incoming; currentID = incomingID; currentRef = incomingRef
                     currentShape = incomingShape
+                    // The incoming photo's own position, zoom and swirl become the scene's: nothing jumps.
+                    if let p = incomingPan { userPan = p; panVelocity = .zero }
+                    if let l = incomingLook { look.zoom = l.zoom; look.twist = l.twist; look.swayingSwirl = l.swayingSwirl }
                 }
                 incoming = nil; incomingID = nil; incomingRef = nil
+                incomingLook = nil; incomingPan = nil
                 transitionClock = nil
                 shownFor = 0
             } else {
@@ -315,7 +329,8 @@ final class KaleidoRenderer {
                 let id: UUID? = ref.id
                 pending = nil
                 // Next and Back answer quickly; the slideshow's own changes take the full, slow fade.
-                fadeSeconds = skipRequested && currentID != nil ? min(transitionSeconds, manualFadeSeconds) : transitionSeconds
+                let manual = skipRequested && currentID != nil
+                fadeSeconds = manual ? min(transitionSeconds, manualFadeSeconds) : transitionSeconds
                 skipRequested = false
                 let refade = refadeRequested
                 refadeRequested = false
@@ -326,7 +341,14 @@ final class KaleidoRenderer {
                     if targetLook.mode != look.mode || targetLook.segments != look.segments { look = look.eased(toward: targetLook, by: 0) }
                     incomingShape = (targetLook.mode, startingMirrorCount(for: targetLook))
                     incoming = tex; incomingID = id; incomingRef = ref
-                    activeStyle = transitionStyle == .random ? TransitionStyle.concrete.randomElement()! : transitionStyle
+                    // The incoming photo arrives already where its scene puts it (a saved scene's position), at
+                    // its own zoom and swirl, instead of the old photo gliding there through the mirrors.
+                    incomingLook = targetLook
+                    incomingPan = panGoal ?? userPan
+                    panGoal = nil
+                    // Picking a scene, Next and Back simply dissolve; the slideshow's own changes use the chosen style.
+                    activeStyle = manual ? .dissolve
+                        : transitionStyle == .random ? TransitionStyle.concrete.randomElement()! : transitionStyle
                     transitionClock = 0
                 }
             }
@@ -517,8 +539,16 @@ final class KaleidoRenderer {
         let amp = look.drift * 0.45
         u.panX = Float(amp * (sin(driftPhase * 0.173) + 0.5 * sin(driftPhase * 0.311 + 1.3)) + userPan.x)
         u.panY = Float(amp * (cos(driftPhase * 0.137) + 0.5 * cos(driftPhase * 0.263 + 0.4)) + userPan.y)
-        u.zoom = Float(look.zoom * exp(0.12 * look.breathing * sin(breathPhase)))
+        let breath = exp(0.12 * look.breathing * sin(breathPhase))
+        u.zoom = Float(look.zoom * breath)
         u.twist = Float(look.swayingSwirl ? look.twist * sin(swirlPhase) : look.twist)
+        // The incoming photo: its own position, zoom and swirl (the same as A's outside a scene change).
+        let bLook = incomingLook ?? look
+        let bPan = incomingPan ?? userPan
+        u.panBX = u.panX - Float(userPan.x) + Float(bPan.x)
+        u.panBY = u.panY - Float(userPan.y) + Float(bPan.y)
+        u.zoomB = Float(bLook.zoom * breath)
+        u.twistB = Float(bLook.swayingSwirl ? bLook.twist * sin(swirlPhase) : bLook.twist)
         u.hue = Float((look.hueShift * .pi / 180 + huePhase).truncatingRemainder(dividingBy: 2 * .pi))
         u.saturation = Float(look.saturation)
         u.vignette = Float(look.vignette)

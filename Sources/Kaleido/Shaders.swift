@@ -19,6 +19,8 @@ enum Shaders {
         float mixAmount;     // 0...1 transition progress (raw)
         float morph;         // 0...1 cross-fade from `segments` to `segmentsMorph` (dynamic mirrors)
         float outline;       // 0...1 thickness of black lines along the pattern's mirrors and tile edges
+        float panBX, panBY;  // the incoming photo (B) keeps its own position, zoom and swirl during a fade, so
+        float zoomB, twistB; // neither photo slides or zooms while one scene gives way to the next
         int segments;       // mirrors of the outgoing photo (A)
         int mode;            // 0 radial, 1 hex, 2 fractal (A)
         int transition;      // 0 dissolve 1 iris 3 zoom 4 segments
@@ -83,11 +85,11 @@ enum Shaders {
     // `scale` is how many photo-space units one screen unit covers at this point (for the mip level).
     // `segments` may be fractional while dynamic mirrors open up a new mirror (or tiles grow denser).
     // `shade` darkens the result: cube faces and tile outlines (1 = untouched).
-    float2 kaleidoPoint(float2 p, constant Uniforms &u, float zoomMul, int mode, float segments, thread float &scale,
+    float2 kaleidoPoint(float2 p, constant Uniforms &u, float zoomMul, int mode, float segments, bool isB, thread float &scale,
                         thread float &shade) {
-        float zoom = u.zoom * zoomMul;
+        float zoom = (isB ? u.zoomB : u.zoom) * zoomMul;
         p = rot2(p, u.rotation);
-        p = rot2(p, u.twist * length(p));
+        p = rot2(p, (isB ? u.twistB : u.twist) * length(p));
         scale = 1.0;
         shade = 1.0;
         float2 f;
@@ -177,7 +179,7 @@ enum Shaders {
         } else {
             f = foldRadial(p, segments);
         }
-        float2 q = rot2(f, u.sourceRotation) / zoom + float2(u.panX, u.panY);
+        float2 q = rot2(f, u.sourceRotation) / zoom + (isB ? float2(u.panBX, u.panBY) : float2(u.panX, u.panY));
         scale /= zoom;
         return q;
     }
@@ -318,13 +320,13 @@ enum Shaders {
             float e = smoothstep(0.0, 1.0, u.morph);
             if (u.mode == 5 && u.morph > 0.0) {
                 // The spiral needs a whole number of arms, so it cross-fades between counts.
-                float2 q = kaleidoPoint(p, u, zoomMul, u.mode, float(u.segments), sA, hA);
-                float2 q2 = kaleidoPoint(p, u, zoomMul, u.mode, float(u.segmentsMorph), sB, hB);
+                float2 q = kaleidoPoint(p, u, zoomMul, u.mode, float(u.segments), false, sA, hA);
+                float2 q2 = kaleidoPoint(p, u, zoomMul, u.mode, float(u.segmentsMorph), false, sB, hB);
                 col = mix(samplePhoto(texA, smp, q, u.aspectA, sA, u) * hA, samplePhoto(texA, smp, q2, u.aspectA, sB, u) * hB, e);
             } else {
                 // Everything else opens up: the count slides continuously from one whole number to the next.
                 float segs = mix(float(u.segments), float(u.segmentsMorph), e);
-                float2 q = kaleidoPoint(p, u, zoomMul, u.mode, segs, sA, hA);
+                float2 q = kaleidoPoint(p, u, zoomMul, u.mode, segs, false, sA, hA);
                 col = samplePhoto(texA, smp, q, u.aspectA, sA, u) * hA;
             }
             float segsNow = u.mode == 5 ? float(u.segments) : mix(float(u.segments), float(u.segmentsMorph), e);
@@ -339,8 +341,8 @@ enum Shaders {
                 zoomA *= exp(span * e);
                 zoomB *= exp(-span * (1.0 - e));
             }
-            float2 qa = kaleidoPoint(p, u, zoomA, u.mode, float(u.segments), sA, hA);
-            float2 qb = kaleidoPoint(p, u, zoomB, u.modeB, float(u.segmentsB), sB, hB);
+            float2 qa = kaleidoPoint(p, u, zoomA, u.mode, float(u.segments), false, sA, hA);
+            float2 qb = kaleidoPoint(p, u, zoomB, u.modeB, float(u.segmentsB), true, sB, hB);
             float3 a = samplePhoto(texA, smp, qa, u.aspectA, sA, u) * hA * outlineFactor(p, u, u.mode, float(u.segments));
             float3 b = samplePhoto(texB, smp, qb, u.aspectB, sB, u) * hB * outlineFactor(p, u, u.modeB, float(u.segmentsB));
 

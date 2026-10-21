@@ -67,7 +67,10 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   day (and shortly after Photos reports a change). New photos join the rotation, vanished ones leave. "Sync now"
   does it on demand. Options skip screenshots and small photos; videos are always skipped.
 - **Slow by default.** Scenes last 90 seconds and cross-fade over 12, with dissolve, iris, zoom-through and
-  segment transitions (or random). Photos come in shuffled order (each once per round) or in order.
+  segment transitions (or random) for the slideshow's own changes; picking a scene, Next and Back always simply
+  dissolve. Each photo keeps its own position, zoom and swirl while they cross-fade, so a saved scene arrives
+  already in place instead of the old one sliding and zooming into it. Photos come in shuffled order (each once
+  per round) or in order.
 - **Good citizen.** 30 or 60 fps cap, 30 fps in Low Power Mode, optional pause on battery, pauses while the
   display is asleep or the screen is locked, and stops drawing when a window fully covers the desktop.
 - **Menu bar item** with Play/Stop, Next photo and Surprise me. Closing the window keeps playback running.
