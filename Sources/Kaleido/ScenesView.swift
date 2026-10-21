@@ -10,7 +10,7 @@ struct ScenesView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            list.frame(width: 260)
+            list.frame(width: 230)
             Divider()
             if let s = app.scenes.scene(selection) {
                 SceneEditor(scene: s)
@@ -83,32 +83,35 @@ struct ScenesView: View {
 struct SceneEditor: View {
     @EnvironmentObject var app: AppState
     let scene: SavedScene
+    @AppStorage("previewShowsPatternLines") private var showLines = false
 
     var body: some View {
+        // The scene itself shows behind this panel; it is the preview.
         VStack(spacing: 0) {
-            PreviewPane(editor: true, transport: false).frame(maxWidth: 480).padding(16)
             if !app.isSceneAvailable(scene) {
                 VStack(spacing: 6) {
                     Text("This scene's photo can't be found. Its look is kept: give it a photo by playing one (Photos, the ▶︎ on a photo), then come back here.")
                         .foregroundStyle(.orange)
                         .multilineTextAlignment(.center)
                     Button("Use the photo on screen") { app.usePhotoOnScreen(for: scene.id) }
-                        .help("Attach the photo showing in the preview to this scene")
+                        .help("Attach the photo showing behind this panel to this scene")
                 }
-                .frame(maxWidth: 480)
-                .padding(.bottom, 8)
+                .padding(12)
             }
             if let draft = app.draft, draft.target == .scene(scene.id) {
                 Form {
                     Section {
                         DraftHeader(draft: draft) { EmptyView() }
+                        Toggle("Debug lines", isOn: $showLines)
+                            .help("Traces the pattern's mirrors and tile edges in red on the scene while this tab is open")
                     } footer: {
-                        Text("Drag the preview to move the photo inside the mirrors; Save keeps where it sits.")
+                        Text("Drag the scene to move the photo inside the mirrors; Save keeps where it sits.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     LookControls(look: draft.look, edit: app.edit)
                 }
                 .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
             }
         }
     }

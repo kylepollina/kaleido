@@ -19,13 +19,15 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   invents. Off, it plays through your saved scenes (or, with none saved, your photos with the look on screen).
   Invented looks use only the shapes ticked in Settings (untick Diamonds if it isn't for you). Next and Back fade
   in 3 seconds; Back brings back the scene before, look and all.
-- **Home** is the scene, as big as the window allows, with one glass mini-player over it (like Apple Music's):
-  Surprise me, Back / Play (or Space) / Next, the scene's name, Zoom (Drift / Push / Pull), Speed, Save scene and
-  Edit scene; each button lights up under the pointer. Edit scene floats over the right side with Randomize, Debug
-  lines (the mirrors traced in red) and every setting of the scene; a click outside it, on the scene too, or Escape
-  closes it. Otherwise a click on the scene fills the whole
-  window with it (sidebar, toolbar and controls step aside, like Portal); click again or press Escape to come
-  back. Dragging still moves the photo either way.
+- **The window is the scene**, edge to edge (like Portal), and everything floats over it in Liquid Glass:
+  - a mini-player (like Apple Music's): Surprise me, Back / Play (or Space) / Next, the scene's name, Zoom
+    (Drift / Push / Pull), Speed, Save scene and Edit scene; each button lights up under the pointer;
+  - the sidebar button (top left) opens a panel on the left with Photos, Scenes and Settings tabs;
+  - Edit scene opens a panel on the right with Randomize, Debug lines (the mirrors traced in red) and every
+    setting of the scene.
+
+  A click on the scene closes any open panel; with none open it hides every control, and another click (or
+  Escape) brings them back. Dragging moves the photo either way.
 - **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
   Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
 - **Eight shapes.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror

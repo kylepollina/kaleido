@@ -2,194 +2,211 @@ import AppKit
 import KaleidoCore
 import SwiftUI
 
+/// The tabs of the floating panel on the left. The scene itself is always the whole window behind it.
 enum AppSection: String, CaseIterable, Identifiable {
-    case home = "Home", photos = "Photos", scenes = "Scenes", settings = "Settings"
+    case photos = "Photos", scenes = "Scenes", settings = "Settings"
     var id: String { rawValue }
-    var icon: String {
+    /// Photos needs room for its album grid; Settings is one column.
+    var panelWidth: CGFloat {
         switch self {
-        case .home: return "house"
-        case .photos: return "photo.on.rectangle"
-        case .scenes: return "photo.artframe"
-        case .settings: return "gearshape"
+        case .photos: return 720
+        case .scenes: return 620
+        case .settings: return 460
         }
     }
-    static let visible = allCases
 }
 
 struct ContentView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.openWindow) private var openWindow
-    @State private var section: AppSection? = AppSection.atLaunch
-    /// Home's full-window view (click the scene): the sidebar and toolbar step aside, the window keeps its size.
-    @State private var immersive = false
-    @State private var columns: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columns) {
-            List(AppSection.visible, selection: $section) { s in
-                Label(s.rawValue, systemImage: s.icon).tag(s)
-            }
-            .navigationSplitViewColumnWidth(min: 160, ideal: 170, max: 200)
-            .opacity(immersive ? 0 : 1)   // fades as it slides away for full window
-            .safeAreaInset(edge: .bottom) {
-                VStack(alignment: .leading, spacing: 6) {
-                    if section != .home { PlayButton(compact: true) }
-                    Text(app.statusText).font(.caption).foregroundStyle(.secondary)
-                }
-                .padding(12)
-            }
-        } detail: {
-            switch section ?? .home {
-            case .home: HomeView(go: { section = $0 }, immersive: $immersive)
-            case .photos: LibraryPane()
-            case .scenes: ScenesView()
-            case .settings: SettingsView()
-            }
-        }
-        .frame(minWidth: 900, idealWidth: 1100, minHeight: 640, idealHeight: 800)
-        // No "Kaleido" header: the title and its bar go, and content runs up under where they were.
-        .toolbar(removing: .title)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        .toolbar(immersive ? .hidden : .automatic, for: .windowToolbar)
-        .onChange(of: immersive) { _, on in
-            withAnimation(HomeView.fullWindowAnimation) { columns = on ? .detailOnly : .all }
-        }
-        .onChange(of: section) { _, s in if s != .home { immersive = false } }
-        .onAppear {
-            if CommandLine.arguments.contains("--full-window") { immersive = true }
-            // The action stays valid after this window closes, so the app delegate can reopen it.
-            let open = openWindow
-            app.openMainWindow = { open(id: "main") }
-            // SwiftUI sometimes opens this window at a tiny size on first launch; never let it be smaller than
-            // the layout needs.
-            DispatchQueue.main.async {
-                for w in NSApp.windows where w.title == "Kaleido" && w.styleMask.contains(.titled) {
-                    w.contentMinSize = NSSize(width: 900, height: 640)
-                    if w.frame.width < 900 || w.frame.height < 640 {
-                        w.setContentSize(NSSize(width: 1100, height: 800))
-                        w.center()
+        HomeView()
+            .frame(minWidth: 900, idealWidth: 1100, minHeight: 640, idealHeight: 800)
+            // No "Kaleido" header: the title and its bar go, and the scene runs up under where they were.
+            .toolbar(removing: .title)
+            .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+            .onAppear {
+                // The action stays valid after this window closes, so the app delegate can reopen it.
+                let open = openWindow
+                app.openMainWindow = { open(id: "main") }
+                // SwiftUI sometimes opens this window at a tiny size on first launch; never let it be smaller than
+                // the layout needs.
+                DispatchQueue.main.async {
+                    for w in NSApp.windows where w.title == "Kaleido" && w.styleMask.contains(.titled) {
+                        w.contentMinSize = NSSize(width: 900, height: 640)
+                        if w.frame.width < 900 || w.frame.height < 640 {
+                            w.setContentSize(NSSize(width: 1100, height: 800))
+                            w.center()
+                        }
                     }
                 }
             }
-        }
-    }
-}
-
-struct PlayButton: View {
-    @EnvironmentObject var app: AppState
-    var compact = false
-
-    var body: some View {
-        Button {
-            app.togglePlay()
-        } label: {
-            Label(app.isPlaying ? "Stop" : (compact ? "Play" : "Play on Desktop"), systemImage: app.isPlaying ? "stop.fill" : "play.fill")
-                .frame(maxWidth: .infinity)
-        }
-        .controlSize(.large)
-        .buttonStyle(.glassProminent)
-        .tint(app.isPlaying ? .red : .accentColor)
-        .keyboardShortcut("p", modifiers: .command)
-    }
-}
-
-extension AppState {
-    var statusText: String {
-        if let r = suspensionReason, isPlaying { return "Paused: \(r.lowercased())" }
-        if isPlaying { return "Playing on your desktop. Stop or quit to get your wallpaper back." }
-        return "Your normal wallpaper is showing."
     }
 }
 
 // MARK: Home
 
-/// Home is the editor for the scene on screen: adjust its settings, save the scene.
+/// The whole window is the scene, edge to edge, like Portal. Everything else floats over it in Liquid Glass: the
+/// mini-player at the bottom, Photos / Scenes / Settings in a panel on the left (the sidebar button, top left),
+/// Edit scene in a panel on the right.
 struct HomeView: View {
     @EnvironmentObject var app: AppState
-    let go: (AppSection) -> Void
-    @Binding var immersive: Bool
+    /// The left panel's tab, or nil while it is closed.
+    @State private var panel: AppSection? = AppSection.atLaunch
     /// Edit scene starts closed every time the window opens.
-    @State private var editing = false
+    @State private var editing = CommandLine.arguments.contains("--edit-scene")
+    /// A click on the scene fades every control away; another click (or Escape) brings them back.
+    @State private var controlsHidden = CommandLine.arguments.contains("--hide-controls")
+    @AppStorage("previewShowsOriginal") private var showOriginal = false
     @AppStorage("previewShowsPatternLines") private var showLines = false
 
-    /// Going in and out of full window: one slow, smooth ease for the scene, the controls and the sidebar.
-    static let fullWindowAnimation = Animation.smooth(duration: 0.55)
+    static let panelAnimation = Animation.smooth(duration: 0.4)
 
-    private func closeEditing() {
-        withAnimation(.easeInOut(duration: 0.25)) { editing = false }
+    private func closePanels() {
+        withAnimation(Self.panelAnimation) { editing = false; panel = nil }
     }
 
-    private func setImmersive(_ on: Bool) {
-        withAnimation(Self.fullWindowAnimation) {
-            if on { editing = false }
-            immersive = on
-        }
+    /// A plain click on the scene (dragging still moves the photo): the first one closes any open panel, otherwise
+    /// it hides or brings back the controls.
+    private func sceneClicked() {
+        if editing || panel != nil { closePanels() }
+        else { withAnimation(Self.panelAnimation) { controlsHidden.toggle() } }
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            // The scene is the hero, as big as the window allows; its playback controls float over it in glass.
-            // A plain click on it slides it out to fill the whole window, like Portal; another click (or Escape)
-            // brings it back. With Edit scene open, the first click only closes the panel. Dragging still moves
-            // the photo either way.
-            PreviewPane(controls: AnyView(transport), linesAllowed: editing, immersive: immersive,
-                        onClick: { if editing { closeEditing() } else { setImmersive(!immersive) } })
-            if app.library.enabledItems.isEmpty && !immersive { photosRow.frame(maxWidth: 620) }
-        }
-        .padding(immersive ? 0 : 10)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            if immersive {
-                Button("Leave full window") { setImmersive(false) }
-                    .keyboardShortcut(.cancelAction)
-                    .hidden()
-            }
-        }
-        // A click on empty space closes Edit scene. It sits behind the content, so the kaleidoscope still takes
-        // its own clicks and drags (moving the photo keeps the panel open) and the buttons still work.
-        .background {
-            if editing {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { closeEditing() }
-                // Escape closes it too.
-                Button("Close Edit scene") { closeEditing() }
-                    .keyboardShortcut(.cancelAction)
-                    .hidden()
-            }
-        }
-        // Run up under the (hidden) title bar too.
-        .ignoresSafeArea(.container, edges: immersive ? .all : .top)
-        // Edit scene floats over the right side in a glass panel, so nothing underneath moves. (Not an
-        // .inspector: inside the window's split view one fed the preview's 16:9 sizing back into the split
-        // view's minimum sizes until AppKit gave up, a crash.)
-        .overlay(alignment: .trailing) {
-            if editing {
-                Form {
-                    Section {
-                        HStack {
-                            sceneRow
-                            Spacer()
-                            Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
-                                .buttonStyle(.glass)
-                                .help("A random pattern and settings for this photo")
-                        }
-                        Toggle("Debug lines", isOn: $showLines)
-                            .help("Traces the pattern's mirrors and tile edges in red on the preview while this panel is open")
-                        if !app.library.enabledItems.isEmpty { photosRow }
-                    }
-                    LookControls(look: app.settings.look, edit: app.tweakScene)
+        ZStack {
+            picture.ignoresSafeArea()
+            GeometryReader { geo in
+            HStack(alignment: .top, spacing: 12) {
+                if let panel {
+                    sidePanel(panel, width: panelWidth(panel, room: geo.size.width))
+                        .transition(.move(edge: .leading).combined(with: .opacity))
                 }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
-                .frame(width: 360)
-                .frame(maxHeight: .infinity)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .padding(12)
-                .transition(.move(edge: .trailing).combined(with: .opacity))
+                // The middle keeps the mini-player centred in whatever room the panels leave.
+                VStack(spacing: 10) {
+                    GlassTabs(selection: $showOriginal, options: [(false, "Kaleidoscope"), (true, "Original")])
+                    Spacer(minLength: 0)
+                    if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 560) }
+                    bottomControls
+                }
+                .frame(maxWidth: .infinity)
+                if editing {
+                    editPanel.transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            }
+            .padding(12)
+            .opacity(controlsHidden ? 0 : 1)
+            .allowsHitTesting(!controlsHidden)
+        }
+        .background {
+            // Escape: controls back if hidden, otherwise close the open panels.
+            Button("Close") {
+                if controlsHidden { withAnimation(Self.panelAnimation) { controlsHidden = false } } else { closePanels() }
+            }
+            .keyboardShortcut(.cancelAction)
+            .hidden()
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    withAnimation(Self.panelAnimation) { panel = panel == nil ? .photos : nil }
+                } label: {
+                    Label("Sidebar", systemImage: "sidebar.left")
+                }
+                .help(panel == nil ? "Photos, Scenes and Settings" : "Close the sidebar")
             }
         }
-        .onAppear { if CommandLine.arguments.contains("--edit-scene") { editing = true } }
+        .toolbar(controlsHidden ? .hidden : .visible, for: .windowToolbar)
+        // The Scenes tab and Edit scene each edit the scene on screen, so only one is open at a time.
+        .onChange(of: panel) { _, p in if p == .scenes, editing { withAnimation(Self.panelAnimation) { editing = false } } }
+        .onChange(of: editing) { _, on in if on, panel == .scenes { withAnimation(Self.panelAnimation) { panel = nil } } }
+    }
+
+    private var picture: some View {
+        Group {
+            if let renderer = app.renderer {
+                PreviewView(renderer: renderer, showOriginal: showOriginal,
+                            showOutlines: (editing || panel == .scenes) && showLines, onClick: sceneClicked)
+                    .help(showOriginal ? "The photo as it is" : "Drag to move the photo inside the mirrors; flick it to let it glide")
+            } else {
+                Text("Metal is not available on this Mac.").foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.black)
+    }
+
+    @ViewBuilder private var bottomControls: some View {
+        if showOriginal {
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    Button { app.removeCurrentFromRotation() } label: { Label("Remove from selected photos", systemImage: "minus.circle") }
+                        .help("Take this photo out of the rotation and move on to the next one")
+                    Button { app.revealCurrentPhoto() } label: { Label("Show in library", systemImage: "photo") }
+                        .help("Open it in Finder, or in Photos for photos from your Photos library")
+                }
+                .buttonStyle(.glass)
+            }
+        } else {
+            transport
+        }
+    }
+
+    /// The mini-player's width, kept clear in the middle so the left panel never pushes it off screen.
+    private static let playerWidth: CGFloat = 660
+
+    /// The left panel's own width when the window has room for it, narrower (down to 360) when it doesn't.
+    private func panelWidth(_ s: AppSection, room: CGFloat) -> CGFloat {
+        let right: CGFloat = editing ? 360 + 12 : 0
+        return min(s.panelWidth, max(360, room - right - Self.playerWidth - 12))
+    }
+
+    /// Photos, Scenes and Settings, one glass panel with its tabs on top.
+    private func sidePanel(_ s: AppSection, width: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            GlassTabs(selection: Binding(get: { s }, set: { v in withAnimation(Self.panelAnimation) { panel = v } }),
+                      options: AppSection.allCases.map { ($0, $0.rawValue) })
+                .padding(10)
+            Group {
+                switch s {
+                case .photos: LibraryPane()
+                case .scenes: ScenesView()
+                case .settings: SettingsView()
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(width: width)
+        .frame(maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    /// Edit scene: every setting of the scene on screen.
+    private var editPanel: some View {
+        Form {
+            Section {
+                HStack {
+                    sceneRow
+                    Spacer()
+                    Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
+                        .buttonStyle(.glass)
+                        .help("A random pattern and settings for this photo")
+                }
+                Toggle("Debug lines", isOn: $showLines)
+                    .help("Traces the pattern's mirrors and tile edges in red on the scene while this panel is open")
+                if !app.library.enabledItems.isEmpty { photosRow }
+            }
+            LookControls(look: app.settings.look, edit: app.tweakScene)
+        }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .frame(width: 360)
+        .frame(maxHeight: .infinity)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     /// One glass capsule, like Apple Music's mini player: Surprise me · Back · Play · Next · the scene · Save · Edit.
@@ -239,7 +256,7 @@ struct HomeView: View {
             }
             .help(saved == nil ? "Save scene: keep this photo with these settings and where the photo sits" : "This is one of your saved scenes")
             PlayerIcon(name: "slider.horizontal.3", active: editing, tint: .accentColor) {
-                withAnimation(.easeInOut(duration: 0.25)) { editing.toggle() }
+                withAnimation(Self.panelAnimation) { editing.toggle() }
             }
             .help("Edit scene: the pattern and every setting of this scene")
         }
@@ -298,13 +315,13 @@ struct HomeView: View {
                 Image(systemName: "photo.badge.plus")
                 Text("No photos selected yet.")
                 Spacer()
-                Button("Choose photos…") { go(.photos) }
+                Button("Choose photos…") { withAnimation(Self.panelAnimation) { panel = .photos } }
                 Button("Use macOS wallpapers") { app.library.setWallpapers(true) }
                     .help("Play Apple's desktop pictures until you pick your own")
             } else {
                 Text("\(n) photos in rotation").foregroundStyle(.secondary)
                 Spacer()
-                Button("Choose photos…") { go(.photos) }.buttonStyle(.link)
+                Button("Choose photos…") { withAnimation(Self.panelAnimation) { panel = .photos } }.buttonStyle(.link)
             }
         }
     }
@@ -421,23 +438,6 @@ struct GlassTabs<Value: Hashable>: View {
         }
         .padding(4)
         .glassEffect(.regular, in: .capsule)
-    }
-}
-
-/// An on/off button in Liquid Glass: tinted glass when on, clear glass when off.
-struct GlassToggle: View {
-    @Binding var isOn: Bool
-    let title: String
-    let icon: String
-    let tint: Color
-
-    var body: some View {
-        let button = Button { isOn.toggle() } label: { Label(title, systemImage: icon) }
-        if isOn {
-            button.buttonStyle(.glassProminent).tint(tint)
-        } else {
-            button.buttonStyle(.glass)
-        }
     }
 }
 
@@ -656,11 +656,11 @@ struct SettingsView: View {
 }
 
 extension AppSection {
-    /// `--section scenes` (etc.) opens the window on that section; handy for checking a screen.
-    static var atLaunch: AppSection {
+    /// `--section scenes` (etc.) opens the window with that panel open; handy for checking a screen.
+    static var atLaunch: AppSection? {
         let args = CommandLine.arguments
-        guard let i = args.firstIndex(of: "--section"), i + 1 < args.count else { return .home }
-        return AppSection.allCases.first { $0.rawValue.lowercased() == args[i + 1].lowercased() } ?? .home
+        guard let i = args.firstIndex(of: "--section"), i + 1 < args.count else { return nil }
+        return AppSection.allCases.first { $0.rawValue.lowercased() == args[i + 1].lowercased() }
     }
 }
 
