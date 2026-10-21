@@ -243,6 +243,16 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).surprise)
     }
 
+    func testSuperSlowIsAQuarterOfTheSlowestStop() throws {
+        var s = Settings()
+        s.speedStep = 4
+        s.superSlow = true
+        XCTAssertEqual(s.speedMultiplier, Settings.speedMultipliers[0] / 4, "whatever the slider says")
+        XCTAssertEqual(s.effectiveLook(Look()).motion, Look().motion * Settings.speedMultipliers[0] / 4)
+        XCTAssertTrue(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).superSlow)
+        XCTAssertFalse(Settings().superSlow)
+    }
+
     func testDesktopSharpness() throws {
         var s = Settings()
         XCTAssertEqual(s.sharpness, .balanced, "a cooler default than full Retina")

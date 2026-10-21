@@ -107,6 +107,10 @@ public struct Settings: Codable, Equatable, Sendable {
     public var keepScreenAwake = false
     /// 0...4, an index into `speedMultipliers`.
     public var speedStep = Settings.defaultSpeedStep
+    /// Super slow motion (the tortoise in the mini-player): every movement at a quarter of the slowest stop,
+    /// whatever the slider says. Videos still play at their own speed.
+    public var superSlow = false
+    public static let superSlowMultiplier = 0.5
     /// Movement, on top of any look: how the view zooms.
     public var zoomMotion: ZoomMotion = .drift
     /// Desktop drawing resolution (the preview always draws sharp).
@@ -141,7 +145,9 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public init() {}
 
-    public var speedMultiplier: Double { Settings.speedMultipliers[min(max(speedStep, 0), Settings.speedMultipliers.count - 1)] }
+    public var speedMultiplier: Double {
+        superSlow ? Settings.superSlowMultiplier : Settings.speedMultipliers[min(max(speedStep, 0), Settings.speedMultipliers.count - 1)]
+    }
 
     /// The look the renderer should actually use: the chosen look with the global switches and speed applied.
     public func effectiveLook(_ l: Look) -> Look {
@@ -172,6 +178,7 @@ public struct Settings: Codable, Equatable, Sendable {
         playOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .playOnLaunch) ?? d.playOnLaunch
         keepScreenAwake = try c.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? d.keepScreenAwake
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
+        superSlow = (try? c.decodeIfPresent(Bool.self, forKey: .superSlow)) ?? false
         zoomMotion = (try? c.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion)) ?? d.zoomMotion
         surprise = try c.decodeIfPresent(Bool.self, forKey: .surprise) ?? d.surprise
         sharpness = (try? c.decodeIfPresent(Sharpness.self, forKey: .sharpness)) ?? d.sharpness

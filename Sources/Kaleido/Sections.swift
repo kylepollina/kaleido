@@ -305,16 +305,29 @@ struct HomeView: View {
             zoomMenu
             // Speed sits where a music player puts its volume slider.
             HStack(spacing: 6) {
-                Image(systemName: "tortoise.fill").font(.system(size: 12)).foregroundStyle(.secondary)
+                // The tortoise toggles super slow motion: a quarter of the slowest stop, for footage that moves a lot.
+                let slow = app.settings.superSlow
+                Button { app.settings.superSlow.toggle() } label: {
+                    Image(systemName: "tortoise.fill")
+                        .font(.system(size: slow ? 13 : 12, weight: .semibold))
+                        .foregroundStyle(slow ? Color.green : Color.secondary)
+                        .frame(width: 26, height: 26)
+                        .background { if slow { Circle().fill(Color.green.opacity(0.18)) } }
+                        .hoverHighlight(Circle())
+                }
+                .buttonStyle(.plain)
+                .help(slow ? "Super slow motion is on: click to go back to the slider's speed"
+                           : "Super slow motion: everything moves at a quarter of the slowest speed")
                 Slider(value: Binding(get: { Double(app.settings.speedStep) },
-                                      set: { app.settings.speedStep = Int($0.rounded()) }),
+                                      set: { app.settings.speedStep = Int($0.rounded()); app.settings.superSlow = false }),
                        in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
                     .controlSize(.small)
                     .frame(width: 96)
+                    .opacity(slow ? 0.4 : 1)
+                    .help("Speed: how fast everything moves (moving it ends super slow motion)")
                 Image(systemName: "hare.fill").font(.system(size: 12)).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 6)
-            .help("Speed: how fast everything moves")
             playerDivider
             PlayerIcon(name: saved == nil ? "bookmark" : "bookmark.fill", active: saved != nil, tint: .accentColor) {
                 if saved == nil { app.saveScene() }
