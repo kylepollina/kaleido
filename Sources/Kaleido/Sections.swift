@@ -58,6 +58,8 @@ struct HomeView: View {
     @State private var editing = CommandLine.arguments.contains("--edit-scene")
     /// A click on the scene fades every control away; another click (or Escape) brings them back.
     @State private var controlsHidden = CommandLine.arguments.contains("--hide-controls")
+    /// The Photos tab filling the window.
+    @State private var photosExpanded = CommandLine.arguments.contains("--expand-photos")
     @AppStorage("previewShowsOriginal") private var showOriginal = false
     @AppStorage("previewShowsPatternLines") private var showLines = false
 
@@ -78,23 +80,41 @@ struct HomeView: View {
         ZStack {
             picture.ignoresSafeArea()
             GeometryReader { geo in
-            HStack(alignment: .top, spacing: 12) {
-                if let panel {
-                    sidePanel(panel, width: panelWidth(panel, room: geo.size.width))
-                        .transition(.move(edge: .leading).combined(with: .opacity))
+                let room = geo.size.width
+                let right: CGFloat = editing ? Self.editWidth : 0
+                let left: CGFloat = panel.map { panelWidth($0, room: room, right: right) } ?? 0
+                let gaps: CGFloat = (left > 0 ? 12 : 0) + (right > 0 ? 12 : 0)
+                let middle: CGFloat = room - left - right - gaps
+                // Room for the mini-player between the panels: it sits there, centred. Otherwise it spans the
+                // bottom and the panels stop above it, so nothing is ever cut off.
+                let playerBetween = middle >= Self.playerWidth
+                ZStack {
+                    HStack(alignment: .top, spacing: 0) {
+                        if let panel {
+                            sidePanel(panel, width: left)
+                                .transition(.move(edge: .leading).combined(with: .opacity))
+                        }
+                        Spacer(minLength: 0)
+                        if editing {
+                            editPanel.transition(.move(edge: .trailing).combined(with: .opacity))
+                        }
+                    }
+                    .padding(.bottom, playerBetween ? 0 : Self.playerHeight + 12)
+                    VStack(spacing: 10) {
+                        if middle >= 260 {
+                            GlassTabs(selection: $showOriginal, options: [(false, "Kaleidoscope"), (true, "Original")])
+                                .padding(.leading, left > 0 ? left + 12 : 0)
+                                .padding(.trailing, right > 0 ? right + 12 : 0)
+                        }
+                        Spacer(minLength: 0)
+                        Group {
+                            if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 560) }
+                            bottomControls
+                        }
+                        .padding(.leading, playerBetween && left > 0 ? left + 12 : 0)
+                        .padding(.trailing, playerBetween && right > 0 ? right + 12 : 0)
+                    }
                 }
-                // The middle keeps the mini-player centred in whatever room the panels leave.
-                VStack(spacing: 10) {
-                    GlassTabs(selection: $showOriginal, options: [(false, "Kaleidoscope"), (true, "Original")])
-                    Spacer(minLength: 0)
-                    if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 560) }
-                    bottomControls
-                }
-                .frame(maxWidth: .infinity)
-                if editing {
-                    editPanel.transition(.move(edge: .trailing).combined(with: .opacity))
-                }
-            }
             }
             .padding(12)
             .opacity(controlsHidden ? 0 : 1)
@@ -119,16 +139,16 @@ struct HomeView: View {
             }
         }
         .toolbar(controlsHidden ? .hidden : .visible, for: .windowToolbar)
-        // The Scenes tab and Edit scene each edit the scene on screen, so only one is open at a time.
-        .onChange(of: panel) { _, p in if p == .scenes, editing { withAnimation(Self.panelAnimation) { editing = false } } }
-        .onChange(of: editing) { _, on in if on, panel == .scenes { withAnimation(Self.panelAnimation) { panel = nil } } }
+        // Expanded Photos takes the whole window, so Edit scene opening shrinks it back (and vice versa).
+        .onChange(of: editing) { _, on in if on, photosExpanded { withAnimation(Self.panelAnimation) { photosExpanded = false } } }
+        .onChange(of: photosExpanded) { _, on in if on, editing { withAnimation(Self.panelAnimation) { editing = false } } }
     }
 
     private var picture: some View {
         Group {
             if let renderer = app.renderer {
                 PreviewView(renderer: renderer, showOriginal: showOriginal,
-                            showOutlines: (editing || panel == .scenes) && showLines, onClick: sceneClicked)
+                            showOutlines: editing && showLines, onClick: sceneClicked)
                     .help(showOriginal ? "The photo as it is" : "Drag to move the photo inside the mirrors; flick it to let it glide")
             } else {
                 Text("Metal is not available on this Mac.").foregroundStyle(.secondary)
@@ -156,11 +176,15 @@ struct HomeView: View {
 
     /// The mini-player's width, kept clear in the middle so the left panel never pushes it off screen.
     private static let playerWidth: CGFloat = 660
+    private static let playerHeight: CGFloat = 50
+    private static let editWidth: CGFloat = 360
 
-    /// The left panel's own width when the window has room for it, narrower (down to 360) when it doesn't.
-    private func panelWidth(_ s: AppSection, room: CGFloat) -> CGFloat {
-        let right: CGFloat = editing ? 360 + 12 : 0
-        return min(s.panelWidth, max(360, room - right - Self.playerWidth - 12))
+    /// The left panel's own width when the window has room for it beside the mini-player, narrower (down to
+    /// 360) when it doesn't, and the whole window when Photos is expanded.
+    private func panelWidth(_ s: AppSection, room: CGFloat, right: CGFloat) -> CGFloat {
+        let beside = right > 0 ? right + 12 : 0
+        if s == .photos && photosExpanded { return room - beside }
+        return min(s.panelWidth, max(360, room - beside - Self.playerWidth - 12), room - beside)
     }
 
     /// Photos, Scenes and Settings, one glass panel with its tabs on top.
@@ -168,6 +192,20 @@ struct HomeView: View {
         VStack(spacing: 0) {
             GlassTabs(selection: Binding(get: { s }, set: { v in withAnimation(Self.panelAnimation) { panel = v } }),
                       options: AppSection.allCases.map { ($0, $0.rawValue) })
+                .frame(maxWidth: .infinity)
+                .overlay(alignment: .trailing) {
+                    if s == .photos {
+                        // Photos can take the whole window, for browsing; the scene still shows around it.
+                        Button { withAnimation(Self.panelAnimation) { photosExpanded.toggle() } } label: {
+                            Image(systemName: photosExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .frame(width: 30, height: 30)
+                                .hoverHighlight(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(photosExpanded ? "Back to a side panel" : "Fill the window, to browse your photos")
+                    }
+                }
                 .padding(10)
             Group {
                 switch s {
@@ -204,7 +242,7 @@ struct HomeView: View {
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
-        .frame(width: 360)
+        .frame(width: Self.editWidth)
         .frame(maxHeight: .infinity)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
@@ -482,34 +520,7 @@ struct HueCyclingPicker: View, Equatable {
     }
 }
 
-/// Name, an "unsaved changes" note, and Revert / Save for whatever the editor has open.
-struct DraftHeader<Extra: View>: View {
-    @EnvironmentObject var app: AppState
-    let draft: EditDraft
-    @ViewBuilder var extra: Extra
-
-    var body: some View {
-        TextField("Name", text: Binding(get: { draft.name }, set: { app.renameDraft($0) }))
-        HStack {
-            if draft.hasChanges {
-                Label("Unsaved changes", systemImage: "circle.fill")
-                    .font(.caption).foregroundStyle(.orange)
-                    .help("You see the changes now; they are kept only if you press Save")
-            }
-            Spacer()
-            extra
-            Button("Revert") { app.revertDraft() }
-                .disabled(!draft.hasChanges)
-                .help("Throw away the changes since the last save")
-            Button("Save") { app.saveDraft() }
-                .keyboardShortcut("s", modifiers: .command)
-                .buttonStyle(.glassProminent)
-                .disabled(!draft.hasChanges)
-        }
-    }
-}
-
-/// The look controls shared by Home and the scene editor. `edit` says where a change goes.
+/// The look controls in Edit scene. `edit` says where a change goes.
 struct LookControls: View {
     @EnvironmentObject var app: AppState
     let look: Look

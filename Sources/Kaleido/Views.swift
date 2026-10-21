@@ -173,17 +173,28 @@ struct LibraryPane: View {
         let enabled = app.library.enabledItems.count
         let total = app.library.items.count
         VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Photo library").font(.headline)
-                    Text(total == 0 ? "Nothing selected yet" : "\(enabled) of \(total) photos in rotation")
-                        .font(.caption).foregroundStyle(.secondary)
+            // One quiet line of status and three icon buttons, so it reads cleanly even in a narrow panel.
+            HStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(total == 0 ? "Nothing selected yet" : "\(enabled.formatted()) of \(total.formatted()) in rotation")
+                        .font(.callout.weight(.semibold))
+                        .lineLimit(1)
+                    Text(syncLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
-                Spacer()
-                if app.isSyncing { ProgressView().controlSize(.small) }
-                Text(syncLine).font(.caption).foregroundStyle(.secondary)
-                Button("Sync now") { app.syncNow() }.controlSize(.small).disabled(app.isSyncing)
-                Button("Add Folder…") { choose(directories: true) }
+                Spacer(minLength: 8)
+                Button { app.syncNow() } label: {
+                    Group {
+                        if app.isSyncing { ProgressView().controlSize(.small) } else { Image(systemName: "arrow.clockwise") }
+                    }
+                    .frame(width: 30, height: 30)
+                    .hoverHighlight(Circle())
+                }
+                .disabled(app.isSyncing)
+                .help("Sync now: pick up new photos in your chosen albums and folders")
+                Button { choose(directories: true) } label: {
+                    Image(systemName: "folder.badge.plus").frame(width: 30, height: 30).hoverHighlight(Circle())
+                }
+                .help("Add a folder of photos")
                 Menu {
                     Button("Skip screenshots") {
                         app.library.filters.excludeScreenshots.toggle()
@@ -196,10 +207,17 @@ struct LibraryPane: View {
                     Button("Remove missing files") { app.library.removeMissing() }
                     Button("Bring back removed photos (\(app.library.dismissedCount))") { app.library.resetDismissed(); app.syncNow() }
                         .disabled(app.library.dismissedCount == 0)
-                } label: { Image(systemName: "ellipsis.circle") }
-                    .menuStyle(.borderlessButton).fixedSize()
+                } label: {
+                    Image(systemName: "ellipsis").frame(width: 30, height: 30).hoverHighlight(Circle())
+                }
+                .menuStyle(.button)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Photo filters and clean-up")
             }
-            .padding(.horizontal, 16).padding(.vertical, 10)
+            .buttonStyle(.plain)
+            .font(.system(size: 14, weight: .medium))
+            .padding(.horizontal, 16).padding(.vertical, 6)
 
             if let openID, let card = makeCards(app).first(where: { $0.id == openID }) {
                 AlbumDetailView(card: card) {

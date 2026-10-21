@@ -27,10 +27,6 @@ final class AppState: ObservableObject, PhotoProvider {
     let photos = PhotosService()
     /// The scene on screen, if any. A scene holds its photo until Next or Previous.
     @Published private(set) var activeSceneID: UUID?
-    /// Unsaved edits in the scene editor: on screen at once, written only by Save.
-    @Published private(set) var draft: EditDraft? {
-        didSet { if draft?.target != oldValue?.target { updateHold() } }
-    }
     /// Bumped whenever a scene's thumbnail is rewritten, so cards reload it.
     @Published private(set) var sceneThumbVersion = 0
     private var sceneArriving: SavedScene?
@@ -76,12 +72,6 @@ final class AppState: ObservableObject, PhotoProvider {
         // library, so unticking its album later doesn't lose it.
         for s in scenes.scenes where s.photoKey == nil {
             if let item = library.item(s.photoID) { scenes.setPhoto(s.id, photoID: s.photoID, key: item.key, name: item.name) }
-        }
-        renderer?.didDrag = { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self, case .scene = self.draft?.target else { return }
-                self.draft?.moved = true
-            }
         }
         photos.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         photos.onLibraryChange = { [weak self] in self?.scheduleSync(after: 20) }
@@ -162,16 +152,9 @@ final class AppState: ObservableObject, PhotoProvider {
     /// Back to the scene before: its photo and its pattern.
     func previousPhoto() { renderer?.previous() }
 
-    /// While the scene editor is open, shuffling never swaps out what is being edited.
-    var isEditingScenes = false { didSet { updateHold() } }
-
-    func nextPhotoKeepingLook() { renderer?.skip() }
-
-    /// A scene being edited (Home or the Scenes editor) stays until you move on.
+    /// A scene being edited on Home stays until you move on.
     private func updateHold() {
-        var editingScene = false
-        if case .scene = draft?.target { editingScene = true }
-        renderer?.holdPhoto = editingScene || sceneTweaked
+        renderer?.holdPhoto = sceneTweaked
     }
 
     /// "Remove from selected photos" on the Original tab: out of the rotation (it stays in its album), then move on.
@@ -217,7 +200,7 @@ final class AppState: ObservableObject, PhotoProvider {
         // A new scene: this photo with an invented pattern (Surprise me), otherwise the pattern on screen.
         var look = settings.look
         var g = SystemRandomNumberGenerator()
-        if surprisePending || (settings.surprise && !isEditingScenes) {
+        if surprisePending || settings.surprise {
             look = Look.random(shapes: settings.inventedShapes, using: &g)
         }
         surprisePending = false
@@ -237,7 +220,7 @@ final class AppState: ObservableObject, PhotoProvider {
 
     private func show(saved s: SavedScene) {
         activeSceneID = s.id
-        settings.look = draft?.target == .scene(s.id) ? draft!.look : s.look
+        settings.look = s.look
         renderer?.glidePan(to: SIMD2(s.panX, s.panY))
     }
 
@@ -346,9 +329,14 @@ final class AppState: ObservableObject, PhotoProvider {
         return id
     }
 
+    func renameScene(_ id: UUID, to name: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let s = scenes.scene(id), !name.isEmpty, name != s.name else { return }
+        scenes.update(id, name: name, look: s.look, pan: nil)
+    }
+
     func deleteScene(_ id: UUID) {
         if activeSceneID == id { activeSceneID = nil }
-        if draft?.target == .scene(id) { draft = nil }
         scenes.delete(id)
         try? FileManager.default.removeItem(at: Self.sceneThumbnailURL(id))
     }
@@ -368,60 +356,12 @@ final class AppState: ObservableObject, PhotoProvider {
         sceneThumbVersion += 1
     }
 
-    // MARK: Editing scenes
-
-    /// Opens a scene in the editor: it plays, and edits wait for Save.
-    func beginEditing(scene id: UUID) {
-        guard draft?.target != .scene(id) else { return }
-        discardDraft()
-        guard let s = scenes.scene(id) else { return }
-        draft = EditDraft(target: .scene(id), name: s.name, look: s.look)
-        showScene(s)
-    }
-
-    /// Changes the draft and shows it right away; nothing is saved.
-    func edit(_ change: (inout Look) -> Void) {
-        guard var d = draft else { return }
-        change(&d.look)
-        d.look.clamp()
-        draft = d
-        settings.look = d.look
-    }
-
-    func renameDraft(_ name: String) { draft?.name = name }
-
-    func saveDraft() {
-        guard let d = draft, d.hasChanges else { return }
-        switch d.target {
-        case .scene(let id):
-            let pan = d.moved ? renderer.map { ($0.pan.x, $0.pan.y) } : nil
-            scenes.update(id, name: d.name, look: d.look, pan: pan)
-            draft = EditDraft(target: d.target, name: d.name, look: d.look)
-            if activeSceneID == id, renderer?.currentPhotoID == scenes.scene(id)?.photoID { writeSceneThumbnail(id) }
-        }
-    }
-
-    /// Back to the saved version, on screen too.
-    func revertDraft() {
-        guard let d = draft else { return }
-        draft = EditDraft(target: d.target, name: d.savedName, look: d.savedLook)
-        if d.look != d.savedLook { settings.look = d.savedLook }
-        if case .scene(let id) = d.target, d.moved, let s = scenes.scene(id) { renderer?.glidePan(to: SIMD2(s.panX, s.panY)) }
-    }
-
-    /// Leaving the editor without saving throws the edits away.
-    func discardDraft() {
-        guard draft != nil else { return }
-        revertDraft()
-        draft = nil
-    }
-
     // MARK: PhotoProvider
 
     func nextPhoto(after current: UUID?) -> PhotoRef? {
         plannedScene = nil
         let saved = shuffleScenes.filter { $0.id != activeSceneID }
-        if !isEditingScenes, settings.effectiveSceneShuffle.nextIsSaved(savedCount: saved.count, roll: Double.random(in: 0..<1)),
+        if settings.effectiveSceneShuffle.nextIsSaved(savedCount: saved.count, roll: Double.random(in: 0..<1)),
            let s = saved.randomElement(), let ref = sceneRef(s) {
             plannedScene = s
             return ref

@@ -11,7 +11,8 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 ## Features
 
 - **Desktop playback.** One borderless window per display, just above the wallpaper and below desktop icons.
-  Mouse clicks pass through. Works across Spaces, multiple displays, and display changes.
+  Mouse clicks pass through. Works across Spaces, multiple displays, and display changes. Play and Stop fade the
+  kaleidoscope in over the wallpaper and back out (1.5 s).
 - **Scenes.** A scene is a photo with a look (shape, mirrors, swirl, colour...). What's on screen is always a
   scene: a saved one, or a new one Kaleido just put together. "Save scene" keeps it (photo, look and where you
   dragged the photo).
@@ -22,7 +23,9 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
 - **The window is the scene**, edge to edge (like Portal), and everything floats over it in Liquid Glass:
   - a mini-player (like Apple Music's): Surprise me, Back / Play (or Space) / Next, the scene's name, Zoom
     (Drift / Push / Pull), Speed, Save scene and Edit scene; each button lights up under the pointer;
-  - the sidebar button (top left) opens a panel on the left with Photos, Scenes and Settings tabs;
+  - the sidebar button (top left) opens a panel on the left with Photos, Scenes and Settings tabs (Photos can
+    expand to fill the window, for browsing). Scenes lists your scenes as pictures: click to show one, star the
+    ones that should come up as scenes change, swipe or right-click to rename or delete;
   - Edit scene opens a panel on the right with Randomize, Debug lines (the mirrors traced in red) and every
     setting of the scene.
 

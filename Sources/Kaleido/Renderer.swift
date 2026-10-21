@@ -192,8 +192,6 @@ final class KaleidoRenderer {
     private var lastDragTime: CFTimeInterval = 0
     /// Where a scene wants the photo to sit; the pan glides there and then stays.
     private var panGoal: SIMD2<Double>?
-    /// Called when the user lets go of the preview after dragging the photo.
-    var didDrag: (() -> Void)?
     /// A scene is showing: keep this photo until asked to move on.
     var holdPhoto = false
 
@@ -428,7 +426,6 @@ final class KaleidoRenderer {
         if CACurrentMediaTime() - lastDragTime > 0.08 { panVelocity = .zero }
         let speed = simd_length(panVelocity)
         if speed > 3 { panVelocity *= 3 / speed }
-        didDrag?()
     }
 
     /// Jump straight to the target look (no easing); used for offscreen snapshots.

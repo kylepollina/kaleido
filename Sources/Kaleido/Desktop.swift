@@ -41,9 +41,19 @@ final class DesktopController {
         isShowing = false
         for (center, o) in observers { center.removeObserver(o) }
         observers = []
-        for (_, entry) in windows { close(entry.window) }
+        // Fade out to the wallpaper, then close.
+        let leaving = windows.values.map(\.window)
         windows = [:]
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = Self.fadeSeconds
+            for w in leaving { w.animator().alphaValue = 0 }
+        }, completionHandler: { [weak self] in
+            MainActor.assumeIsolated { for w in leaving { self?.close(w) } }
+        })
     }
+
+    /// Play and Stop cross-fade between the wallpaper and the kaleidoscope.
+    static let fadeSeconds = 1.5
 
     func setFrameRate(_ fps: Int) {
         self.fps = fps
@@ -120,7 +130,13 @@ final class DesktopController {
             view.renderScale = renderScale
             window.contentView = view
             window.setFrame(screen.frame, display: true)
+            // Fades in over the wallpaper rather than popping on.
+            window.alphaValue = 0
             window.orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = Self.fadeSeconds
+                window.animator().alphaValue = 1
+            }
             windows[id] = (window, view)
         }
         for id in windows.keys where !live.contains(id) {

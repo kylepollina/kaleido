@@ -100,24 +100,3 @@ public final class SceneLibrary: ObservableObject {
         if let fileURL { JSONFile.save(scenes, to: fileURL) }
     }
 }
-
-/// Unsaved edits to a scene. They show on screen right away, but nothing is written until Save;
-/// leaving the editor throws them away.
-public struct EditDraft: Equatable, Sendable {
-    public enum Target: Equatable, Sendable { case scene(UUID) }
-    public let target: Target
-    public var name: String
-    public var look: Look
-    public let savedName: String
-    public let savedLook: Look
-    /// The photo was dragged inside the mirrors (scenes keep where the photo sits).
-    public var moved = false
-
-    public init(target: Target, name: String, look: Look) {
-        self.target = target
-        self.name = name; self.look = look
-        savedName = name; savedLook = look
-    }
-
-    public var hasChanges: Bool { name != savedName || look != savedLook || moved }
-}

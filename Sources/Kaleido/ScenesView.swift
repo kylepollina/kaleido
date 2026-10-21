@@ -4,116 +4,115 @@ import SwiftUI
 
 // MARK: Scenes
 
+/// Your saved scenes as a list of pictures: click one to show it, star the ones that should come up as scenes
+/// change, swipe (or right-click) to rename or delete. Changing a scene's look happens in Edit scene, on screen.
 struct ScenesView: View {
     @EnvironmentObject var app: AppState
-    @State private var selection: UUID?
+    @State private var renaming: UUID?
+    @State private var newName = ""
+    @FocusState private var nameFocused: Bool
 
     var body: some View {
-        HStack(spacing: 0) {
-            list.frame(width: 230)
-            Divider()
-            if let s = app.scenes.scene(selection) {
-                SceneEditor(scene: s)
-            } else {
+        VStack(spacing: 0) {
+            if app.scenes.scenes.isEmpty {
                 VStack(spacing: 10) {
-                    Text(app.scenes.scenes.isEmpty
-                         ? "No scenes yet. A scene keeps one photo with its look and where it sits in the mirrors."
-                         : "Pick a scene to show and edit it.")
+                    Image(systemName: "photo.artframe").font(.system(size: 28)).foregroundStyle(.secondary)
+                    Text("No scenes yet. A scene keeps one photo with its look and where it sits in the mirrors.")
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Save what's on screen as a scene") { selection = app.saveScene() }
                 }
-                .frame(maxWidth: 420)
+                .padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(app.scenes.scenes) { s in row(s) }
+                }
+                .listStyle(.plain)
             }
+            Button { _ = app.saveScene() } label: {
+                Label("Save the scene on screen", systemImage: "bookmark")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glass)
+            .controlSize(.large)
+            .padding(12)
+            .help("Keep this photo with these settings and where the photo sits")
         }
-        .onAppear {
-            app.isEditingScenes = true
-            if selection == nil { selection = app.activeSceneID ?? app.scenes.scenes.first?.id }
-            if let id = selection { app.beginEditing(scene: id) }
-        }
-        .onDisappear {
-            app.discardDraft()
-            app.isEditingScenes = false
-        }
-        .onChange(of: selection) { _, id in if let id { app.beginEditing(scene: id) } else { app.discardDraft() } }
     }
 
-    private var list: some View {
-        VStack(spacing: 0) {
-            List(selection: $selection) {
-                ForEach(app.scenes.scenes) { s in
-                    HStack(spacing: 8) {
-                        Button { app.scenes.toggleFavorite(s.id) } label: {
-                            Image(systemName: s.isFavorite ? "heart.fill" : "heart")
-                                .foregroundStyle(s.isFavorite ? Color.pink : Color.secondary)
-                        }
-                        .buttonStyle(.borderless)
-                        .help(s.isFavorite ? "Shown on Home" : "Heart to show it on Home")
-                        SceneThumbnail(id: s.id).frame(width: 64, height: 36).clipShape(RoundedRectangle(cornerRadius: 4))
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(s.name).lineLimit(1)
-                            Text(app.isSceneAvailable(s) ? s.look.summary : "Photo missing")
-                                .font(.caption).foregroundStyle(app.isSceneAvailable(s) ? Color.secondary : Color.orange).lineLimit(1)
-                        }
-                    }
-                    .tag(s.id)
+    private func row(_ s: SavedScene) -> some View {
+        let available = app.isSceneAvailable(s)
+        let active = app.activeSceneID == s.id
+        return HStack(spacing: 12) {
+            SceneThumbnail(id: s.id)
+                .frame(width: 112, height: 63)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(active ? Color.accentColor : .clear, lineWidth: 2)
                 }
+            VStack(alignment: .leading, spacing: 2) {
+                if renaming == s.id {
+                    TextField("Name", text: $newName)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($nameFocused)
+                        .onSubmit { finishRenaming() }
+                        .onExitCommand { renaming = nil }
+                } else {
+                    Text(s.name).font(.body.weight(active ? .semibold : .regular)).lineLimit(1)
+                }
+                Text(available ? s.look.summary : "Photo missing")
+                    .font(.caption)
+                    .foregroundStyle(available ? Color.secondary : Color.orange)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Button { app.scenes.toggleFavorite(s.id) } label: {
+                Image(systemName: s.isFavorite ? "star.fill" : "star")
+                    .foregroundStyle(s.isFavorite ? Color.yellow : Color.secondary)
+                    .frame(width: 28, height: 28)
+                    .hoverHighlight(Circle())
+            }
+            .buttonStyle(.plain)
+            .help(s.isFavorite ? "Starred: comes up as scenes change" : "Star it so it comes up as scenes change")
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture { if renaming != s.id { app.showScene(s) } }
+        .opacity(available ? 1 : 0.7)
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) { app.deleteScene(s.id) } label: { Label("Delete", systemImage: "trash") }
+            Button { startRenaming(s) } label: { Label("Rename", systemImage: "pencil") }
+                .tint(.blue)
+        }
+        .swipeActions(edge: .leading) {
+            Button { app.scenes.toggleFavorite(s.id) } label: {
+                Label(s.isFavorite ? "Unstar" : "Star", systemImage: s.isFavorite ? "star.slash" : "star.fill")
+            }
+            .tint(.yellow)
+        }
+        .contextMenu {
+            Button("Show") { app.showScene(s) }.disabled(!available)
+            Button("Rename…") { startRenaming(s) }
+            Button(s.isFavorite ? "Unstar" : "Star") { app.scenes.toggleFavorite(s.id) }
+            Button("Duplicate") { _ = app.scenes.duplicate(s.id) }
+            if !available {
+                Button("Use the photo on screen") { app.usePhotoOnScreen(for: s.id) }
             }
             Divider()
-            HStack(spacing: 4) {
-                Button { selection = app.saveScene() } label: { Image(systemName: "plus") }
-                    .help("New scene from what's on screen")
-                Button { if let s = selection, let id = app.scenes.duplicate(s) { selection = id } } label: { Image(systemName: "plus.square.on.square") }
-                    .help("Duplicate")
-                    .disabled(selection == nil)
-                Button {
-                    if let s = selection { app.deleteScene(s); selection = nil }
-                } label: { Image(systemName: "minus") }
-                    .help("Delete")
-                    .disabled(selection == nil)
-                Spacer()
-            }
-            .buttonStyle(.borderless)
-            .padding(8)
+            Button("Delete", role: .destructive) { app.deleteScene(s.id) }
         }
     }
-}
 
-struct SceneEditor: View {
-    @EnvironmentObject var app: AppState
-    let scene: SavedScene
-    @AppStorage("previewShowsPatternLines") private var showLines = false
+    private func startRenaming(_ s: SavedScene) {
+        newName = s.name
+        renaming = s.id
+        DispatchQueue.main.async { nameFocused = true }
+    }
 
-    var body: some View {
-        // The scene itself shows behind this panel; it is the preview.
-        VStack(spacing: 0) {
-            if !app.isSceneAvailable(scene) {
-                VStack(spacing: 6) {
-                    Text("This scene's photo can't be found. Its look is kept: give it a photo by playing one (Photos, the ▶︎ on a photo), then come back here.")
-                        .foregroundStyle(.orange)
-                        .multilineTextAlignment(.center)
-                    Button("Use the photo on screen") { app.usePhotoOnScreen(for: scene.id) }
-                        .help("Attach the photo showing behind this panel to this scene")
-                }
-                .padding(12)
-            }
-            if let draft = app.draft, draft.target == .scene(scene.id) {
-                Form {
-                    Section {
-                        DraftHeader(draft: draft) { EmptyView() }
-                        Toggle("Debug lines", isOn: $showLines)
-                            .help("Traces the pattern's mirrors and tile edges in red on the scene while this tab is open")
-                    } footer: {
-                        Text("Drag the scene to move the photo inside the mirrors; Save keeps where it sits.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    LookControls(look: draft.look, edit: app.edit)
-                }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
-            }
-        }
+    private func finishRenaming() {
+        if let id = renaming { app.renameScene(id, to: newName) }
+        renaming = nil
     }
 }
 

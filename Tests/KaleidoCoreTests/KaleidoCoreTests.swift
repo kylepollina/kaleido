@@ -785,20 +785,6 @@ final class SceneTests: XCTestCase {
         let old = #"[{"id": "\#(UUID().uuidString)", "name": "Old", "photoID": "\#(UUID().uuidString)", "look": {}, "panX": 0, "panY": 0, "isFavorite": true, "created": 0}]"#
         XCTAssertNil(try JSONDecoder().decode([SavedScene].self, from: Data(old.utf8)).first?.photoKey)
     }
-
-    func testDraftTracksUnsavedChanges() {
-        var d = EditDraft(target: .scene(UUID()), name: "Lake", look: Look())
-        XCTAssertFalse(d.hasChanges)
-        d.look.segments = 9
-        XCTAssertTrue(d.hasChanges)
-        d.look.segments = Look().segments
-        XCTAssertFalse(d.hasChanges, "changing it back is no change")
-        d.name = "Mine"
-        XCTAssertTrue(d.hasChanges)
-        var s = EditDraft(target: .scene(UUID()), name: "S", look: Look())
-        s.moved = true
-        XCTAssertTrue(s.hasChanges, "moving the photo counts")
-    }
 }
 
 final class AerialTests: XCTestCase {
