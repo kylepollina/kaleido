@@ -667,6 +667,8 @@ final class KaleidoView: NSView {
     private(set) var pixelWidth = 0, pixelHeight = 0
     private let maxInFlight = 2
     var preferredFramesPerSecond: Int { didSet { applyRate() } }
+    /// Fraction of the Retina pixel density to draw at (the desktop draws lighter to keep the Mac cool).
+    var renderScale: CGFloat = 1
     var suspended = false { didSet { refreshPause() } }
     var isPaused: Bool { link?.isPaused ?? true }
     /// Preview only: show the photo itself instead of the kaleidoscope.
@@ -756,7 +758,7 @@ final class KaleidoView: NSView {
     private func refreshPause() { link?.isPaused = suspended || occluded }
 
     private func ensureSurfaces() -> Bool {
-        let scale = window?.backingScaleFactor ?? 2
+        let scale = (window?.backingScaleFactor ?? 2) * renderScale
         let w = max(Int(bounds.width * scale), 2), h = max(Int(bounds.height * scale), 2)
         if w == pixelWidth && h == pixelHeight && !surfaces.isEmpty { return true }
         surfaces = []

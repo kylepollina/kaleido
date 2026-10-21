@@ -11,6 +11,15 @@ struct KaleidoApp: App {
         if CommandLine.arguments.contains("--snapshot") {
             MainActor.assumeIsolated { Snapshot.runAndExit() }
         }
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--stress-render"), i + 1 < args.count {
+            func number(_ name: String, _ d: Double) -> Double {
+                args.firstIndex(of: name).flatMap { $0 + 1 < args.count ? Double(args[$0 + 1]) : nil } ?? d
+            }
+            MainActor.assumeIsolated {
+                StressRender.run(dir: args[i + 1], seconds: number("--seconds", 600), perPhoto: number("--per-photo", 10))
+            }
+        }
     }
 
     var body: some Scene {

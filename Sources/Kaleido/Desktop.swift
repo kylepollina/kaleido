@@ -50,6 +50,13 @@ final class DesktopController {
         for (_, e) in windows { e.view.preferredFramesPerSecond = fps }
     }
 
+    /// Draws the desktop at this fraction of Retina density (fewer pixels, cooler Mac).
+    func setRenderScale(_ scale: Double) {
+        renderScale = CGFloat(scale)
+        for (_, e) in windows { e.view.renderScale = renderScale }
+    }
+    private var renderScale: CGFloat = 0.75
+
     func setSuspended(_ value: Bool) {
         suspended = value
         if !value { renderer.resetClock() }
@@ -110,6 +117,7 @@ final class DesktopController {
             window.title = "Kaleido Desktop"
             let view = KaleidoView(renderer: renderer, fps: fps)
             view.suspended = suspended
+            view.renderScale = renderScale
             window.contentView = view
             window.setFrame(screen.frame, display: true)
             window.orderFrontRegardless()

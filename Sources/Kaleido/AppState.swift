@@ -618,6 +618,7 @@ final class AppState: ObservableObject, PhotoProvider {
         queue.shuffle = settings.shuffle
         updateHold()
         desktop?.setFrameRate(currentFrameRate)
+        desktop?.setRenderScale(settings.effectiveSharpness(lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled))
         refreshSuspension()
         updateKeepAwake()
     }

@@ -59,6 +59,28 @@ public enum ZoomMotion: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// How many pixels the desktop is drawn at. Fewer pixels, scaled up smoothly by the system, keep the Mac cooler;
+/// soft, slow photos lose very little.
+public enum Sharpness: String, Codable, CaseIterable, Identifiable, Sendable {
+    case full, balanced, light
+    public var id: String { rawValue }
+    public var label: String {
+        switch self {
+        case .full: return "Full (Retina)"
+        case .balanced: return "Balanced"
+        case .light: return "Light (coolest)"
+        }
+    }
+    /// Fraction of the display's Retina pixel density to draw at.
+    public var fraction: Double {
+        switch self {
+        case .full: return 1
+        case .balanced: return 0.75
+        case .light: return 0.5
+        }
+    }
+}
+
 /// Where a new scene's pattern comes from.
 public enum PatternSource: String, Codable, CaseIterable, Identifiable, Sendable {
     case current, mine, invented, both
@@ -117,6 +139,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var speedStep = Settings.defaultSpeedStep
     /// Movement, on top of any look: how the view zooms.
     public var zoomMotion: ZoomMotion = .drift
+    /// Desktop drawing resolution (the preview always draws sharp).
+    public var sharpness: Sharpness = .balanced
     /// Surprise me: as scenes change, mix saved scenes with brand-new ones (a photo with an invented pattern).
     /// Off: play through the saved scenes (or, with none saved, the photos with the pattern on screen).
     public var surprise = true
@@ -178,6 +202,7 @@ public struct Settings: Codable, Equatable, Sendable {
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
         zoomMotion = (try? c.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion)) ?? d.zoomMotion
         surprise = try c.decodeIfPresent(Bool.self, forKey: .surprise) ?? d.surprise
+        sharpness = (try? c.decodeIfPresent(Sharpness.self, forKey: .sharpness)) ?? d.sharpness
         sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
         patternSource = (try? c.decodeIfPresent(PatternSource.self, forKey: .patternSource)) ?? d.patternSource
         excludedShapes = (try? c.decodeIfPresent([MirrorMode].self, forKey: .excludedShapes)) ?? []
@@ -230,6 +255,11 @@ public struct Settings: Codable, Equatable, Sendable {
     /// The rate to actually render at, given system conditions.
     public func effectiveFrameRate(lowPowerMode: Bool) -> Int {
         (limitInLowPowerMode && lowPowerMode) ? 30 : frameRate
+    }
+
+    /// Desktop drawing resolution, as a fraction of Retina: Low Power Mode (when limited) always draws Light.
+    public func effectiveSharpness(lowPowerMode: Bool) -> Double {
+        (limitInLowPowerMode && lowPowerMode) ? Sharpness.light.fraction : sharpness.fraction
     }
 }
 

@@ -726,7 +726,11 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 Toggle("Keep the screen awake while playing", isOn: $app.settings.keepScreenAwake)
                 Toggle("Pause on battery", isOn: $app.settings.pauseOnBattery)
-                Toggle("30 fps in Low Power Mode", isOn: $app.settings.limitInLowPowerMode)
+                Picker("Desktop sharpness", selection: $app.settings.sharpness) {
+                    ForEach(Sharpness.allCases) { Text($0.label).tag($0) }
+                }
+                .help("Fewer pixels keep the Mac cooler; the system scales the picture up smoothly. Balanced draws about half the pixels of Full, Light a quarter.")
+                Toggle("Lighter in Low Power Mode (30 fps, Light sharpness)", isOn: $app.settings.limitInLowPowerMode)
                 Toggle("Start playing when Kaleido opens", isOn: $app.settings.playOnLaunch)
             }
         }

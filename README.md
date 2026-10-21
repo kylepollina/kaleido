@@ -125,6 +125,13 @@ visibility and frame counts; Debug > Rebuild Desktop Windows (or the menu bar it
 
 Developer helpers: `KALEIDO_DEBUG=1` prints frame pacing every 5 s. `Kaleido --snapshot out.png --photo a.jpg
 [--mode hex --segments 6 --time 10 --size 1920x1080]` renders one frame offscreen with the real shader.
+`Kaleido --stress-render folder [--seconds 600 --per-photo 10]` plays every photo and video in a folder through the
+real renderer off screen at 30 fps and logs memory every 30 s, for hunting leaks without touching the desktop.
+
+**Keeping the Mac cool:** the desktop is drawn at Settings > Performance > Desktop sharpness: Balanced (the default)
+draws about half the pixels of Full Retina, Light a quarter, and the system scales the picture up smoothly. Low
+Power Mode draws Light at 30 fps. Drawing stops whenever the desktop is covered, the display sleeps or the screen
+locks.
 
 ## Limitations
 

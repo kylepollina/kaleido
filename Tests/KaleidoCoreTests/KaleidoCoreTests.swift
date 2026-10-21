@@ -255,6 +255,17 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).surprise)
     }
 
+    func testDesktopSharpness() throws {
+        var s = Settings()
+        XCTAssertEqual(s.sharpness, .balanced, "a cooler default than full Retina")
+        XCTAssertEqual(s.effectiveSharpness(lowPowerMode: false), 0.75)
+        XCTAssertEqual(s.effectiveSharpness(lowPowerMode: true), Sharpness.light.fraction, "Low Power Mode draws light")
+        s.limitInLowPowerMode = false
+        XCTAssertEqual(s.effectiveSharpness(lowPowerMode: true), 0.75)
+        s.sharpness = .full
+        XCTAssertEqual(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).sharpness, .full)
+    }
+
     func testMovementSwitches() throws {
         var s = Settings()
         XCTAssertEqual(s.zoomMotion, .drift)
