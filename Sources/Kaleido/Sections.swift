@@ -267,16 +267,16 @@ struct HomeView: View {
         let saved = app.scenes.scene(app.activeSceneID)
         return HStack(spacing: 4) {
             PlayerIcon(name: "dice", active: app.settings.surprise, tint: .pink) { app.settings.surprise.toggle() }
-                .help(app.settings.surprise
-                      ? "Surprise me is on: as scenes change, mostly new ones Kaleido makes up, sometimes your saved scenes"
-                      : "Surprise me is off: plays through your saved scenes (or, with none saved, your photos with this look)")
+                .tip(app.settings.surprise
+                      ? "Surprise me: on (mostly new scenes, sometimes saved ones)"
+                      : "Surprise me: off (only your saved scenes)")
             PlayerIcon(name: "backward.fill", size: 19) { app.previousPhoto() }
-                .help("The scene before")
+                .tip("Previous scene")
             PlayerIcon(name: app.isPlaying ? "stop.fill" : "play.fill", size: 26) { app.togglePlay() }
                 .keyboardShortcut("p", modifiers: .command)
-                .help(app.isPlaying ? "Stop: your normal wallpaper comes back (Space)" : "Play on the desktop (Space)")
+                .tip(app.isPlaying ? "Stop (Space)" : "Play on the desktop (Space)")
             PlayerIcon(name: "forward.fill", size: 19) { app.nextPhoto() }
-                .help("Next scene")
+                .tip("Next scene")
             // Where a music player shows the song: which scene this is, and whether it is on the desktop.
             VStack(alignment: .leading, spacing: 1) {
                 Text(saved?.name ?? (app.sceneTweaked ? "Your scene" : "New scene"))
@@ -289,7 +289,7 @@ struct HomeView: View {
                         Text(album.title).lineLimit(1)
                         Button { app.stopAlbumSlideshow() } label: { Image(systemName: "xmark.circle.fill") }
                             .buttonStyle(.plain)
-                            .help("Stop playing this album: back to all your selected photos")
+                            .tip("Stop playing this album")
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -317,15 +317,14 @@ struct HomeView: View {
                         .hoverHighlight(Circle())
                 }
                 .buttonStyle(.plain)
-                .help(slow ? "Super slow motion is on: click to go back to the slider's speed"
-                           : "Super slow motion: movement at an eighth of the slowest speed, videos at an eighth of real time")
+                .tip(slow ? "Super slow motion: on" : "Super slow motion")
                 Slider(value: Binding(get: { Double(app.settings.speedStep) },
                                       set: { app.settings.speedStep = Int($0.rounded()); app.settings.superSlow = false }),
                        in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
                     .controlSize(.small)
                     .frame(width: 96)
                     .opacity(slow ? 0.4 : 1)
-                    .help("Speed: how fast everything moves (moving it ends super slow motion)")
+                    .tip("Speed")
                 Image(systemName: "hare.fill").font(.system(size: 12)).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 6)
@@ -333,11 +332,11 @@ struct HomeView: View {
             PlayerIcon(name: saved == nil ? "bookmark" : "bookmark.fill", active: saved != nil, tint: .accentColor) {
                 if saved == nil { app.saveScene() }
             }
-            .help(saved == nil ? "Save scene: keep this photo with these settings and where the photo sits" : "This is one of your saved scenes")
+            .tip(saved == nil ? "Save scene" : "Saved scene")
             PlayerIcon(name: "slider.horizontal.3", active: editing, tint: .accentColor) {
                 withAnimation(Self.panelAnimation) { editing.toggle() }
             }
-            .help("Edit scene: the pattern and every setting of this scene")
+            .tip("Edit scene")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -369,7 +368,7 @@ struct HomeView: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Zoom: \(app.settings.zoomMotion.label). Drift wanders slowly; Push and Pull keep sliding the photo through the mirrors one way or the other.")
+        .tip("Zoom: Drift, Push or Pull")
     }
 
     /// Which scene this is.
@@ -445,6 +444,51 @@ extension View {
     /// clickable. Liquid Glass's own `.interactive()` reacts only on glass shapes, and glass inside the glass
     /// capsule looks doubled, so the mini-player draws its own.
     func hoverHighlight<S: Shape>(_ shape: S) -> some View { modifier(HoverHighlight(shape: shape)) }
+}
+
+extension View {
+    /// A tooltip drawn by SwiftUI itself, above the control after a short hover. The mini-player floats over the
+    /// scene's AppKit view, which swallows standard `.help` tooltips there.
+    func tip(_ text: String) -> some View { modifier(HoverTip(text: text)) }
+}
+
+private struct HoverTip: ViewModifier {
+    let text: String
+    /// KALEIDO_SHOW_TIPS=1 shows every tip at once, for checking how they look.
+    @State private var shown = ProcessInfo.processInfo.environment["KALEIDO_SHOW_TIPS"] == "1"
+    @State private var pending: DispatchWorkItem?
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                pending?.cancel()
+                if inside {
+                    let show = DispatchWorkItem { withAnimation(.easeOut(duration: 0.15)) { shown = true } }
+                    pending = show
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: show)
+                } else {
+                    withAnimation(.easeIn(duration: 0.1)) { shown = false }
+                }
+            }
+            .simultaneousGesture(TapGesture().onEnded { pending?.cancel(); shown = false })
+            // A zero-height strip along the control's top edge; the tip hangs above it, centred, one line.
+            .overlay(alignment: .top) {
+                Color.clear.frame(height: 0)
+                    .overlay(alignment: .bottom) {
+                        if shown {
+                            Text(text)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .fixedSize()
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .glassEffect(.regular, in: Capsule())
+                                .padding(.bottom, 14)
+                                .allowsHitTesting(false)
+                                .transition(.opacity)
+                        }
+                    }
+            }
+    }
 }
 
 private struct HoverHighlight<S: Shape>: ViewModifier {
