@@ -17,9 +17,9 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   scene: a saved one, or a new one Kaleido just put together. "Save scene" keeps it (photo, look and where you
   dragged the photo), and its speed and zoom (Drift / Push / Pull). Changing speed or zoom on a saved scene
   saves itself; the rest needs Save.
-- **Play from** (the line under the scene's name in the mini-player): **Discover** plays all your selected photos
+- **Play from** (the first button in the mini-player, a menu like Zoom's): **Discover** plays all your selected photos
   in random order, with saved scenes popping in now and then; **My scenes** plays your saved scenes as a playlist
-  (also "Play my scenes" at the top of the Scenes tab); playing an album from Photos is the third mode.
+  (also "Play my scenes" at the top of the Scenes tab); or pick any album with photos selected (also Play album in Photos).
 - **Random patterns** (the dice, on by default): every scene that comes up gets an invented pattern, a saved
   scene's photo included (its saved pattern is left alone), so photos that make good patterns keep coming back
   new. Off, saved scenes show their own pattern and other photos keep the one on screen. **Shuffle** (beside it)
@@ -54,7 +54,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   (the wedges make room while an extra one grows from nothing), or one closes; tilings grow denser or sparser. A
   change comes about every 3 minutes, whatever the speed, and takes about 40 seconds to open up. Turn it on in Edit scene.
 - **One speed control.** Five stops from turtle to rabbit, like the trackpad speed setting. Click the tortoise for
-  super slow motion: every movement at an eighth of the slowest stop, and videos at an eighth of real time.
+  super slow motion (the slider drops to the bottom with it): every movement at an eighth of the slowest stop, and videos at an eighth of real time.
 - **Zoom: Drift, Push, Pull.** Push and Pull are what dragging the preview does, done continuously: the photo keeps
   sliding through the mirrors one way or the other (along the mirrors' own axis, which turns with the pattern).
   Whether that reads as zooming in or out depends on the pattern, hence the neutral names. Drift leaves only the

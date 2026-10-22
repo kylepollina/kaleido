@@ -295,7 +295,9 @@ struct HomeView: View {
     private var transport: some View {
         let saved = app.scenes.scene(app.activeSceneID)
         return HStack(spacing: 4) {
-            // Two toggles, like Shuffle and Repeat in Music: invented patterns, and random order.
+            // What it plays from, then two toggles, like Shuffle and Repeat in Music: invented patterns, and random order.
+            modeMenu
+            playerDivider
             PlayerIcon(name: "dice", active: app.settings.surprise, tint: .pink) { app.settings.surprise.toggle() }
                 .tip(app.settings.surprise ? "Random patterns: on (every scene gets an invented pattern)"
                                            : "Random patterns: off (saved scenes keep their own pattern)")
@@ -312,12 +314,15 @@ struct HomeView: View {
                 .tip(app.isPlaying ? "Stop (Space)" : "Play on the desktop (Space)")
             PlayerIcon(name: "forward.fill", size: 19) { app.nextPhoto() }
                 .tip("Next scene")
-            // Where a music player shows the song: which scene this is, and what it is playing from.
+            // Where a music player shows the song: which scene this is, and whether it is on the desktop.
             VStack(alignment: .leading, spacing: 1) {
                 Text(saved?.name ?? (app.draftSceneName.isEmpty ? (app.sceneTweaked ? "Your scene" : "New scene") : app.draftSceneName))
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
-                modeMenu
+                Text(app.isPlaying ? (app.suspensionReason.map { "Paused: \($0.lowercased())" } ?? "On your desktop") : "Preview only")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             .frame(width: 140, alignment: .leading)
             .padding(.horizontal, 8)
@@ -341,38 +346,48 @@ struct HomeView: View {
         .glossy(Capsule())
     }
 
-    /// What it is playing from (Discover, My scenes, or an album) as a small menu, and whether the desktop is paused.
+    /// What it plays from, like Zoom: the mode's icon and name, with a menu of Discover, My scenes and the albums
+    /// that have photos selected.
     private var modeMenu: some View {
         let album = app.albumSlideshow
-        let title = album.map { "Album: \($0.title)" } ?? app.settings.playSource.label
+        let title = album?.title ?? app.settings.playSource.label
         let icon = album != nil ? "photo.stack" : app.settings.playSource.icon
+        let albums = makeCards(app).filter { card in app.library.itemIDs(in: card.id).contains { app.library.item($0)?.isEnabled == true } }
         return Menu {
-            ForEach(PlaySource.allCases) { source in
-                Toggle(isOn: Binding(get: { album == nil && app.settings.playSource == source },
-                                     set: { _ in app.setPlaySource(source) })) {
-                    Label(source.label, systemImage: source.icon)
+            Picker("Play from", selection: Binding(get: { album == nil ? app.settings.playSource : nil },
+                                                   set: { if let v = $0 { app.setPlaySource(v) } })) {
+                ForEach(PlaySource.allCases) { source in
+                    Label(source.label, systemImage: source.icon).tag(Optional(source))
+                        .selectionDisabled(source == .scenes && !app.hasPlayableScenes)
                 }
-                .disabled(source == .scenes && !app.hasPlayableScenes)
             }
-            if let album {
-                Divider()
-                Button("Stop playing \(album.title)") { app.stopAlbumSlideshow() }
+            .pickerStyle(.inline)
+            if !albums.isEmpty {
+                Picker("Albums", selection: Binding(get: { album?.id },
+                                                    set: { id in
+                                                        if let card = albums.first(where: { $0.id == id }) { app.playAlbum(card.id, title: card.title) }
+                                                    })) {
+                    ForEach(albums) { card in Label(card.title, systemImage: "photo.stack").tag(Optional(card.id)) }
+                }
+                .pickerStyle(.inline)
             }
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: icon).font(.system(size: 10))
-                Text(app.isPlaying ? (app.suspensionReason.map { _ in "\(title) · paused" } ?? title) : title).lineLimit(1)
-                Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                Text(title)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .contentShape(Rectangle())
+            .padding(.horizontal, 8)
+            .frame(width: 124, height: 38)   // room for "My scenes" so nothing shifts; long album names truncate
+            .hoverHighlight(Capsule())
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .tip("Play from: Discover (all your photos, saved scenes now and then) or My scenes")
+        .tip("Play from: Discover, My scenes, or one album")
     }
 
     private var playerDivider: some View {
@@ -616,7 +631,11 @@ struct SpeedSlider: View {
     var body: some View {
         let slow = app.settings.superSlow
         HStack(spacing: 6) {
-            Button { app.settings.superSlow.toggle() } label: {
+            Button {
+                // Super slow motion goes below the slowest stop, so the slider drops to the bottom with it.
+                if !slow { app.setSceneMotion(speedStep: 0) }
+                app.settings.superSlow.toggle()
+            } label: {
                 Image(systemName: "tortoise.fill")
                     .font(.system(size: slow ? 13 : 12, weight: .semibold))
                     .foregroundStyle(slow ? Color.green : Color.secondary)
