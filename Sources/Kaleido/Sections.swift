@@ -253,24 +253,20 @@ struct HomeView: View {
             .padding(.top, 14)
             Form {
                 Section {
-                    TextField("Scene name", text: $sceneName, prompt: Text("Scene name"))
+                    TextField("Scene name", text: $app.draftSceneName, prompt: Text("Scene name"))
                         .labelsHidden()
                         .textFieldStyle(.roundedBorder)
                         .multilineTextAlignment(.leading)
-                        .onSubmit { if let id = app.activeSceneID { app.renameScene(id, to: sceneName) } }
+                        .onSubmit { if let id = app.activeSceneID { app.renameScene(id, to: app.draftSceneName) } }
                     // Like the mini-player's bookmark: filled and tinted while this scene is saved as it is.
                     let saved = app.activeSceneID != nil
-                    Button {
-                        _ = app.saveScene(named: sceneName)
-                        if let s = app.scenes.scene(app.activeSceneID) { sceneName = s.name }
-                    } label: {
+                    Button { app.toggleBookmark() } label: {
                         Label(saved ? "Saved" : "Save", systemImage: saved ? "bookmark.fill" : "bookmark")
                             .foregroundStyle(saved ? Color.accentColor : Color.primary)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glass)
-                    .disabled(saved)
-                    .help(saved ? "Saved scene" : "Keep this photo with these settings as a saved scene")
+                    .help(saved ? "Saved scene (click to remove it)" : "Keep this photo with these settings as a saved scene")
                 }
                 ShapeControls(look: app.settings.look, edit: app.tweakScene, showLines: $showLines)
                 Section("Motion") {
@@ -285,20 +281,10 @@ struct HomeView: View {
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
-            .onAppear { syncSceneName() }
-            .onChange(of: app.activeSceneID) { _, _ in syncSceneName() }
         }
         .frame(width: Self.editWidth)
         .frame(maxHeight: .infinity)
         .glossy(RoundedRectangle(cornerRadius: 24, style: .continuous))
-    }
-
-    @State private var sceneName = ""
-
-    /// The name field follows the saved scene on screen; a new or edited scene keeps what was typed.
-    private func syncSceneName() {
-        if let s = app.scenes.scene(app.activeSceneID) { sceneName = s.name }
-        else if !app.sceneTweaked { sceneName = "" }
     }
 
     private var zoomBinding: Binding<ZoomMotion> {
@@ -328,7 +314,7 @@ struct HomeView: View {
                 .tip("Next scene")
             // Where a music player shows the song: which scene this is, and what it is playing from.
             VStack(alignment: .leading, spacing: 1) {
-                Text(saved?.name ?? (app.sceneTweaked ? "Your scene" : "New scene"))
+                Text(saved?.name ?? (app.draftSceneName.isEmpty ? (app.sceneTweaked ? "Your scene" : "New scene") : app.draftSceneName))
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
                 modeMenu
@@ -342,7 +328,7 @@ struct HomeView: View {
             .padding(.horizontal, 6)
             playerDivider
             PlayerIcon(name: saved == nil ? "bookmark" : "bookmark.fill", active: saved != nil, tint: .accentColor) {
-                if let saved { app.deleteScene(saved.id) } else { app.saveScene() }
+                app.toggleBookmark()
             }
             .tip(saved == nil ? "Save scene" : "Saved scene (click to remove it)")
             PlayerIcon(name: "slider.horizontal.3", active: editing, tint: .accentColor) {

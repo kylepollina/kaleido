@@ -26,7 +26,9 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   plays My scenes and albums in random order; Discover is always random. Randomize in Edit scene re-rolls the
   pattern on screen once. Invented patterns use only the shapes ticked in Settings (untick Diamonds if it isn't
   for you). Next and Back fade in 3 seconds; Back brings back the scene before, look and all.
-- **Bookmark** in the mini-player saves the scene; click it again (lit) to remove the saved scene.
+- **Bookmark** saves the scene; click it again (lit) to remove the saved scene. Edit scene is a bigger version of
+  the mini-player's editing: its Save button, name, speed (with the tortoise) and zoom are the same controls, so a
+  change in one shows in the other.
 - **The window is the scene**, edge to edge (like Portal), and everything floats over it in Liquid Glass:
   - a mini-player (like Apple Music's): Random patterns, Shuffle, Back / Play (or Space) / Next, the scene's name and what it plays from, Zoom
     (Drift / Push / Pull), Speed, Save scene and Edit scene; each button lights up under the pointer;

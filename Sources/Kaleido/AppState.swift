@@ -31,7 +31,10 @@ final class AppState: ObservableObject, PhotoProvider {
     /// Playing the saved scenes as a playlist (the My scenes mode), unless an album is playing.
     var playingScenes: Bool { albumSlideshow == nil && settings.playSource == .scenes }
     /// The scene on screen, if any. A scene holds its photo until Next or Previous.
-    @Published private(set) var activeSceneID: UUID?
+    @Published private(set) var activeSceneID: UUID? { didSet { syncDraftName() } }
+    /// The name in Edit scene's field: the saved scene's name, or what was typed for one not saved yet. The
+    /// mini-player's bookmark saves under it too.
+    @Published var draftSceneName = ""
     /// Bumped whenever a scene's thumbnail is rewritten, so cards reload it.
     @Published private(set) var sceneThumbVersion = 0
     private var sceneArriving: SavedScene?
@@ -415,6 +418,17 @@ final class AppState: ObservableObject, PhotoProvider {
         activeSceneID = id
         clearTweaked()
         return id
+    }
+
+    /// The bookmark, in the mini-player and in Edit scene alike: saves the scene on screen (under the name typed in
+    /// Edit scene), or, when it is already saved, removes the saved scene (what is on screen stays).
+    func toggleBookmark() {
+        if let id = activeSceneID { deleteScene(id) } else { saveScene(named: draftSceneName) }
+    }
+
+    private func syncDraftName() {
+        if let s = scenes.scene(activeSceneID) { draftSceneName = s.name }
+        else if tweakedFromID == nil && !sceneTweaked { draftSceneName = "" }
     }
 
     func renameScene(_ id: UUID, to name: String) {
