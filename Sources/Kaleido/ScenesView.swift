@@ -15,18 +15,19 @@ struct ScenesView: View {
     var body: some View {
         VStack(spacing: 0) {
             Button {
-                if app.playingScenes { app.stopPlayingScenes() } else { app.playScenes() }
+                app.setPlaySource(app.playingScenes ? .discover : .scenes)
             } label: {
-                Label(app.playingScenes ? "Stop playing scenes" : "Play scenes",
-                      systemImage: app.playingScenes ? "stop.fill" : "play.fill")
+                Label(app.playingScenes ? "Back to Discover" : "Play my scenes",
+                      systemImage: app.playingScenes ? "sparkles" : "play.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
             .controlSize(.large)
             .padding([.horizontal, .top], 12)
             .padding(.bottom, 4)
-            .disabled(!app.playingScenes && !app.scenes.scenes.contains(where: app.isSceneAvailable))
-            .help("Play through your saved scenes one after the other (shuffled when Shuffle photo order is on), on the desktop too")
+            .disabled(!app.playingScenes && !app.hasPlayableScenes)
+            .help(app.playingScenes ? "Play from all your photos again, with saved scenes now and then"
+                                    : "Play your saved scenes as a playlist (in this order, or shuffled with Shuffle on)")
             if app.scenes.scenes.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "photo.artframe").font(.system(size: 28)).foregroundStyle(.secondary)

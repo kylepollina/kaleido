@@ -28,6 +28,25 @@ public enum SceneShuffle: String, Codable, CaseIterable, Identifiable, Sendable 
     }
 }
 
+/// Where scenes come from as they change (an album playing is a third mode, chosen in Photos, that isn't saved).
+public enum PlaySource: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// All the selected photos, with saved scenes popping in now and then, always in random order.
+    case discover
+    /// The saved scenes as a playlist, in the Scenes list's order or shuffled.
+    case scenes
+    public var id: String { rawValue }
+    public var label: String {
+        switch self {
+        case .discover: return "Discover"
+        case .scenes: return "My scenes"
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        self = PlaySource(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .discover
+    }
+}
+
 /// How the view zooms, for every scene. Infinite zooms loop seamlessly (each doubling cross-fades into the next).
 /// Push and Pull keep sliding the photo through the mirrors one way or the other. Whether that reads as zooming in
 /// or out depends on the pattern, hence the neutral names. Drift leaves only the look's own drift and gentle zoom breathing.
@@ -112,12 +131,12 @@ public struct Settings: Codable, Equatable, Sendable {
     public static let superSlowVideoRate: Float = 0.125
     /// Desktop drawing resolution (the preview always draws sharp).
     public var sharpness: Sharpness = .balanced
-    /// Surprise me: as scenes change, mix saved scenes with brand-new ones (a photo with an invented pattern).
-    /// Off: play through the saved scenes (or, with none saved, the photos with the pattern on screen).
+    /// Random patterns (the dice in the mini-player): every scene that comes up gets an invented pattern, a saved
+    /// scene's photo included (the saved pattern is left as it is). Off: saved scenes show their own pattern and
+    /// other photos keep the one on screen. Stored under its old name, "surprise".
     public var surprise = true
-    /// The scene shuffle Surprise me stands for. New scenes get an invented pattern when it is on, and keep the
-    /// pattern on screen when it is off.
-    public var effectiveSceneShuffle: SceneShuffle { surprise ? .mixed : .saved }
+    /// Where scenes come from: Discover or My scenes.
+    public var playSource: PlaySource = .discover
     public var sceneShuffle: SceneShuffle = .mixed
     /// Shapes invented patterns may not use (e.g. Diamonds, if you don't like it).
     public var excludedShapes: [MirrorMode] = []
@@ -179,6 +198,7 @@ public struct Settings: Codable, Equatable, Sendable {
         keepScreenAwake = try c.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? d.keepScreenAwake
         superSlow = (try? c.decodeIfPresent(Bool.self, forKey: .superSlow)) ?? false
         surprise = try c.decodeIfPresent(Bool.self, forKey: .surprise) ?? d.surprise
+        playSource = (try? c.decodeIfPresent(PlaySource.self, forKey: .playSource)) ?? d.playSource
         sharpness = (try? c.decodeIfPresent(Sharpness.self, forKey: .sharpness)) ?? d.sharpness
         sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
         excludedShapes = (try? c.decodeIfPresent([MirrorMode].self, forKey: .excludedShapes)) ?? []

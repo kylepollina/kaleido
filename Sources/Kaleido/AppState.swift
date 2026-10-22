@@ -28,9 +28,8 @@ final class AppState: ObservableObject, PhotoProvider {
     let aerialDownloads = AerialDownloads()
     /// Playing one album as a slideshow: only its selected photos, no saved scenes (nil: the whole rotation).
     @Published private(set) var albumSlideshow: (id: String, title: String)?
-    /// Playing through the saved scenes, one after the other (in the Scenes list's order, or shuffled when
-    /// Shuffle photo order is on), until stopped.
-    @Published private(set) var playingScenes = false
+    /// Playing the saved scenes as a playlist (the My scenes mode), unless an album is playing.
+    var playingScenes: Bool { albumSlideshow == nil && settings.playSource == .scenes }
     /// The scene on screen, if any. A scene holds its photo until Next or Previous.
     @Published private(set) var activeSceneID: UUID?
     /// Bumped whenever a scene's thumbnail is rewritten, so cards reload it.
@@ -199,9 +198,15 @@ final class AppState: ObservableObject, PhotoProvider {
         sceneHistory.append(ShownScene(photoID: renderer?.currentPhotoID, look: settings.look, savedID: activeSceneID))
         if sceneHistory.count > 40 { sceneHistory.removeFirst() }
         if let s = sceneArriving ?? plannedScene, s.photoID == photoID {
+            // A scene picked in the list always shows as saved; one that playback brought up gets an invented
+            // pattern on its photo while Random patterns is on (the saved scene itself is left as it is).
+            let picked = sceneArriving != nil
             sceneArriving = nil
             plannedScene = nil
-            show(saved: s)
+            if picked || !settings.surprise { show(saved: s) } else {
+                activeSceneID = nil
+                settings.look = inventedLook()
+            }
             return
         }
         plannedScene = nil
@@ -211,18 +216,21 @@ final class AppState: ObservableObject, PhotoProvider {
             markTweaked()
             return
         }
-        // A new scene: this photo with an invented pattern (Surprise me), otherwise the pattern on screen.
-        var look = settings.look
-        var g = SystemRandomNumberGenerator()
-        if surprisePending || settings.surprise {
-            look = Look.random(shapes: settings.inventedShapes, using: &g)
-            // Speed and zoom are the viewer's: an invented scene keeps the ones on screen.
-            look.speedStep = settings.look.speedStep
-            look.zoomMotion = settings.look.zoomMotion
-        }
+        // A new scene: this photo with an invented pattern (Random patterns), otherwise the pattern on screen.
+        let look = surprisePending || settings.surprise ? inventedLook() : settings.look
         surprisePending = false
         activeSceneID = nil
         settings.look = look
+    }
+
+    /// An invented pattern, from the shapes allowed in Settings. Speed and zoom are the viewer's: it keeps the
+    /// ones on screen.
+    private func inventedLook() -> Look {
+        var g = SystemRandomNumberGenerator()
+        var look = Look.random(shapes: settings.inventedShapes, using: &g)
+        look.speedStep = settings.look.speedStep
+        look.zoomMotion = settings.look.zoomMotion
+        return look
     }
 
     /// The fade to a new scene was turned back: the scene before it returns.
@@ -244,7 +252,6 @@ final class AppState: ObservableObject, PhotoProvider {
     /// A new photo with an invented pattern.
     func surpriseMe() {
         surprisePending = true
-        if playingScenes { playingScenes = false; renderer?.discardPending() }
         if library.enabledItems.count <= 1 { sceneWillStart(photoID: renderer?.currentPhotoID, back: false) }
         renderer?.skip()
     }
@@ -274,10 +281,7 @@ final class AppState: ObservableObject, PhotoProvider {
 
     /// Edit scene's Randomize: an invented pattern on the photo showing (shapes as allowed in Settings).
     func randomizeScene() {
-        var g = SystemRandomNumberGenerator()
-        var look = Look.random(shapes: settings.inventedShapes, using: &g)
-        look.speedStep = settings.look.speedStep
-        look.zoomMotion = settings.look.zoomMotion
+        let look = inventedLook()
         tweakScene { $0 = look }
     }
 
@@ -365,7 +369,7 @@ final class AppState: ObservableObject, PhotoProvider {
     /// The saved scenes "Play scenes" goes through: those whose photo is still there, in the Scenes list's order.
     private var playlist: [SavedScene] { scenes.starredFirst.filter(isSceneAvailable) }
 
-    /// The scene after the one on screen (a random other one when Shuffle photo order is on).
+    /// The scene after the one on screen (a random other one when Shuffle is on).
     private func nextSceneInPlaylist() -> SavedScene? {
         let list = playlist
         guard !list.isEmpty else { return nil }
@@ -377,22 +381,19 @@ final class AppState: ObservableObject, PhotoProvider {
         return list[(i + 1) % list.count]
     }
 
-    /// Plays through the saved scenes, starting now, until stopped.
-    func playScenes() {
-        guard !playlist.isEmpty else { return }
+    /// Switches the mode (Discover or My scenes; an album playing stops) and moves on to its first scene at once.
+    func setPlaySource(_ source: PlaySource) {
+        guard source != settings.playSource || albumSlideshow != nil else { return }
+        if source == .scenes && playlist.isEmpty { return }
         albumSlideshow = nil
-        playingScenes = true
+        settings.playSource = source
         clearTweaked()
+        // Whatever was loaded ahead came from the old mode.
         renderer?.discardPending()
-        if let s = nextSceneInPlaylist() { showScene(s) }
-        if !isPlaying { play() }
+        if let ref = nextPhoto(after: renderer?.currentPhotoID) { renderer?.show(ref, refade: true) }
     }
 
-    /// Back to the whole rotation.
-    func stopPlayingScenes() {
-        playingScenes = false
-        renderer?.discardPending()
-    }
+    var hasPlayableScenes: Bool { !playlist.isEmpty }
 
     /// Freezes what is on screen (photo, look and where the photo sits) as a new scene.
     @discardableResult
@@ -451,13 +452,15 @@ final class AppState: ObservableObject, PhotoProvider {
             plannedScene = s
             return ref
         }
+        // Discover: now and then a saved scene pops in among the photos.
         let saved = shuffleScenes.filter { $0.id != activeSceneID }
-        if albumSlideshow == nil, settings.effectiveSceneShuffle.nextIsSaved(savedCount: saved.count, roll: Double.random(in: 0..<1)),
+        if albumSlideshow == nil, SceneShuffle.mixed.nextIsSaved(savedCount: saved.count, roll: Double.random(in: 0..<1)),
            let s = saved.randomElement(), let ref = sceneRef(s) {
             plannedScene = s
             return ref
         }
-        queue.shuffle = settings.shuffle
+        // Discover is always random; an album follows Shuffle.
+        queue.shuffle = albumSlideshow == nil || settings.shuffle
         var items = library.enabledItems
         if let album = albumSlideshow {
             let inAlbum = Set(library.itemIDs(in: album.id))
@@ -480,14 +483,13 @@ final class AppState: ObservableObject, PhotoProvider {
     /// Plays only this album's selected photos (as new scenes, no saved ones) until stopped.
     func playAlbum(_ id: String, title: String) {
         albumSlideshow = (id, title)
-        playingScenes = false
         clearTweaked()
         // The photo already loaded ahead came from the whole rotation: drop it and start on the album at once.
         renderer?.discardPending()
         if let ref = nextPhoto(after: renderer?.currentPhotoID) { renderer?.show(ref) }
     }
 
-    /// Back to the whole rotation (the album photo loaded ahead is dropped too).
+    /// Back to the mode before the album (the album photo loaded ahead is dropped too).
     func stopAlbumSlideshow() {
         albumSlideshow = nil
         renderer?.discardPending()

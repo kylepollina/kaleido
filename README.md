@@ -17,16 +17,18 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   scene: a saved one, or a new one Kaleido just put together. "Save scene" keeps it (photo, look and where you
   dragged the photo), and its speed and zoom (Drift / Push / Pull). Changing speed or zoom on a saved scene
   saves itself; the rest needs Save.
-- **Play scenes** (top of the Scenes tab) plays through your saved scenes one after the other (shuffled when
-  Shuffle photo order is on), like playing an album.
-- **Random scenes.** The dice in the mini-player is a one-shot: a new photo with an invented pattern, now.
-  Randomize in Edit scene invents a new pattern for the photo on screen. Settings > "Invent new scenes while
-  playing" (on by default) mixes invented scenes in among your saved ones as scenes change; off, only saved scenes
-  play (or, with none saved, your photos with the look on screen).
-  Invented looks use only the shapes ticked in Settings (untick Diamonds if it isn't for you). Next and Back fade
-  in 3 seconds; Back brings back the scene before, look and all.
+- **Play from** (the line under the scene's name in the mini-player): **Discover** plays all your selected photos
+  in random order, with saved scenes popping in now and then; **My scenes** plays your saved scenes as a playlist
+  (also "Play my scenes" at the top of the Scenes tab); playing an album from Photos is the third mode.
+- **Random patterns** (the dice, on by default): every scene that comes up gets an invented pattern, a saved
+  scene's photo included (its saved pattern is left alone), so photos that make good patterns keep coming back
+  new. Off, saved scenes show their own pattern and other photos keep the one on screen. **Shuffle** (beside it)
+  plays My scenes and albums in random order; Discover is always random. Randomize in Edit scene re-rolls the
+  pattern on screen once. Invented patterns use only the shapes ticked in Settings (untick Diamonds if it isn't
+  for you). Next and Back fade in 3 seconds; Back brings back the scene before, look and all.
+- **Bookmark** in the mini-player saves the scene; click it again (lit) to remove the saved scene.
 - **The window is the scene**, edge to edge (like Portal), and everything floats over it in Liquid Glass:
-  - a mini-player (like Apple Music's): New random scene, Back / Play (or Space) / Next, the scene's name, Zoom
+  - a mini-player (like Apple Music's): Random patterns, Shuffle, Back / Play (or Space) / Next, the scene's name and what it plays from, Zoom
     (Drift / Push / Pull), Speed, Save scene and Edit scene; each button lights up under the pointer;
   - the sidebar button (top left) opens a panel on the left with Photos, Scenes and Settings tabs (Photos can
     expand to fill the window, for browsing). Scenes lists your scenes as pictures: click to show one, star the
@@ -104,7 +106,7 @@ Run the tests with `swift test`.
 
 1. Click **Add Folder…** or **Add Photos…** (or drop files on the window).
 2. Press **Play on Desktop** (⌘P). Move to an empty desktop, or use Mission Control's show-desktop, to see it.
-3. Tune the scene with Edit scene, or use the dice to invent new ones.
+3. Tune the scene with Edit scene, or leave the dice on for new patterns.
 4. **Stop** or quit to get your wallpaper back.
 
 Open an album and press **Play album** to play only its selected photos as a slideshow (the mini-player shows

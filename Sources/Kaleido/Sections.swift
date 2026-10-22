@@ -305,12 +305,20 @@ struct HomeView: View {
         Binding(get: { app.settings.look.zoomMotion }, set: { app.setSceneMotion(zoomMotion: $0) })
     }
 
-    /// One glass capsule, like Apple Music's mini player: Surprise me · Back · Play · Next · the scene · Save · Edit.
+    /// One glass capsule, like Apple Music's mini player: Random patterns · Shuffle · Back · Play · Next · the scene · Save · Edit.
     private var transport: some View {
         let saved = app.scenes.scene(app.activeSceneID)
         return HStack(spacing: 4) {
-            PlayerIcon(name: "dice", tint: .pink) { app.surpriseMe() }
-                .tip("New random scene: a new photo with an invented pattern")
+            // Two toggles, like Shuffle and Repeat in Music: invented patterns, and random order.
+            PlayerIcon(name: "dice", active: app.settings.surprise, tint: .pink) { app.settings.surprise.toggle() }
+                .tip(app.settings.surprise ? "Random patterns: on (every scene gets an invented pattern)"
+                                           : "Random patterns: off (saved scenes keep their own pattern)")
+            let discover = app.albumSlideshow == nil && app.settings.playSource == .discover
+            PlayerIcon(name: "shuffle", active: discover || app.settings.shuffle, tint: .accentColor) { app.settings.shuffle.toggle() }
+                .disabled(discover)
+                .opacity(discover ? 0.5 : 1)
+                .tip(discover ? "Shuffle: Discover always plays in random order"
+                              : (app.settings.shuffle ? "Shuffle: on" : "Shuffle: off (in order)"))
             PlayerIcon(name: "backward.fill", size: 19) { app.previousPhoto() }
                 .tip("Previous scene")
             PlayerIcon(name: app.isPlaying ? "stop.fill" : "play.fill", size: 26) { app.togglePlay() }
@@ -318,38 +326,12 @@ struct HomeView: View {
                 .tip(app.isPlaying ? "Stop (Space)" : "Play on the desktop (Space)")
             PlayerIcon(name: "forward.fill", size: 19) { app.nextPhoto() }
                 .tip("Next scene")
-            // Where a music player shows the song: which scene this is, and whether it is on the desktop.
+            // Where a music player shows the song: which scene this is, and what it is playing from.
             VStack(alignment: .leading, spacing: 1) {
                 Text(saved?.name ?? (app.sceneTweaked ? "Your scene" : "New scene"))
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
-                if app.playingScenes {
-                    HStack(spacing: 4) {
-                        Image(systemName: "play.square.stack").font(.system(size: 10))
-                        Text("Playing your scenes").lineLimit(1)
-                        Button { app.stopPlayingScenes() } label: { Image(systemName: "xmark.circle.fill") }
-                            .buttonStyle(.plain)
-                            .tip("Stop playing scenes")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                } else if let album = app.albumSlideshow {
-                    // Playing one album: say which, with a way back to everything.
-                    HStack(spacing: 4) {
-                        Image(systemName: "photo.stack").font(.system(size: 10))
-                        Text(album.title).lineLimit(1)
-                        Button { app.stopAlbumSlideshow() } label: { Image(systemName: "xmark.circle.fill") }
-                            .buttonStyle(.plain)
-                            .tip("Stop playing this album")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                } else {
-                    Text(app.isPlaying ? (app.suspensionReason.map { "Paused: \($0.lowercased())" } ?? "On your desktop") : "Preview only")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                modeMenu
             }
             .frame(width: 140, alignment: .leading)
             .padding(.horizontal, 8)
@@ -360,9 +342,9 @@ struct HomeView: View {
             .padding(.horizontal, 6)
             playerDivider
             PlayerIcon(name: saved == nil ? "bookmark" : "bookmark.fill", active: saved != nil, tint: .accentColor) {
-                if saved == nil { app.saveScene() }
+                if let saved { app.deleteScene(saved.id) } else { app.saveScene() }
             }
-            .tip(saved == nil ? "Save scene" : "Saved scene")
+            .tip(saved == nil ? "Save scene" : "Saved scene (click to remove it)")
             PlayerIcon(name: "slider.horizontal.3", active: editing, tint: .accentColor) {
                 withAnimation(Self.panelAnimation) { editing.toggle() }
             }
@@ -371,6 +353,40 @@ struct HomeView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .glossy(Capsule())
+    }
+
+    /// What it is playing from (Discover, My scenes, or an album) as a small menu, and whether the desktop is paused.
+    private var modeMenu: some View {
+        let album = app.albumSlideshow
+        let title = album.map { "Album: \($0.title)" } ?? app.settings.playSource.label
+        let icon = album != nil ? "photo.stack" : app.settings.playSource.icon
+        return Menu {
+            ForEach(PlaySource.allCases) { source in
+                Toggle(isOn: Binding(get: { album == nil && app.settings.playSource == source },
+                                     set: { _ in app.setPlaySource(source) })) {
+                    Label(source.label, systemImage: source.icon)
+                }
+                .disabled(source == .scenes && !app.hasPlayableScenes)
+            }
+            if let album {
+                Divider()
+                Button("Stop playing \(album.title)") { app.stopAlbumSlideshow() }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: icon).font(.system(size: 10))
+                Text(app.isPlaying ? (app.suspensionReason.map { _ in "\(title) · paused" } ?? title) : title).lineLimit(1)
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .tip("Play from: Discover (all your photos, saved scenes now and then) or My scenes")
     }
 
     private var playerDivider: some View {
@@ -420,6 +436,15 @@ struct HomeView: View {
     }
 }
 
+
+extension PlaySource {
+    var icon: String {
+        switch self {
+        case .discover: return "sparkles"
+        case .scenes: return "bookmark.fill"
+        }
+    }
+}
 
 extension ZoomMotion {
     /// Drift: a breeze. Push: arrows pointing in. Pull: arrows pointing out.
@@ -750,9 +775,10 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Scenes") {
-                Toggle("Invent new scenes while playing", isOn: $app.settings.surprise)
-                    .help("On: as scenes change, new photos get a made-up pattern, mixed with your saved scenes. Off: only your saved scenes play. Play scenes (in Scenes) plays your saved scenes either way.")
-                Toggle("Shuffle photo order", isOn: $app.settings.shuffle)
+                Toggle("Random patterns", isOn: $app.settings.surprise)
+                    .help("Every scene that comes up gets an invented pattern, saved scenes' photos too (the dice in the mini-player)")
+                Toggle("Shuffle My scenes and albums", isOn: $app.settings.shuffle)
+                    .help("Discover always plays in random order")
                 ScaledSliderRow("Time per scene", value: $app.settings.secondsPerPhoto, scale: .log(15, 900)) {
                     $0 < 90 ? "\(Int($0)) s" : String(format: "%.1f min", $0 / 60)
                 }
@@ -779,7 +805,7 @@ struct SettingsView: View {
             } header: {
                 Text("Invented patterns")
             } footer: {
-                Text("Randomize and new scenes with invented patterns only use the shapes ticked here.")
+                Text("Random patterns and Randomize only use the shapes ticked here.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 

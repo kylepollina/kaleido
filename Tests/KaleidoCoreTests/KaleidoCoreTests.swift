@@ -258,10 +258,12 @@ final class SettingsTests: XCTestCase {
     func testSurpriseMeChoosesTheMix() throws {
         var s = Settings()
         XCTAssertTrue(s.surprise, "on by default")
-        XCTAssertEqual(s.effectiveSceneShuffle, .mixed)
+        XCTAssertEqual(s.playSource, .discover, "Discover by default")
         s.surprise = false
-        XCTAssertEqual(s.effectiveSceneShuffle, .saved, "saved scenes only")
-        XCTAssertFalse(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).surprise)
+        s.playSource = .scenes
+        let back = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s))
+        XCTAssertFalse(back.surprise); XCTAssertEqual(back.playSource, .scenes)
+        XCTAssertEqual(try JSONDecoder().decode(PlaySource.self, from: Data(#""someday""#.utf8)), .discover)
     }
 
     func testSuperSlowIsAnEighthOfTheSlowestStop() throws {
