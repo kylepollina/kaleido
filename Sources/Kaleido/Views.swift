@@ -571,8 +571,6 @@ struct PhotoTile: View {
                 }
                 .frame(height: 96)
                 .clipped()
-                .opacity(item.isEnabled ? 1 : 0.4)
-                .saturation(item.isEnabled ? 1 : 0.2)
             Image(systemName: item.isEnabled ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 18))
                 .foregroundStyle(item.isEnabled ? Color.white : Color.white.opacity(0.8), item.isEnabled ? Color.accentColor : Color.black.opacity(0.35))
