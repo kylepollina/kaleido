@@ -113,12 +113,6 @@ struct HomeView: View {
                     }
                     .padding(.bottom, playerBetween ? 0 : Self.playerHeight + 12)
                     VStack(spacing: 10) {
-                        if middle >= 260 {
-                            GlassTabs(selection: $showOriginal, options: [(false, "Kaleidoscope"), (true, "Original")])
-                                .help("Kaleidoscope, or the photo itself as it is (drag the scene to move the photo inside the mirrors)")
-                                .padding(.leading, left > 0 ? left + 12 : 0)
-                                .padding(.trailing, right > 0 ? right + 12 : 0)
-                        }
                         Spacer(minLength: 0)
                         Group {
                             if app.library.enabledItems.isEmpty { photosRow.frame(maxWidth: 560) }
@@ -151,6 +145,12 @@ struct HomeView: View {
                 }
                 .help(panel == nil ? "Photos, Scenes and Settings" : "Close the sidebar")
             }
+            // Up in the title bar's row, beside the window buttons and the sidebar button.
+            ToolbarItem(placement: .principal) {
+                GlassTabs(selection: $showOriginal, options: [(false, "Kaleidoscope"), (true, "Original")])
+                    .help("Kaleidoscope, or the photo itself as it is (drag the scene to move the photo inside the mirrors)")
+            }
+            .sharedBackgroundVisibility(.hidden)
         }
         .toolbar(controlsHidden ? .hidden : .visible, for: .windowToolbar)
         // Expanded Photos takes the whole window, so Edit scene opening shrinks it back (and vice versa).
@@ -174,18 +174,33 @@ struct HomeView: View {
 
     @ViewBuilder private var bottomControls: some View {
         if showOriginal {
-            GlassEffectContainer(spacing: 8) {
-                HStack(spacing: 8) {
-                    Button { app.removeCurrentFromRotation() } label: { Label("Remove from selected photos", systemImage: "minus.circle") }
-                        .help("Take this photo out of the rotation and move on to the next one")
-                    Button { app.revealCurrentPhoto() } label: { Label("Show in library", systemImage: "photo") }
-                        .help("Open it in Finder, or in Photos for photos from your Photos library")
-                }
-                .buttonStyle(.glass)
+            // The same glass capsule as the mini-player, in its place.
+            HStack(spacing: 4) {
+                originalButton("Remove from selected photos", icon: "minus.circle") { app.removeCurrentFromRotation() }
+                    .tip("Take this photo out of the rotation and move on to the next one")
+                playerDivider
+                originalButton("Show in library", icon: "photo") { app.revealCurrentPhoto() }
+                    .tip("Open it in Finder, or in Photos for photos from your Photos library")
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .glossy(Capsule())
         } else {
             transport
         }
+    }
+
+    private func originalButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 15, weight: .semibold))
+                Text(title).font(.callout.weight(.medium))
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .hoverHighlight(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     /// The mini-player's measured width, kept clear between the panels.
@@ -324,8 +339,8 @@ struct HomeView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .frame(width: 140, alignment: .leading)
-            .padding(.horizontal, 8)
+            .widthCap(160)   // as wide as the name, long names truncate
+            .padding(.horizontal, 6)
             playerDivider
             zoomMenu
             // Speed sits where a music player puts its volume slider.
@@ -379,8 +394,9 @@ struct HomeView: View {
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
             }
-            .padding(.horizontal, 8)
-            .frame(width: 124, height: 38)   // room for "My scenes" so nothing shifts; long album names truncate
+            .padding(.horizontal, 10)
+            .widthCap(150)   // as wide as the name; long album names truncate
+            .frame(height: 38)
             .hoverHighlight(Capsule())
         }
         .menuStyle(.button)
@@ -408,7 +424,8 @@ struct HomeView: View {
                 Text(app.settings.look.zoomMotion.label)
                     .font(.callout.weight(.medium))
             }
-            .frame(width: 84, height: 38)   // wide enough for "Drift", "Push" and "Pull" so nothing shifts
+            .padding(.horizontal, 10)
+            .frame(height: 38)
             .hoverHighlight(Capsule())
         }
         .menuStyle(.button)
@@ -900,4 +917,22 @@ extension View {
             }
             .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
     }
+}
+
+/// Hugs its content up to `max` points wide, then truncates: the content gets its own width or `max`,
+/// whichever is smaller, however much room it is offered.
+private struct WidthCap: Layout {
+    var max: CGFloat
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let view = subviews.first else { return .zero }
+        let ideal = view.sizeThatFits(.unspecified)
+        return view.sizeThatFits(ProposedViewSize(width: min(ideal.width, max), height: proposal.height))
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+    }
+}
+
+private extension View {
+    func widthCap(_ max: CGFloat) -> some View { WidthCap(max: max) { self } }
 }

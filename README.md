@@ -42,7 +42,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   A click on the scene closes any open panel; with none open it hides every control, and another click (or
   Escape) brings them back. Dragging moves the photo either way.
 - **Hands on.** Drag the preview to move the photo inside the mirrors; flick it and it keeps gliding. A
-  Kaleidoscope / Original switch shows the photo itself, with "Remove from selected photos" and "Show in library".
+  Kaleidoscope / Original switch at the top of the window, beside the sidebar button, shows the photo itself, with "Remove from selected photos" and "Show in library".
 - **Eight shapes.** Classic radial mirrors, Hex, Fractal, Square tiles, Mirror grid, a Spiral tunnel (mirror
   tiles laid out in log-polar space, so they shrink towards the centre and slowly flow inward; any number of arms, each mirrored about its centre), Triangle (the
   classic three-mirror toy) and Diamonds (Escher's rhombille tiling, kept flat: each diamond holds its own slowly turning mandala).
