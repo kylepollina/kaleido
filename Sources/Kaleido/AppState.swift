@@ -9,6 +9,10 @@ import Photos
 final class AppState: ObservableObject, PhotoProvider {
     static let shared = AppState()
 
+    /// Where the left panel was when it closed, so it reopens on the same tab, album and scroll position.
+    /// Not published: views read it as they appear and write it as they change.
+    let sidebar = SidebarMemory()
+
     @Published var settings: Settings {
         didSet {
             guard settings != oldValue else { return }
@@ -715,4 +719,12 @@ final class AppState: ObservableObject, PhotoProvider {
             FileHandle.standardError.write(Data("kaleido: photos status \(photos.status.rawValue), albums \(photos.albums.count)\n".utf8))
         }
     }
+}
+
+final class SidebarMemory {
+    var section: AppSection = .photos
+    /// The album or folder open in Photos, or nil for the list of them.
+    var openAlbum: String?
+    /// How far down each list was scrolled, by album id ("" for the list of albums).
+    var scrollY: [String: CGFloat] = [:]
 }

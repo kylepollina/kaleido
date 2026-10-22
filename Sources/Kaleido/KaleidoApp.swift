@@ -39,7 +39,7 @@ struct KaleidoApp: App {
         MenuBarExtra {
             MenuBarContent().environmentObject(app)
         } label: {
-            Image(systemName: app.isPlaying ? "camera.macro.circle.fill" : "camera.macro")
+            Image(systemName: app.isPlaying ? "star.hexagon.fill" : "star.hexagon")
         }
     }
 }

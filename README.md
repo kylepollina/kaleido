@@ -33,7 +33,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   - a mini-player (like Apple Music's): Random patterns, Shuffle, Back / Play (or Space) / Next, the scene's name and what it plays from, Zoom
     (Drift / Push / Pull), Speed, Save scene and Edit scene; each button lights up under the pointer;
   - the sidebar button (top left) opens a panel on the left with Photos, Scenes and Settings tabs (Photos can
-    expand to fill the window, for browsing). Scenes lists your scenes as pictures: click to show one, star the
+    expand to fill the window, for browsing; closing and reopening it comes back to the same tab, album and scroll position). Scenes lists your scenes as pictures: click to show one, star the
     ones you love (they move to the top and come up more often; new scenes start unstarred), swipe or
     right-click to rename or delete;
   - Edit scene opens a panel on the right with Randomize (top right), the scene's name and Save, Shape with Debug lines (the mirrors traced in red), Motion (speed with the tortoise, zoom) and every
@@ -48,7 +48,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   classic three-mirror toy) and Diamonds (Escher's rhombille tiling, kept flat: each diamond holds its own slowly turning mandala).
 - **Outlines.** Any pattern can draw black lines along its mirrors and tile edges (an Outlines switch); they bend
   with swirl and follow dynamic mirrors. Settings > Effects can turn them off everywhere.
-- **Keep the screen awake** while playing (Settings > Performance), and a flower in the menu bar. Switching back
+- **Keep the screen awake** while playing (Settings > Performance), and a star-in-a-hexagon icon in the menu bar. Switching back
   to Kaleido (Cmd-Tab or the Dock) reopens its window if you closed it.
 - **Dynamic mirrors.** A pattern can let its mirror count wander slowly between two numbers. A new mirror opens up
   (the wedges make room while an extra one grows from nothing), or one closes; tilings grow denser or sparser. A

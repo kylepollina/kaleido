@@ -207,7 +207,7 @@ enum BuiltInWallpapers {
 
 struct LibraryPane: View {
     @EnvironmentObject var app: AppState
-    @State private var openID: String?
+    @State private var openID: String? = AppState.shared.sidebar.openAlbum
 
     var body: some View {
         let enabled = app.library.enabledItems.count
@@ -273,6 +273,7 @@ struct LibraryPane: View {
                 LibraryHomeView(open: { card in app.open(card); openID = card.id })
             }
         }
+        .onChange(of: openID) { _, id in app.sidebar.openAlbum = id }
         .dropDestination(for: URL.self) { urls, _ in
             let folders = urls.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
             return !folders.isEmpty && app.library.add(urls: folders) >= 0
@@ -334,6 +335,7 @@ struct LibraryHomeView: View {
             }
             .padding(.horizontal, 16).padding(.bottom, 16)
         }
+        .remembersScroll("")
     }
 
     @ViewBuilder private var photosBanner: some View {
@@ -545,8 +547,34 @@ struct AlbumDetailView: View {
                     AerialCatalogSection(downloads: app.aerialDownloads)
                 }
             }
+            .remembersScroll(card.id)
         }
     }
+}
+
+/// Keeps a scroll view's position in the sidebar's memory, and goes back to it when the view reappears
+/// (the panel reopening, or coming back to an album).
+private struct RemembersScroll: ViewModifier {
+    let key: String
+    @State private var position = ScrollPosition()
+
+    func body(content: Content) -> some View {
+        content
+            .scrollPosition($position)
+            // Only where a scroll comes to rest: a list appearing (or being torn down) reports the top on its own.
+            .onScrollPhaseChange { old, phase, context in
+                if phase == .idle, old != .idle { AppState.shared.sidebar.scrollY[key] = context.geometry.contentOffset.y }
+            }
+            .onAppear {
+                guard let y = AppState.shared.sidebar.scrollY[key], y > 0 else { return }
+                // After the first layout, so the lazy grid knows how tall it is.
+                DispatchQueue.main.async { position.scrollTo(y: y) }
+            }
+    }
+}
+
+extension View {
+    func remembersScroll(_ key: String) -> some View { modifier(RemembersScroll(key: key)) }
 }
 
 struct PhotoTile: View {
@@ -652,3 +680,4 @@ struct MenuBarContent: View {
         Button("Quit Kaleido") { NSApp.terminate(nil) }.keyboardShortcut("q")
     }
 }
+

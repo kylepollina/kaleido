@@ -139,7 +139,7 @@ struct HomeView: View {
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button {
-                    withAnimation(Self.panelAnimation) { panel = panel == nil ? .photos : nil }
+                    withAnimation(Self.panelAnimation) { panel = panel == nil ? app.sidebar.section : nil }
                 } label: {
                     Label("Sidebar", systemImage: "sidebar.left")
                 }
@@ -153,6 +153,7 @@ struct HomeView: View {
             .sharedBackgroundVisibility(.hidden)
         }
         .toolbar(controlsHidden ? .hidden : .visible, for: .windowToolbar)
+        .onChange(of: panel) { _, p in if let p { app.sidebar.section = p } }
         // Expanded Photos takes the whole window, so Edit scene opening shrinks it back (and vice versa).
         .onChange(of: editing) { _, on in if on, photosExpanded { setPhotosExpanded(false) } }
         .onChange(of: photosExpanded) { _, on in if on, editing { withAnimation(Self.panelAnimation) { editing = false } } }
