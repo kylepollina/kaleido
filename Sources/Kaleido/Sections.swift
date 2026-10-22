@@ -253,31 +253,33 @@ struct HomeView: View {
             .padding(.top, 14)
             Form {
                 Section {
-                    TextField("Scene name", text: $sceneName)
+                    TextField("Scene name", text: $sceneName, prompt: Text("Scene name"))
+                        .labelsHidden()
+                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.leading)
                         .onSubmit { if let id = app.activeSceneID { app.renameScene(id, to: sceneName) } }
+                    // Like the mini-player's bookmark: filled and tinted while this scene is saved as it is.
+                    let saved = app.activeSceneID != nil
                     Button {
                         _ = app.saveScene(named: sceneName)
                         if let s = app.scenes.scene(app.activeSceneID) { sceneName = s.name }
                     } label: {
-                        Label("Save", systemImage: app.activeSceneID == nil ? "bookmark" : "bookmark.fill")
+                        Label(saved ? "Saved" : "Save", systemImage: saved ? "bookmark.fill" : "bookmark")
+                            .foregroundStyle(saved ? Color.accentColor : Color.primary)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glass)
-                    .help(app.activeSceneID == nil ? "Keep this photo with these settings as a saved scene"
-                                                   : "Save your changes to this scene")
+                    .disabled(saved)
+                    .help(saved ? "Saved scene" : "Keep this photo with these settings as a saved scene")
                 }
                 ShapeControls(look: app.settings.look, edit: app.tweakScene, showLines: $showLines)
                 Section("Motion") {
-                    LabeledContent("Speed") { SpeedSlider() }
-                    LabeledContent("Zoom") {
-                        Picker("Zoom", selection: zoomBinding) {
-                            ForEach(ZoomMotion.allCases) { Text($0.label).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .frame(maxWidth: 200)
-                    }
-                    .help("Drift, or Push / Pull the photo slowly through the mirrors")
+                    LabeledContent("Speed") { SpeedSlider(sliderWidth: 130) }
+                    GlassTabs(selection: zoomBinding,
+                              options: ZoomMotion.allCases.map { ($0, $0.label) },
+                              icons: ZoomMotion.allCases.map(\.icon))
+                        .frame(maxWidth: .infinity)
+                        .help("Zoom: Drift, or Push / Pull the photo slowly through the mirrors")
                 }
                 ColorControls(look: app.settings.look, edit: app.tweakScene)
             }
@@ -354,26 +356,7 @@ struct HomeView: View {
             playerDivider
             zoomMenu
             // Speed sits where a music player puts its volume slider.
-            HStack(spacing: 6) {
-                // The tortoise toggles super slow motion: an eighth of the slowest stop, videos too.
-                let slow = app.settings.superSlow
-                Button { app.settings.superSlow.toggle() } label: {
-                    Image(systemName: "tortoise.fill")
-                        .font(.system(size: slow ? 13 : 12, weight: .semibold))
-                        .foregroundStyle(slow ? Color.green : Color.secondary)
-                        .frame(width: 26, height: 26)
-                        .background { if slow { Circle().fill(Color.green.opacity(0.18)) } }
-                        .hoverHighlight(Circle())
-                }
-                .buttonStyle(.plain)
-                .tip(slow ? "Super slow motion: on" : "Super slow motion")
-                Slider(value: speedBinding, in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
-                    .controlSize(.small)
-                    .frame(width: 96)
-                    .opacity(slow ? 0.4 : 1)
-                    .tip("Speed")
-                Image(systemName: "hare.fill").font(.system(size: 12)).foregroundStyle(.secondary)
-            }
+            SpeedSlider(sliderWidth: 96)
             .padding(.horizontal, 6)
             playerDivider
             PlayerIcon(name: saved == nil ? "bookmark" : "bookmark.fill", active: saved != nil, tint: .accentColor) {
@@ -388,11 +371,6 @@ struct HomeView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .glossy(Capsule())
-    }
-
-    private var speedBinding: Binding<Double> {
-        Binding(get: { Double(app.settings.look.speedStep) },
-                set: { app.setSceneMotion(speedStep: Int($0.rounded())); app.settings.superSlow = false })
     }
 
     private var playerDivider: some View {
@@ -571,6 +549,8 @@ struct CountField: View {
 struct GlassTabs<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [(Value, String)]
+    /// An SF Symbol before each title (optional).
+    var icons: [String] = []
     @Namespace private var pill
 
     var body: some View {
@@ -581,7 +561,12 @@ struct GlassTabs<Value: Hashable>: View {
                 Button {
                     withAnimation(.snappy(duration: 0.25)) { selection = value }
                 } label: {
-                    Text(title)
+                    Label {
+                        Text(title)
+                    } icon: {
+                        if i < icons.count { Image(systemName: icons[i]) }
+                    }
+                        .labelStyle(GlassTabLabelStyle(hasIcon: i < icons.count))
                         .font(.callout.weight(.medium))
                         .foregroundStyle(selected ? Color.white : Color.primary)
                         .padding(.horizontal, 14)
@@ -601,19 +586,44 @@ struct GlassTabs<Value: Hashable>: View {
     }
 }
 
-/// The scene's speed: five stops from turtle to rabbit, like the trackpad speed setting. Saved scenes keep it.
+private struct GlassTabLabelStyle: LabelStyle {
+    let hasIcon: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 5) {
+            if hasIcon { configuration.icon }
+            configuration.title
+        }
+    }
+}
+
+/// The scene's speed: five stops from turtle to rabbit, like the trackpad speed setting (saved scenes keep it). The
+/// tortoise toggles super slow motion: an eighth of the slowest stop, videos too. Mini-player and Edit scene alike.
 struct SpeedSlider: View {
     @EnvironmentObject var app: AppState
+    var sliderWidth: CGFloat = 96
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "tortoise.fill").foregroundStyle(.secondary).help("Slowest")
+        let slow = app.settings.superSlow
+        HStack(spacing: 6) {
+            Button { app.settings.superSlow.toggle() } label: {
+                Image(systemName: "tortoise.fill")
+                    .font(.system(size: slow ? 13 : 12, weight: .semibold))
+                    .foregroundStyle(slow ? Color.green : Color.secondary)
+                    .frame(width: 26, height: 26)
+                    .background { if slow { Circle().fill(Color.green.opacity(0.18)) } }
+                    .hoverHighlight(Circle())
+            }
+            .buttonStyle(.plain)
+            .tip(slow ? "Super slow motion: on" : "Super slow motion")
             Slider(value: Binding(get: { Double(app.settings.look.speedStep) },
                                   set: { app.setSceneMotion(speedStep: Int($0.rounded())); app.settings.superSlow = false }),
                    in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
-            Image(systemName: "hare.fill").foregroundStyle(.secondary).help("Fastest")
+                .controlSize(.small)
+                .frame(width: sliderWidth)
+                .opacity(slow ? 0.4 : 1)
+                .tip("Speed")
+            Image(systemName: "hare.fill").font(.system(size: 12)).foregroundStyle(.secondary)
         }
-        .frame(maxWidth: 220)
     }
 }
 
@@ -675,21 +685,34 @@ struct ShapeControls: View {
     }
 }
 
+/// Hue cycling's Off / Slow / Medium / Fast. Equatable on what it shows, so dragging another slider (every step
+/// rebuilds the look controls) leaves the segmented control alone instead of making it twitch.
+struct HueCyclingPicker: View, Equatable {
+    let step: Int
+    let enabled: Bool
+    let set: (Int) -> Void
+
+    static func == (a: Self, b: Self) -> Bool { a.step == b.step && a.enabled == b.enabled }
+
+    var body: some View {
+        Picker("Hue cycling", selection: Binding(get: { step }, set: set)) {
+            Text("Off").tag(0)
+            Text("Slow").tag(1)
+            Text("Medium").tag(2)
+            Text("Fast").tag(3)
+        }
+        .pickerStyle(.segmented)
+        .disabled(!enabled)
+        .help("Keeps turning the colours around the colour wheel (faster with the scene's Speed)")
+    }
+}
+
 /// Edit scene's Color section. Hue shift picks the colours (a fixed turn of the colour wheel); Hue cycling keeps
 /// turning them around the wheel from there, as fast as its slider says.
 struct ColorControls: View {
     @EnvironmentObject var app: AppState
     let look: Look
     let edit: ((inout Look) -> Void) -> Void
-
-    private static let cycleScale = SliderScale.zeroLog(min: 0.02, max: Look.hueSpeedRange.upperBound)
-
-    /// "off", or how long one lap of the colour wheel takes at the scene's speed.
-    private func lap(_ speed: Double) -> String {
-        guard speed > 0 else { return "off" }
-        let seconds = 360 / (speed * app.settings.speedMultiplier(for: look))
-        return seconds < 90 ? "a lap every \(Int(seconds.rounded())) s" : String(format: "a lap every %.0f min", seconds / 60)
-    }
 
     var body: some View {
         Section {
@@ -699,9 +722,9 @@ struct ColorControls: View {
             HueShiftStrip(degrees: look.hueShift)
                 .opacity(app.settings.allowHueChanges ? 1 : 0.4)
                 .help("Top: the original colours. Bottom: what each one becomes with this hue shift.")
-            ScaledSliderRow("Hue cycling", value: bind(\.hueSpeed), scale: Self.cycleScale, tick: 0, format: lap)
-                .disabled(!app.settings.allowHueChanges)
-                .help("Keeps turning the colours around the colour wheel. Left is off; the speed follows the scene's Speed.")
+            HueCyclingPicker(step: Look.hueCycleStep(look.hueSpeed), enabled: app.settings.allowHueChanges,
+                             set: { i in edit { $0.hueSpeed = Look.hueCycleSteps[i] } })
+                .equatable()
             SliderRow("Saturation", value: bind(\.saturation), range: 0.5...1.5) { String(format: "%.0f%%", $0 * 100) }
                 .disabled(!app.settings.allowSaturationChanges)
             SliderRow("Vignette", value: bind(\.vignette), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
@@ -833,17 +856,17 @@ extension View {
             .glassEffect(.regular, in: shape)
             .overlay {
                 shape
-                    .fill(LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0.04), .clear],
+                    .fill(LinearGradient(colors: [.white.opacity(0.12), .white.opacity(0.02), .clear],
                                          startPoint: .top, endPoint: .center))
                     .blendMode(.plusLighter)
                     .allowsHitTesting(false)
             }
             .overlay {
                 shape
-                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.75), .white.opacity(0.08), .white.opacity(0.35)],
-                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.2)
+                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.5), .white.opacity(0.05), .white.opacity(0.22)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
                     .allowsHitTesting(false)
             }
-            .shadow(color: .black.opacity(0.25), radius: 14, y: 6)
+            .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
     }
 }

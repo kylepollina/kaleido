@@ -32,7 +32,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
     expand to fill the window, for browsing). Scenes lists your scenes as pictures: click to show one, star the
     ones you love (they move to the top and come up more often; new scenes start unstarred), swipe or
     right-click to rename or delete;
-  - Edit scene opens a panel on the right with Randomize (top right), the scene's name and Save, Shape with Debug lines (the mirrors traced in red), Motion (speed, zoom) and every
+  - Edit scene opens a panel on the right with Randomize (top right), the scene's name and Save, Shape with Debug lines (the mirrors traced in red), Motion (speed with the tortoise, zoom) and every
     setting of the scene.
 
   A click on the scene closes any open panel; with none open it hides every control, and another click (or
@@ -55,9 +55,9 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   sliding through the mirrors one way or the other (along the mirrors' own axis, which turns with the pattern).
   Whether that reads as zooming in or out depends on the pattern, hence the neutral names. Drift leaves only the
   look's own slow zoom breathing (set in Edit scene). Changes ease in and out.
-- **Hue.** Hue shift turns every colour a fixed amount around the colour wheel. Hue cycling keeps turning them
-  around the wheel from there; its slider shows how long a lap takes at the scene's speed (about a minute at the
-  top, up to an hour at the bottom).
+- **Hue.** Hue shift turns every colour a fixed amount around the colour wheel. Hue cycling (Off / Slow / Medium /
+  Fast) keeps turning them around the wheel from there: at the default speed a lap takes about 10 minutes, 3.5
+  minutes or 1 minute.
 - **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every scene.
 - **macOS Aerials (video).** Every aerial in macOS's list shows up; the ones not on this Mac yet have a Download
   button (Kaleido fetches the video from Apple into its own folder, never macOS's). The slow-motion films macOS downloads for its moving wallpapers and screen

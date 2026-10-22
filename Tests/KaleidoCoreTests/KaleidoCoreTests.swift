@@ -88,7 +88,7 @@ final class SettingsTests: XCTestCase {
         var s = Settings()
         s.look.mode = .hex
         s.look.segments = 11
-        s.look.hueSpeed = 0.15
+        s.look.hueSpeed = 0.3
         s.secondsPerPhoto = 42
         s.shuffle = false
         s.transition = .iris
@@ -145,12 +145,12 @@ final class SettingsTests: XCTestCase {
         var wild = Look()
         wild.rotationSpeed = 500; wild.hueSpeed = 500; wild.driftSpeed = 99; wild.twist = 9; wild.motion = 50
         wild.clamp()
-        XCTAssertEqual(wild.rotationSpeed, 0.6); XCTAssertEqual(wild.hueSpeed, Look.hueSpeedRange.upperBound, "hue cycling stops at its fastest")
+        XCTAssertEqual(wild.rotationSpeed, 0.6); XCTAssertEqual(wild.hueSpeed, Look.hueCycleSteps.last, "hue cycling snaps to its fastest step")
         XCTAssertEqual(wild.driftSpeed, 0.5); XCTAssertEqual(wild.twist, 1); XCTAssertEqual(wild.motion, 2)
         var g = SplitMix64(seed: 9)
         for _ in 0..<300 {
             let l = Look.random(using: &g)
-            XCTAssertLessThanOrEqual(abs(l.rotationSpeed), 0.15); XCTAssertLessThanOrEqual(l.hueSpeed, 0.25); XCTAssertLessThanOrEqual(l.driftSpeed, 0.15)
+            XCTAssertLessThanOrEqual(abs(l.rotationSpeed), 0.15); XCTAssertLessThanOrEqual(l.hueSpeed, 0.3); XCTAssertLessThanOrEqual(l.driftSpeed, 0.15)
         }
     }
 
@@ -197,10 +197,11 @@ final class SettingsTests: XCTestCase {
         let s = try JSONDecoder().decode(Settings.self, from: Data(old.utf8))
         XCTAssertEqual(s.look.speedStep, 4); XCTAssertEqual(s.look.zoomMotion, .pull)
         let lib = SceneLibrary(fileURL: nil)
-        var l = Look(); l.speedStep = 0; l.zoomMotion = .push; l.hueSpeed = 0.7
+        var l = Look(); l.speedStep = 0; l.zoomMotion = .push; l.hueSpeed = 0.3
         let id = lib.add(name: "A", photoID: UUID(), look: l)
         let back = try JSONDecoder().decode(SavedScene.self, from: JSONEncoder().encode(lib.scene(id)!))
-        XCTAssertEqual(back.look.speedStep, 0); XCTAssertEqual(back.look.zoomMotion, .push); XCTAssertEqual(back.look.hueSpeed, 0.7)
+        XCTAssertEqual(back.look.speedStep, 0); XCTAssertEqual(back.look.zoomMotion, .push); XCTAssertEqual(back.look.hueSpeed, 0.3)
+        XCTAssertEqual(Look.hueCycleStep(0.05), 1, "the old slow step stays on")
         XCTAssertEqual(try JSONDecoder().decode(TransitionStyle.self, from: Data(#""segments""#.utf8)), .random, "the removed ripple loads as random")
     }
 

@@ -93,9 +93,14 @@ public struct Look: Codable, Equatable, Sendable {
     /// Static hue rotation in degrees: where on the colour wheel the colours start.
     public var hueShift: Double = 0
     /// Hue cycling: degrees per second the colours keep turning around the wheel, before the scene's speed is
-    /// applied (0 is off). At the default speed 1 is a lap in about a minute, 0.1 a lap in ten minutes.
+    /// applied. One of `hueCycleSteps`.
     public var hueSpeed: Double = 0
-    public static let hueSpeedRange = 0.0...1.2
+    /// Off, slow, medium, fast. At the default speed: a lap in about 10 minutes, 3.5 minutes, 1 minute.
+    public static let hueCycleSteps: [Double] = [0, 0.1, 0.3, 1.0]
+    /// The nearest step's index (a tie goes to the faster step, so the old, slower steps never round to off).
+    public static func hueCycleStep(_ v: Double) -> Int {
+        hueCycleSteps.indices.reversed().min { abs(hueCycleSteps[$0] - v) < abs(hueCycleSteps[$1] - v) }!
+    }
     /// The scene's speed: an index into `Settings.speedMultipliers` (turtle to rabbit), for every movement.
     public var speedStep = Settings.defaultSpeedStep
     /// How the view zooms in this scene (Drift, Push or Pull).
@@ -153,7 +158,7 @@ public struct Look: Codable, Equatable, Sendable {
         drift = min(max(drift, 0), 1)
         driftSpeed = min(max(driftSpeed, 0), 0.5)
         twist = min(max(twist, -1), 1)
-        hueSpeed = min(max(hueSpeed, Self.hueSpeedRange.lowerBound), Self.hueSpeedRange.upperBound)
+        hueSpeed = Self.hueCycleSteps[Self.hueCycleStep(hueSpeed)]
         speedStep = min(max(speedStep, 0), Settings.speedMultipliers.count - 1)
         breathing = min(max(breathing, 0), 1)
         motion = min(max(motion, 0), 2)
@@ -206,7 +211,7 @@ public struct Look: Codable, Equatable, Sendable {
         l.driftSpeed = Double.random(in: 0.03...0.15, using: &g)
         l.twist = Double.random(in: 0..<1, using: &g) < 0.3 ? Double.random(in: -0.4...0.4, using: &g) : 0
         l.hueShift = Double.random(in: 0..<1, using: &g) < 0.4 ? Double.random(in: 0...360, using: &g) : 0
-        l.hueSpeed = Double.random(in: 0..<1, using: &g) < 0.3 ? [0.1, 0.25].randomElement(using: &g)! : 0
+        l.hueSpeed = Double.random(in: 0..<1, using: &g) < 0.3 ? [0.1, 0.3].randomElement(using: &g)! : 0
         l.saturation = Double.random(in: 0.95...1.4, using: &g)
         l.vignette = Double.random(in: 0.1...0.45, using: &g)
         l.outline = Double.random(in: 0..<1, using: &g) < 0.15 ? 0.25 : 0
