@@ -24,7 +24,7 @@ enum Shaders {
         float originalMix;   // 0...1 cross-fade from the kaleidoscope to the plain photo (the Original tab)
         int segments;       // mirrors of the outgoing photo (A)
         int mode;            // 0 radial, 1 hex, 2 fractal (A)
-        int transition;      // 0 dissolve 1 iris 3 zoom 4 segments
+        int transition;      // 0 dissolve 1 iris 3 zoom
         int hasB;
         int segmentsB;       // the incoming photo (B) can arrive with a different look
         int modeB;
@@ -353,13 +353,6 @@ enum Shaders {
             float r = length(p) / halfDiag;
             if (u.transition == 1) {
                 m = 1.0 - smoothstep(t * (1.0 + w) - w, t * (1.0 + w), r);
-            } else if (u.transition == 4) {
-                int n = max(u.segmentsB, 3);
-                float seg = 2.0 * PI / float(n);
-                float idx = floor((atan2(p.y, p.x) + PI) / seg);
-                float h = hash11(idx + 1.0);
-                float local = clamp(t * 1.6 - h * 0.6, 0.0, 1.0);
-                m = smoothstep(0.0, 1.0, local);
             } else if (u.transition == 3) {
                 m = smoothstep(0.15, 0.85, t);
             } else {

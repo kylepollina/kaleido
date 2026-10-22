@@ -211,7 +211,8 @@ struct HomeView: View {
                     if s == .photos {
                         // Photos can take the whole window, for browsing; the scene still shows around it.
                         Button { setPhotosExpanded(!photosExpanded) } label: {
-                            Image(systemName: photosExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                            // The panel grows to the right, so the arrows run along the up-right / down-left diagonal.
+                            Image(systemName: photosExpanded ? "arrow.down.left.and.arrow.up.right" : "arrow.up.right.and.arrow.down.left")
                                 .font(.system(size: 13, weight: .semibold))
                                 .frame(width: 30, height: 30)
                                 .hoverHighlight(Circle())
@@ -235,41 +236,79 @@ struct HomeView: View {
         .frame(width: width)
         .frame(maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .glossy(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
-    /// Edit scene: every setting of the scene on screen.
+    /// Edit scene: every setting of the scene on screen. Randomize sits top right, outside the sections; then the
+    /// scene's name and Save, the shape, speed and zoom, and the colours.
     private var editPanel: some View {
-        Form {
-            Section {
-                HStack {
-                    sceneRow
-                    Spacer()
-                    Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
-                        .buttonStyle(.glass)
-                        .help("A random pattern and settings for this photo")
-                }
-                Toggle("Debug lines", isOn: $showLines)
-                    .help("Traces the pattern's mirrors and tile edges in red on the scene while this panel is open")
-                if !app.library.enabledItems.isEmpty { photosRow }
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button { app.randomizeScene() } label: { Label("Randomize", systemImage: "dice") }
+                    .buttonStyle(.glass)
+                    .help("Invent a new random pattern for this photo (the photo, speed and zoom stay)")
             }
-            LookControls(look: app.settings.look, edit: app.tweakScene)
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            Form {
+                Section {
+                    TextField("Scene name", text: $sceneName)
+                        .onSubmit { if let id = app.activeSceneID { app.renameScene(id, to: sceneName) } }
+                    Button {
+                        _ = app.saveScene(named: sceneName)
+                        if let s = app.scenes.scene(app.activeSceneID) { sceneName = s.name }
+                    } label: {
+                        Label("Save", systemImage: app.activeSceneID == nil ? "bookmark" : "bookmark.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glass)
+                    .help(app.activeSceneID == nil ? "Keep this photo with these settings as a saved scene"
+                                                   : "Save your changes to this scene")
+                }
+                ShapeControls(look: app.settings.look, edit: app.tweakScene, showLines: $showLines)
+                Section("Motion") {
+                    LabeledContent("Speed") { SpeedSlider() }
+                    LabeledContent("Zoom") {
+                        Picker("Zoom", selection: zoomBinding) {
+                            ForEach(ZoomMotion.allCases) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(maxWidth: 200)
+                    }
+                    .help("Drift, or Push / Pull the photo slowly through the mirrors")
+                }
+                ColorControls(look: app.settings.look, edit: app.tweakScene)
+            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .onAppear { syncSceneName() }
+            .onChange(of: app.activeSceneID) { _, _ in syncSceneName() }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
         .frame(width: Self.editWidth)
         .frame(maxHeight: .infinity)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .glossy(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    @State private var sceneName = ""
+
+    /// The name field follows the saved scene on screen; a new or edited scene keeps what was typed.
+    private func syncSceneName() {
+        if let s = app.scenes.scene(app.activeSceneID) { sceneName = s.name }
+        else if !app.sceneTweaked { sceneName = "" }
+    }
+
+    private var zoomBinding: Binding<ZoomMotion> {
+        Binding(get: { app.settings.look.zoomMotion }, set: { app.setSceneMotion(zoomMotion: $0) })
     }
 
     /// One glass capsule, like Apple Music's mini player: Surprise me · Back · Play · Next · the scene · Save · Edit.
     private var transport: some View {
         let saved = app.scenes.scene(app.activeSceneID)
         return HStack(spacing: 4) {
-            PlayerIcon(name: "dice", active: app.settings.surprise, tint: .pink) { app.settings.surprise.toggle() }
-                .tip(app.settings.surprise
-                      ? "Surprise me: on (mostly new scenes, sometimes saved ones)"
-                      : "Surprise me: off (only your saved scenes)")
+            PlayerIcon(name: "dice", tint: .pink) { app.surpriseMe() }
+                .tip("New random scene: a new photo with an invented pattern")
             PlayerIcon(name: "backward.fill", size: 19) { app.previousPhoto() }
                 .tip("Previous scene")
             PlayerIcon(name: app.isPlaying ? "stop.fill" : "play.fill", size: 26) { app.togglePlay() }
@@ -282,7 +321,17 @@ struct HomeView: View {
                 Text(saved?.name ?? (app.sceneTweaked ? "Your scene" : "New scene"))
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
-                if let album = app.albumSlideshow {
+                if app.playingScenes {
+                    HStack(spacing: 4) {
+                        Image(systemName: "play.square.stack").font(.system(size: 10))
+                        Text("Playing your scenes").lineLimit(1)
+                        Button { app.stopPlayingScenes() } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.plain)
+                            .tip("Stop playing scenes")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else if let album = app.albumSlideshow {
                     // Playing one album: say which, with a way back to everything.
                     HStack(spacing: 4) {
                         Image(systemName: "photo.stack").font(.system(size: 10))
@@ -318,9 +367,7 @@ struct HomeView: View {
                 }
                 .buttonStyle(.plain)
                 .tip(slow ? "Super slow motion: on" : "Super slow motion")
-                Slider(value: Binding(get: { Double(app.settings.speedStep) },
-                                      set: { app.settings.speedStep = Int($0.rounded()); app.settings.superSlow = false }),
-                       in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
+                Slider(value: speedBinding, in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
                     .controlSize(.small)
                     .frame(width: 96)
                     .opacity(slow ? 0.4 : 1)
@@ -340,7 +387,12 @@ struct HomeView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .glassEffect(.regular, in: .capsule)
+        .glossy(Capsule())
+    }
+
+    private var speedBinding: Binding<Double> {
+        Binding(get: { Double(app.settings.look.speedStep) },
+                set: { app.setSceneMotion(speedStep: Int($0.rounded())); app.settings.superSlow = false })
     }
 
     private var playerDivider: some View {
@@ -350,15 +402,15 @@ struct HomeView: View {
     /// Zoom as the current mode's icon and name, with a small menu of Drift / Push / Pull.
     private var zoomMenu: some View {
         Menu {
-            Picker("Zoom", selection: $app.settings.zoomMotion) {
+            Picker("Zoom", selection: zoomBinding) {
                 ForEach(ZoomMotion.allCases) { Label($0.label, systemImage: $0.icon).tag($0) }
             }
             .pickerStyle(.inline)
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: app.settings.zoomMotion.icon)
+                Image(systemName: app.settings.look.zoomMotion.icon)
                     .font(.system(size: 15, weight: .semibold))
-                Text(app.settings.zoomMotion.label)
+                Text(app.settings.look.zoomMotion.label)
                     .font(.callout.weight(.medium))
             }
             .frame(width: 84, height: 38)   // wide enough for "Drift", "Push" and "Pull" so nothing shifts
@@ -369,21 +421,6 @@ struct HomeView: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .tip("Zoom: Drift, Push or Pull")
-    }
-
-    /// Which scene this is.
-    private var sceneRow: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if let s = app.scenes.scene(app.activeSceneID) {
-                Label(s.name, systemImage: "bookmark.fill")
-            } else {
-                Text(app.sceneTweaked ? "Your scene (not saved yet)" : "New scene")
-            }
-            if app.sceneTweaked {
-                Text("Shuffle waits on this scene until you press Next or save it.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-        }
     }
 
     private var photosRow: some View {
@@ -564,18 +601,19 @@ struct GlassTabs<Value: Hashable>: View {
     }
 }
 
-/// The one speed control: five stops from turtle to rabbit, like the trackpad speed setting.
-struct SpeedControl: View {
+/// The scene's speed: five stops from turtle to rabbit, like the trackpad speed setting. Saved scenes keep it.
+struct SpeedSlider: View {
     @EnvironmentObject var app: AppState
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "tortoise.fill").foregroundStyle(.secondary).help("Slowest")
-            Slider(value: Binding(get: { Double(app.settings.speedStep) },
-                                  set: { app.settings.speedStep = Int($0.rounded()) }),
+            Slider(value: Binding(get: { Double(app.settings.look.speedStep) },
+                                  set: { app.setSceneMotion(speedStep: Int($0.rounded())); app.settings.superSlow = false }),
                    in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
             Image(systemName: "hare.fill").foregroundStyle(.secondary).help("Fastest")
         }
+        .frame(maxWidth: 220)
     }
 }
 
@@ -583,91 +621,96 @@ extension Look {
     var summary: String { "\(mode.label), \(mode.countLabel.lowercased()) \(segments)" }
 }
 
-/// Hue cycling's Off / Slow / Medium / Fast. Equatable on what it shows, so dragging another slider (every step
-/// rebuilds the look controls) leaves the segmented control alone instead of making it twitch.
-struct HueCyclingPicker: View, Equatable {
-    let step: Int
-    let enabled: Bool
-    let set: (Int) -> Void
-
-    static func == (a: Self, b: Self) -> Bool { a.step == b.step && a.enabled == b.enabled }
+/// Edit scene's Shape section (with the debug-lines toggle under the shapes).
+struct ShapeControls: View {
+    @EnvironmentObject var app: AppState
+    let look: Look
+    let edit: ((inout Look) -> Void) -> Void
+    @Binding var showLines: Bool
 
     var body: some View {
-        Picker("Hue cycling", selection: Binding(get: { step }, set: set)) {
-            Text("Off").tag(0)
-            Text("Slow").tag(1)
-            Text("Medium").tag(2)
-            Text("Fast").tag(3)
+        Section("Shape") {
+            PatternPicker(selection: bind(\.mode))
+            Toggle("Debug lines", isOn: $showLines)
+                .help("Traces the pattern's mirrors and tile edges in red on the scene while this panel is open")
+            CountField(title: look.mode.countLabel,
+                       value: Binding(get: { look.segments }, set: { v in edit { $0.segments = v } }),
+                       range: Look.segmentRange)
+            Toggle("Dynamic mirrors", isOn: bind(\.dynamicMirrors))
+                .disabled(!app.settings.allowDynamicMirrors)
+                .help("Slowly changes how many mirrors there are")
+            if look.dynamicMirrors {
+                LabeledContent("Between") {
+                    HStack {
+                        Stepper("\(look.mirrorsMin)", value: Binding(get: { look.mirrorsMin },
+                                                                   set: { v in edit { $0.mirrorsMin = min(v, $0.mirrorsMax) } }),
+                                in: Look.segmentRange)
+                        Text("and")
+                        Stepper("\(look.mirrorsMax)", value: Binding(get: { look.mirrorsMax },
+                                                                   set: { v in edit { $0.mirrorsMax = max(v, $0.mirrorsMin) } }),
+                                in: Look.segmentRange)
+                    }
+                    .monospacedDigit()
+                }
+            }
+            // How big the photo looks inside the mirrors; 1.00× sits in the middle of the slider with a tick.
+            ScaledSliderRow("Scale", value: bind(\.zoom), scale: .centeredLog(min: 0.4, mid: 1, max: 3), tick: 1) {
+                String(format: "%.2f×", $0)
+            }
+            .help("How big the photo looks inside the mirrors: higher shows a small detail, lower shows more of the photo")
+            SliderRow("Swirl", value: bind(\.twist), range: -1...1, zeroTick: true) { $0 == 0 ? "none" : String(format: "%+.2f", $0) }
+                .disabled(!app.settings.allowSwirl)
+            Toggle("Sway", isOn: bind(\.swayingSwirl))
+                .disabled(!app.settings.allowSwirl || look.twist == 0)
+                .help("Swings the swirl slowly back and forth: from this much, through straight, to the same amount the other way and back")
+            Toggle("Outlines", isOn: Binding(get: { look.outline > 0 },
+                                             set: { on in edit { $0.outline = on ? Look.outlineSteps[1] : 0 } }))
+                .disabled(!app.settings.allowOutlines)
+                .help("Thin black lines along every mirror and tile edge")
         }
-        .pickerStyle(.segmented)
-        .disabled(!enabled)
-        .help("Slowly cycles the colours around the colour wheel")
+    }
+
+    private func bind<T>(_ keyPath: WritableKeyPath<Look, T>) -> Binding<T> {
+        Binding(get: { look[keyPath: keyPath] }, set: { v in edit { $0[keyPath: keyPath] = v } })
     }
 }
 
-/// The look controls in Edit scene. `edit` says where a change goes.
-struct LookControls: View {
+/// Edit scene's Color section. Hue shift picks the colours (a fixed turn of the colour wheel); Hue cycling keeps
+/// turning them around the wheel from there, as fast as its slider says.
+struct ColorControls: View {
     @EnvironmentObject var app: AppState
     let look: Look
     let edit: ((inout Look) -> Void) -> Void
 
+    private static let cycleScale = SliderScale.zeroLog(min: 0.02, max: Look.hueSpeedRange.upperBound)
+
+    /// "off", or how long one lap of the colour wheel takes at the scene's speed.
+    private func lap(_ speed: Double) -> String {
+        guard speed > 0 else { return "off" }
+        let seconds = 360 / (speed * app.settings.speedMultiplier(for: look))
+        return seconds < 90 ? "a lap every \(Int(seconds.rounded())) s" : String(format: "a lap every %.0f min", seconds / 60)
+    }
+
     var body: some View {
-        Group {
-                Section("Shape") {
-                    PatternPicker(selection: bind(\.mode))
-                    CountField(title: look.mode.countLabel,
-                               value: Binding(get: { look.segments }, set: { v in edit { $0.segments = v } }),
-                               range: Look.segmentRange)
-                    Toggle("Dynamic mirrors (slowly change how many)", isOn: bind(\.dynamicMirrors))
-                        .disabled(!app.settings.allowDynamicMirrors)
-                    if look.dynamicMirrors {
-                        LabeledContent("Between") {
-                            HStack {
-                                Stepper("\(look.mirrorsMin)", value: Binding(get: { look.mirrorsMin },
-                                                                                   set: { v in edit { $0.mirrorsMin = min(v, $0.mirrorsMax) } }),
-                                        in: Look.segmentRange)
-                                Text("and")
-                                Stepper("\(look.mirrorsMax)", value: Binding(get: { look.mirrorsMax },
-                                                                                   set: { v in edit { $0.mirrorsMax = max(v, $0.mirrorsMin) } }),
-                                        in: Look.segmentRange)
-                            }
-                            .monospacedDigit()
-                        }
-                    }
-                    // How big the photo looks inside the mirrors. (Movement is the mini-player's Zoom; the look's
-                    // breathing and drift amounts stay at their defaults and are no longer shown.)
-                    SliderRow("Scale", value: bind(\.zoom), range: 0.4...3) { String(format: "%.2f×", $0) }
-                        .help("How big the photo looks inside the mirrors: higher shows a small detail, lower shows more of the photo")
-                    SliderRow("Swirl", value: bind(\.twist), range: -1...1, zeroTick: true) { $0 == 0 ? "none" : String(format: "%+.2f", $0) }
-                        .disabled(!app.settings.allowSwirl)
-                    Toggle("Sway (swing the swirl slowly back and forth)", isOn: bind(\.swayingSwirl))
-                        .disabled(!app.settings.allowSwirl || look.twist == 0)
-                        .help("Swings from this much swirl, through straight, to the same amount the other way and back")
-                    Toggle("Outlines", isOn: Binding(get: { look.outline > 0 },
-                                                     set: { on in edit { $0.outline = on ? Look.outlineSteps[1] : 0 } }))
-                        .disabled(!app.settings.allowOutlines)
-                        .help("Thin black lines along every mirror and tile edge")
-                }
-                Section {
-                    SliderRow("Hue shift", value: bind(\.hueShift), range: 0...360, zeroTick: true) { $0 < 0.5 ? "none" : "\(Int($0))°" }
-                        .disabled(!app.settings.allowHueChanges)
-                    HueShiftStrip(degrees: look.hueShift)
-                        .opacity(app.settings.allowHueChanges ? 1 : 0.4)
-                        .help("Top: the original colours. Bottom: what each one becomes with this hue shift.")
-                    HueCyclingPicker(step: Look.hueCycleSteps.firstIndex(of: Look.hueCycleSteps.min {
-                                         abs($0 - look.hueSpeed) < abs($1 - look.hueSpeed) }!)!,
-                                     enabled: app.settings.allowHueChanges,
-                                     set: { i in edit { $0.hueSpeed = Look.hueCycleSteps[i] } })
-                        .equatable()
-                    SliderRow("Saturation", value: bind(\.saturation), range: 0.5...1.5) { String(format: "%.0f%%", $0 * 100) }
-                        .disabled(!app.settings.allowSaturationChanges)
-                    SliderRow("Vignette", value: bind(\.vignette), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
-                        .disabled(!app.settings.allowVignette)
-                } header: {
-                    Text("Color")
-                } footer: {
-                    Text("Effects switched off in Settings stay off for every scene.").font(.caption).foregroundStyle(.secondary)
-                }
+        Section {
+            SliderRow("Hue shift", value: bind(\.hueShift), range: 0...360, zeroTick: true) { $0 < 0.5 ? "none" : "\(Int($0))°" }
+                .disabled(!app.settings.allowHueChanges)
+                .help("Turns every colour a fixed amount around the colour wheel")
+            HueShiftStrip(degrees: look.hueShift)
+                .opacity(app.settings.allowHueChanges ? 1 : 0.4)
+                .help("Top: the original colours. Bottom: what each one becomes with this hue shift.")
+            ScaledSliderRow("Hue cycling", value: bind(\.hueSpeed), scale: Self.cycleScale, tick: 0, format: lap)
+                .disabled(!app.settings.allowHueChanges)
+                .help("Keeps turning the colours around the colour wheel. Left is off; the speed follows the scene's Speed.")
+            SliderRow("Saturation", value: bind(\.saturation), range: 0.5...1.5) { String(format: "%.0f%%", $0 * 100) }
+                .disabled(!app.settings.allowSaturationChanges)
+            SliderRow("Vignette", value: bind(\.vignette), range: 0...1) { String(format: "%.0f%%", $0 * 100) }
+                .disabled(!app.settings.allowVignette)
+        } header: {
+            Text("Color")
+        } footer: {
+            Text("Hue shift sets where the colours start; hue cycling keeps them turning from there. Effects switched off in Settings stay off for every scene.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -684,7 +727,8 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Scenes") {
-                Toggle("Surprise me (mix in new scenes Kaleido makes up)", isOn: $app.settings.surprise)
+                Toggle("Invent new scenes while playing", isOn: $app.settings.surprise)
+                    .help("On: as scenes change, new photos get a made-up pattern, mixed with your saved scenes. Off: only your saved scenes play. Play scenes (in Scenes) plays your saved scenes either way.")
                 Toggle("Shuffle photo order", isOn: $app.settings.shuffle)
                 ScaledSliderRow("Time per scene", value: $app.settings.secondsPerPhoto, scale: .log(15, 900)) {
                     $0 < 90 ? "\(Int($0)) s" : String(format: "%.1f min", $0 / 60)
@@ -693,7 +737,6 @@ struct SettingsView: View {
                     ForEach(TransitionStyle.allCases) { Text($0.label).tag($0) }
                 }
                 ScaledSliderRow("Transition length", value: $app.settings.transitionSeconds, scale: .log(2, 30)) { String(format: "%.0f s", $0) }
-                LabeledContent("Speed") { SpeedControl().frame(maxWidth: 260) }
             }
 
             Section {
@@ -713,7 +756,7 @@ struct SettingsView: View {
             } header: {
                 Text("Invented patterns")
             } footer: {
-                Text("Surprise me and new scenes with invented patterns only use the shapes ticked here.")
+                Text("Randomize and new scenes with invented patterns only use the shapes ticked here.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -727,7 +770,7 @@ struct SettingsView: View {
             } header: {
                 Text("Effects")
             } footer: {
-                Text("Switch an effect off and no pattern, scene or Surprise me will use it; your photos keep their own colors.")
+                Text("Switch an effect off and no pattern, scene or random scene will use it; your photos keep their own colors.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -779,5 +822,28 @@ struct HueShiftStrip: View {
             return Color(hue: h, saturation: 0.75, brightness: 0.95)
         }
         return LinearGradient(colors: stops, startPoint: .leading, endPoint: .trailing)
+    }
+}
+
+extension View {
+    /// Liquid Glass with extra gloss: a soft sheen over the top of the pane and a bright rim that fades along the
+    /// edge, like light catching glass.
+    func glossy<S: InsettableShape>(_ shape: S) -> some View {
+        self
+            .glassEffect(.regular, in: shape)
+            .overlay {
+                shape
+                    .fill(LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0.04), .clear],
+                                         startPoint: .top, endPoint: .center))
+                    .blendMode(.plusLighter)
+                    .allowsHitTesting(false)
+            }
+            .overlay {
+                shape
+                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.75), .white.opacity(0.08), .white.opacity(0.35)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.2)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: .black.opacity(0.25), radius: 14, y: 6)
     }
 }

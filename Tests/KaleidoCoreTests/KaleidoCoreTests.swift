@@ -145,12 +145,12 @@ final class SettingsTests: XCTestCase {
         var wild = Look()
         wild.rotationSpeed = 500; wild.hueSpeed = 500; wild.driftSpeed = 99; wild.twist = 9; wild.motion = 50
         wild.clamp()
-        XCTAssertEqual(wild.rotationSpeed, 0.6); XCTAssertEqual(wild.hueSpeed, 0.4, "hue cycling snaps to its fastest step")
+        XCTAssertEqual(wild.rotationSpeed, 0.6); XCTAssertEqual(wild.hueSpeed, Look.hueSpeedRange.upperBound, "hue cycling stops at its fastest")
         XCTAssertEqual(wild.driftSpeed, 0.5); XCTAssertEqual(wild.twist, 1); XCTAssertEqual(wild.motion, 2)
         var g = SplitMix64(seed: 9)
         for _ in 0..<300 {
             let l = Look.random(using: &g)
-            XCTAssertLessThanOrEqual(abs(l.rotationSpeed), 0.15); XCTAssertLessThanOrEqual(l.hueSpeed, 0.2); XCTAssertLessThanOrEqual(l.driftSpeed, 0.15)
+            XCTAssertLessThanOrEqual(abs(l.rotationSpeed), 0.15); XCTAssertLessThanOrEqual(l.hueSpeed, 0.25); XCTAssertLessThanOrEqual(l.driftSpeed, 0.15)
         }
     }
 
@@ -170,7 +170,7 @@ final class SettingsTests: XCTestCase {
         let v3 = #"{"version": 3, "look": {"motion": 1.8, "segments": 9}, "transition": "spin"}"#
         let s = try JSONDecoder().decode(Settings.self, from: Data(v3.utf8))
         XCTAssertEqual(s.look.motion, 1)
-        XCTAssertEqual(s.speedStep, Settings.defaultSpeedStep)
+        XCTAssertEqual(s.look.speedStep, Settings.defaultSpeedStep)
         XCTAssertEqual(s.look.segments, 9)
         XCTAssertEqual(s.transition, .random, "removed transitions load as random instead of breaking the file")
         XCTAssertEqual(try JSONDecoder().decode(TransitionStyle.self, from: Data(#""swirl""#.utf8)), .random)
@@ -179,16 +179,36 @@ final class SettingsTests: XCTestCase {
 
     func testSpeedStepsScaleMotionAndClamp() {
         var s = Settings()
-        XCTAssertEqual(s.speedMultiplier, Settings.speedMultipliers[2])
+        XCTAssertEqual(s.speedMultiplier(for: Look()), Settings.speedMultipliers[2])
         XCTAssertEqual(Settings.speedMultipliers.count, 5)
         XCTAssertEqual(Settings.speedMultipliers, Settings.speedMultipliers.sorted(), "turtle to rabbit")
-        s.speedStep = 0
-        XCTAssertEqual(s.effectiveLook(Look()).motion, 2, "slowest is an eighth of the fastest")
-        s.speedStep = 4
-        XCTAssertEqual(s.effectiveLook(Look()).motion, 16, "fastest is four times the slowest")
-        s.speedStep = 99
+        var l = Look()
+        l.speedStep = 0
+        XCTAssertEqual(s.effectiveLook(l).motion, 2, "slowest is an eighth of the fastest")
+        l.speedStep = 4
+        XCTAssertEqual(s.effectiveLook(l).motion, 16, "fastest is four times the slowest")
+        s.look.speedStep = 99
         s.clamp()
-        XCTAssertEqual(s.speedStep, 4)
+        XCTAssertEqual(s.look.speedStep, 4)
+    }
+
+    func testSpeedAndZoomBelongToTheSceneAndOldFilesMigrate() throws {
+        let old = #"{"version": 5, "speedStep": 4, "zoomMotion": "pull", "look": {"segments": 7}}"#
+        let s = try JSONDecoder().decode(Settings.self, from: Data(old.utf8))
+        XCTAssertEqual(s.look.speedStep, 4); XCTAssertEqual(s.look.zoomMotion, .pull)
+        let lib = SceneLibrary(fileURL: nil)
+        var l = Look(); l.speedStep = 0; l.zoomMotion = .push; l.hueSpeed = 0.7
+        let id = lib.add(name: "A", photoID: UUID(), look: l)
+        let back = try JSONDecoder().decode(SavedScene.self, from: JSONEncoder().encode(lib.scene(id)!))
+        XCTAssertEqual(back.look.speedStep, 0); XCTAssertEqual(back.look.zoomMotion, .push); XCTAssertEqual(back.look.hueSpeed, 0.7)
+        XCTAssertEqual(try JSONDecoder().decode(TransitionStyle.self, from: Data(#""segments""#.utf8)), .random, "the removed ripple loads as random")
+    }
+
+    func testCenteredLogPutsTheMiddleInTheMiddle() {
+        let scale = SliderScale.centeredLog(min: 0.4, mid: 1, max: 3)
+        XCTAssertEqual(scale.value(at: 0.5), 1, accuracy: 1e-9)
+        XCTAssertEqual(scale.value(at: 0), 0.4, accuracy: 1e-9); XCTAssertEqual(scale.value(at: 1), 3, accuracy: 1e-9)
+        for v in [0.4, 0.7, 1, 1.8, 3] { XCTAssertEqual(scale.value(at: scale.position(for: v)), v, accuracy: 1e-9) }
     }
 
     func testGlobalSwitchesOverrideAnyLook() {
@@ -245,9 +265,9 @@ final class SettingsTests: XCTestCase {
 
     func testSuperSlowIsAnEighthOfTheSlowestStop() throws {
         var s = Settings()
-        s.speedStep = 4
+        s.look.speedStep = 4
         s.superSlow = true
-        XCTAssertEqual(s.speedMultiplier, Settings.speedMultipliers[0] / 8, "whatever the slider says")
+        XCTAssertEqual(s.speedMultiplier(for: s.look), Settings.speedMultipliers[0] / 8, "whatever the slider says")
         XCTAssertEqual(s.effectiveLook(Look()).motion, Look().motion * Settings.speedMultipliers[0] / 8)
         XCTAssertTrue(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).superSlow)
         XCTAssertFalse(Settings().superSlow)
@@ -266,17 +286,18 @@ final class SettingsTests: XCTestCase {
 
     func testMovementSwitches() throws {
         var s = Settings()
-        XCTAssertEqual(s.zoomMotion, .drift)
+        XCTAssertEqual(s.look.zoomMotion, .drift)
         var l = Look(); l.breathing = 0.7
         XCTAssertEqual(s.effectiveLook(l).breathing, 0.7, "Drift keeps the look's own breathing")
-        s.zoomMotion = .push
+        l.zoomMotion = .push
+        s.look.zoomMotion = .push
         XCTAssertEqual(s.effectiveLook(l).breathing, 0, "push or pull replaces the breathing")
         XCTAssertEqual(ZoomMotion.push.direction, 1); XCTAssertEqual(ZoomMotion.pull.direction, -1)
         let back = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s))
-        XCTAssertEqual(back.zoomMotion, .push)
+        XCTAssertEqual(back.look.zoomMotion, .push)
         // The old names carry over.
         func old(_ raw: String) throws -> ZoomMotion {
-            try JSONDecoder().decode(Settings.self, from: Data(#"{"version": 5, "zoomMotion": "\#(raw)"}"#.utf8)).zoomMotion
+            try JSONDecoder().decode(Settings.self, from: Data(#"{"version": 5, "zoomMotion": "\#(raw)"}"#.utf8)).look.zoomMotion
         }
         XCTAssertEqual(try old("zoomIn"), .push)
         XCTAssertEqual(try old("zoomOut"), .pull)

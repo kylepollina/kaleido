@@ -45,8 +45,8 @@ public enum MirrorMode: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 public enum TransitionStyle: String, Codable, CaseIterable, Identifiable, Sendable {
-    // The angular "swirl wipe" and the dizzying "spin" were removed; old settings that name them load as random.
-    case random, dissolve, iris, zoom, segments
+    // The angular "swirl wipe", the dizzying "spin" and the "segment ripple" were removed; old settings that name them load as random.
+    case random, dissolve, iris, zoom
     public var id: String { rawValue }
     public var label: String {
         switch self {
@@ -54,7 +54,6 @@ public enum TransitionStyle: String, Codable, CaseIterable, Identifiable, Sendab
         case .dissolve: return "Dissolve"
         case .iris: return "Iris"
         case .zoom: return "Zoom through"
-        case .segments: return "Segment ripple"
         }
     }
     /// Index used by the shader. `.random` has none; the renderer picks a concrete style per transition.
@@ -63,7 +62,6 @@ public enum TransitionStyle: String, Codable, CaseIterable, Identifiable, Sendab
         case .random, .dissolve: return 0
         case .iris: return 1
         case .zoom: return 3
-        case .segments: return 4
         }
     }
 
@@ -92,10 +90,16 @@ public struct Look: Codable, Equatable, Sendable {
     public var twist: Double = 0
     /// Swirl sways back and forth (through straight and the other way) instead of holding still.
     public var swayingSwirl = false
-    /// Static hue rotation in degrees.
+    /// Static hue rotation in degrees: where on the colour wheel the colours start.
     public var hueShift: Double = 0
-    /// Degrees per second the hue keeps rotating (at most 0.6: a full cycle in 10 minutes).
+    /// Hue cycling: degrees per second the colours keep turning around the wheel, before the scene's speed is
+    /// applied (0 is off). At the default speed 1 is a lap in about a minute, 0.1 a lap in ten minutes.
     public var hueSpeed: Double = 0
+    public static let hueSpeedRange = 0.0...1.2
+    /// The scene's speed: an index into `Settings.speedMultipliers` (turtle to rabbit), for every movement.
+    public var speedStep = Settings.defaultSpeedStep
+    /// How the view zooms in this scene (Drift, Push or Pull).
+    public var zoomMotion: ZoomMotion = .drift
     public var saturation: Double = 1.1
     public var vignette: Double = 0.35
     /// 0...1 how far the zoom slowly breathes in and out (about a ten minute cycle).
@@ -107,8 +111,6 @@ public struct Look: Codable, Equatable, Sendable {
     /// Black lines along every mirror and tile edge: one of `outlineSteps` (0 = off, 0.25 = on).
     public var outline: Double = 0
     public static let outlineSteps: [Double] = [0, 0.25]
-    /// Hue cycling choices in degrees per second: off, slow, medium, fast.
-    public static let hueCycleSteps: [Double] = [0, 0.05, 0.15, 0.4]
     public var dynamicMirrors = false
     public var mirrorsMin = 4
     public var mirrorsMax = 12
@@ -128,6 +130,8 @@ public struct Look: Codable, Equatable, Sendable {
         swayingSwirl = try c.decodeIfPresent(Bool.self, forKey: .swayingSwirl) ?? d.swayingSwirl
         hueShift = try c.decodeIfPresent(Double.self, forKey: .hueShift) ?? d.hueShift
         hueSpeed = try c.decodeIfPresent(Double.self, forKey: .hueSpeed) ?? d.hueSpeed
+        speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
+        zoomMotion = (try? c.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion)) ?? d.zoomMotion
         saturation = try c.decodeIfPresent(Double.self, forKey: .saturation) ?? d.saturation
         vignette = try c.decodeIfPresent(Double.self, forKey: .vignette) ?? d.vignette
         breathing = try c.decodeIfPresent(Double.self, forKey: .breathing) ?? d.breathing
@@ -149,8 +153,8 @@ public struct Look: Codable, Equatable, Sendable {
         drift = min(max(drift, 0), 1)
         driftSpeed = min(max(driftSpeed, 0), 0.5)
         twist = min(max(twist, -1), 1)
-        let h = hueSpeed
-        hueSpeed = Self.hueCycleSteps.min { abs($0 - h) < abs($1 - h) }!
+        hueSpeed = min(max(hueSpeed, Self.hueSpeedRange.lowerBound), Self.hueSpeedRange.upperBound)
+        speedStep = min(max(speedStep, 0), Settings.speedMultipliers.count - 1)
         breathing = min(max(breathing, 0), 1)
         motion = min(max(motion, 0), 2)
         let o = outline
@@ -202,7 +206,7 @@ public struct Look: Codable, Equatable, Sendable {
         l.driftSpeed = Double.random(in: 0.03...0.15, using: &g)
         l.twist = Double.random(in: 0..<1, using: &g) < 0.3 ? Double.random(in: -0.4...0.4, using: &g) : 0
         l.hueShift = Double.random(in: 0..<1, using: &g) < 0.4 ? Double.random(in: 0...360, using: &g) : 0
-        l.hueSpeed = Double.random(in: 0..<1, using: &g) < 0.3 ? [0.05, 0.15].randomElement(using: &g)! : 0
+        l.hueSpeed = Double.random(in: 0..<1, using: &g) < 0.3 ? [0.1, 0.25].randomElement(using: &g)! : 0
         l.saturation = Double.random(in: 0.95...1.4, using: &g)
         l.vignette = Double.random(in: 0.1...0.45, using: &g)
         l.outline = Double.random(in: 0..<1, using: &g) < 0.15 ? 0.25 : 0

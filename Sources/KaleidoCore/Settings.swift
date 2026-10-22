@@ -82,10 +82,10 @@ public enum Sharpness: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 public struct Settings: Codable, Equatable, Sendable {
-    /// 5 = scene shuffling. 4 = speed is a 5-stop global control and looks carry no speed of their own.
+    /// 6 = speed and zoom belong to each scene's look. 5 = scene shuffling. 4 = speed is a 5-stop global control and looks carry no speed of their own.
     /// 3 = barely-moving ranges, 2 = calm ranges. Older files (no version) had much faster ranges and are
     /// migrated on load.
-    public static let currentVersion = 5
+    public static let currentVersion = 6
 
     /// The five stops of the speed slider (turtle to rabbit), as multipliers on every motion speed.
     /// Rabbit is eight times the turtle. Even steps on a log scale in between.
@@ -105,15 +105,11 @@ public struct Settings: Codable, Equatable, Sendable {
     public var playOnLaunch = false
     /// While playing, stop the display from going to sleep on its own (a screensaver-style keep-awake).
     public var keepScreenAwake = false
-    /// 0...4, an index into `speedMultipliers`.
-    public var speedStep = Settings.defaultSpeedStep
     /// Super slow motion (the tortoise in the mini-player): every movement at an eighth of the slowest stop,
     /// whatever the slider says, and videos at an eighth of real time.
     public var superSlow = false
     public static let superSlowMultiplier = 0.25
     public static let superSlowVideoRate: Float = 0.125
-    /// Movement, on top of any look: how the view zooms.
-    public var zoomMotion: ZoomMotion = .drift
     /// Desktop drawing resolution (the preview always draws sharp).
     public var sharpness: Sharpness = .balanced
     /// Surprise me: as scenes change, mix saved scenes with brand-new ones (a photo with an invented pattern).
@@ -146,8 +142,9 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public init() {}
 
-    public var speedMultiplier: Double {
-        superSlow ? Settings.superSlowMultiplier : Settings.speedMultipliers[min(max(speedStep, 0), Settings.speedMultipliers.count - 1)]
+    /// The multiplier on every movement for a look: its own speed stop, or the tortoise's fixed crawl.
+    public func speedMultiplier(for l: Look) -> Double {
+        superSlow ? Settings.superSlowMultiplier : Settings.speedMultipliers[min(max(l.speedStep, 0), Settings.speedMultipliers.count - 1)]
     }
 
     /// The look the renderer should actually use: the chosen look with the global switches and speed applied.
@@ -159,10 +156,12 @@ public struct Settings: Codable, Equatable, Sendable {
         if !allowSwirl { r.twist = 0 }
         if !allowDynamicMirrors { r.dynamicMirrors = false }
         if !allowOutlines { r.outline = 0 }
-        if zoomMotion != .drift { r.breathing = 0 }
-        r.motion = l.motion * speedMultiplier
+        if l.zoomMotion != .drift { r.breathing = 0 }
+        r.motion = l.motion * speedMultiplier(for: l)
         return r
     }
+
+    private enum LegacyKeys: String, CodingKey { case speedStep, zoomMotion }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -178,9 +177,7 @@ public struct Settings: Codable, Equatable, Sendable {
         limitInLowPowerMode = try c.decodeIfPresent(Bool.self, forKey: .limitInLowPowerMode) ?? d.limitInLowPowerMode
         playOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .playOnLaunch) ?? d.playOnLaunch
         keepScreenAwake = try c.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? d.keepScreenAwake
-        speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
         superSlow = (try? c.decodeIfPresent(Bool.self, forKey: .superSlow)) ?? false
-        zoomMotion = (try? c.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion)) ?? d.zoomMotion
         surprise = try c.decodeIfPresent(Bool.self, forKey: .surprise) ?? d.surprise
         sharpness = (try? c.decodeIfPresent(Sharpness.self, forKey: .sharpness)) ?? d.sharpness
         sceneShuffle = (try? c.decodeIfPresent(SceneShuffle.self, forKey: .sceneShuffle)) ?? d.sceneShuffle
@@ -193,6 +190,12 @@ public struct Settings: Codable, Equatable, Sendable {
         allowSwirl = try c.decodeIfPresent(Bool.self, forKey: .allowSwirl) ?? true
         allowDynamicMirrors = try c.decodeIfPresent(Bool.self, forKey: .allowDynamicMirrors) ?? true
         allowOutlines = try c.decodeIfPresent(Bool.self, forKey: .allowOutlines) ?? true
+        if fileVersion < 6 {
+            // Speed and zoom used to be global; they now live in the look (and so in each scene).
+            let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+            if let step = try? legacy.decodeIfPresent(Int.self, forKey: .speedStep) { look.speedStep = step }
+            if let zoom = try? legacy.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion) { look.zoomMotion = zoom }
+        }
         if fileVersion < 5 {
             // Pattern shuffling became scene shuffling: keep showing new photos.
             sceneShuffle = .new
@@ -200,7 +203,7 @@ public struct Settings: Codable, Equatable, Sendable {
         if fileVersion < 4 {
             // Speed moved from each look's "Motion" slider to the global 5-stop control.
             look.motion = 1
-            speedStep = d.speedStep
+            look.speedStep = d.look.speedStep
         }
         if fileVersion < 3 {
             // The old ranges were far too lively. Reset every speed-like value to the calm defaults and keep
@@ -223,7 +226,6 @@ public struct Settings: Codable, Equatable, Sendable {
         secondsPerPhoto = min(max(secondsPerPhoto, 10), 3600)
         transitionSeconds = min(max(transitionSeconds, 2), 30)
         frameRate = frameRate >= 60 ? 60 : 30
-        speedStep = min(max(speedStep, 0), Settings.speedMultipliers.count - 1)
         look.clamp()
     }
 

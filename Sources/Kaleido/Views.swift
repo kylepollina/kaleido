@@ -3,6 +3,57 @@ import KaleidoCore
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// A small clickable tick under a slider's track at `position` (0...1 along the track); clicking sets the value.
+/// SwiftUI's macOS slider keeps its track about half a knob in from each end, which the tick allows for.
+private struct SliderTick: ViewModifier {
+    let position: Double
+    let active: Bool
+    let help: String
+    let action: () -> Void
+    func body(content: Content) -> some View {
+        let inset: CGFloat = 11, width = SliderLine<EmptyView>.sliderWidth
+        content
+            .padding(.bottom, 8)
+            .overlay(alignment: .bottomLeading) {
+                Button(action: action) {
+                    Rectangle().fill(active ? Color.accentColor : Color.secondary.opacity(0.8)).frame(width: 2, height: 7)
+                        .padding(.horizontal, 8).padding(.vertical, 3).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(help)
+                .offset(x: inset + (width - 2 * inset) * position - 9, y: 2)
+            }
+    }
+}
+
+extension View {
+    fileprivate func sliderTick(at position: Double, active: Bool, help: String, action: @escaping () -> Void) -> some View {
+        modifier(SliderTick(position: position, active: active, help: help, action: action))
+    }
+}
+
+/// One Form row for a slider: the name and its value on the left, the slider on the right. The slider has a fixed
+/// width so a tick under it can be placed exactly.
+private struct SliderLine<Control: View>: View {
+    let title: String
+    let valueText: String
+    @ViewBuilder let control: Control
+
+    static var sliderWidth: CGFloat { 190 }
+
+    var body: some View {
+        LabeledContent {
+            control.frame(width: Self.sliderWidth)
+        } label: {
+            HStack {
+                Text(title)
+                Spacer(minLength: 6)
+                Text(valueText).monospacedDigit().foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
 struct SliderRow: View {
     let title: String
     @Binding var value: Double
@@ -18,37 +69,18 @@ struct SliderRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(title)
-                Spacer()
-                Text(format(value)).monospacedDigit().foregroundStyle(.secondary)
-            }
+        SliderLine(title: title, valueText: format(value)) {
             if let step {
                 Slider(value: $value, in: range, step: step)
             } else if zeroTick {
                 Slider(value: Binding(get: { value }, set: { v in
                     value = abs(v) < (range.upperBound - range.lowerBound) * 0.03 ? 0 : v
                 }), in: range)
-                .overlay(alignment: .bottomLeading) { zeroMark }
+                .sliderTick(at: (0 - range.lowerBound) / (range.upperBound - range.lowerBound),
+                            active: value == 0, help: "Set to zero") { value = 0 }
             } else {
                 Slider(value: $value, in: range)
             }
-        }
-    }
-
-    /// A small tick under the slider at zero; clicking it sets the value to zero.
-    private var zeroMark: some View {
-        GeometryReader { g in
-            let knob: CGFloat = 10   // the slider's track starts and ends about half a knob in from its edges
-            let x = knob + (g.size.width - 2 * knob) * (0 - range.lowerBound) / (range.upperBound - range.lowerBound)
-            Button { value = 0 } label: {
-                Rectangle().fill(value == 0 ? Color.accentColor : Color.secondary).frame(width: 2, height: 7)
-                    .padding(.horizontal, 6).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Set to zero")
-            .position(x: x, y: g.size.height + 5)
         }
     }
 }
@@ -57,20 +89,26 @@ struct ScaledSliderRow: View {
     let title: String
     @Binding var value: Double
     let scale: SliderScale
+    /// A value that gets a clickable tick under the slider, and that the knob snaps to when it comes close.
+    var tick: Double?
     let format: (Double) -> String
 
-    init(_ title: String, value: Binding<Double>, scale: SliderScale, format: @escaping (Double) -> String) {
-        self.title = title; self._value = value; self.scale = scale; self.format = format
+    init(_ title: String, value: Binding<Double>, scale: SliderScale, tick: Double? = nil, format: @escaping (Double) -> String) {
+        self.title = title; self._value = value; self.scale = scale; self.tick = tick; self.format = format
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(title)
-                Spacer()
-                Text(format(value)).monospacedDigit().foregroundStyle(.secondary)
+        SliderLine(title: title, valueText: format(value)) {
+            if let tick {
+                let at = scale.position(for: tick)
+                Slider(value: Binding(get: { scale.position(for: value) }, set: { t in
+                    value = abs(t - at) < 0.03 ? tick : scale.value(at: t)
+                }), in: 0...1)
+                .sliderTick(at: at, active: abs(value - tick) < 1e-9,
+                            help: tick == 0 ? "Off" : "Reset to \(format(tick))") { value = tick }
+            } else {
+                Slider(value: Binding(get: { scale.position(for: value) }, set: { value = scale.value(at: $0) }), in: 0...1)
             }
-            Slider(value: Binding(get: { scale.position(for: value) }, set: { value = scale.value(at: $0) }), in: 0...1)
         }
     }
 }
@@ -606,7 +644,7 @@ struct MenuBarContent: View {
     var body: some View {
         Button(app.isPlaying ? "Stop" : "Play on Desktop") { app.togglePlay() }
         Button("Next Photo") { app.nextPhoto() }.disabled(!app.isPlaying)
-        Button("Surprise Me") { app.surpriseMe() }
+        Button("New Random Scene") { app.surpriseMe() }
         Button("Refresh Desktop Windows") { app.rebuildDesktop() }.disabled(!app.isPlaying)
         Divider()
         Button("Show Kaleido Window") {

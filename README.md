@@ -15,19 +15,24 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   kaleidoscope in over the wallpaper and back out (1.5 s).
 - **Scenes.** A scene is a photo with a look (shape, mirrors, swirl, colour...). What's on screen is always a
   scene: a saved one, or a new one Kaleido just put together. "Save scene" keeps it (photo, look and where you
-  dragged the photo).
-- **Surprise me** (a toggle, on by default): as scenes change, Kaleido mixes your saved scenes with new ones it
-  invents. Off, it plays through your saved scenes (or, with none saved, your photos with the look on screen).
+  dragged the photo), and its speed and zoom (Drift / Push / Pull). Changing speed or zoom on a saved scene
+  saves itself; the rest needs Save.
+- **Play scenes** (top of the Scenes tab) plays through your saved scenes one after the other (shuffled when
+  Shuffle photo order is on), like playing an album.
+- **Random scenes.** The dice in the mini-player is a one-shot: a new photo with an invented pattern, now.
+  Randomize in Edit scene invents a new pattern for the photo on screen. Settings > "Invent new scenes while
+  playing" (on by default) mixes invented scenes in among your saved ones as scenes change; off, only saved scenes
+  play (or, with none saved, your photos with the look on screen).
   Invented looks use only the shapes ticked in Settings (untick Diamonds if it isn't for you). Next and Back fade
   in 3 seconds; Back brings back the scene before, look and all.
 - **The window is the scene**, edge to edge (like Portal), and everything floats over it in Liquid Glass:
-  - a mini-player (like Apple Music's): Surprise me, Back / Play (or Space) / Next, the scene's name, Zoom
+  - a mini-player (like Apple Music's): New random scene, Back / Play (or Space) / Next, the scene's name, Zoom
     (Drift / Push / Pull), Speed, Save scene and Edit scene; each button lights up under the pointer;
   - the sidebar button (top left) opens a panel on the left with Photos, Scenes and Settings tabs (Photos can
     expand to fill the window, for browsing). Scenes lists your scenes as pictures: click to show one, star the
     ones you love (they move to the top and come up more often; new scenes start unstarred), swipe or
     right-click to rename or delete;
-  - Edit scene opens a panel on the right with Randomize, Debug lines (the mirrors traced in red) and every
+  - Edit scene opens a panel on the right with Randomize (top right), the scene's name and Save, Shape with Debug lines (the mirrors traced in red), Motion (speed, zoom) and every
     setting of the scene.
 
   A click on the scene closes any open panel; with none open it hides every control, and another click (or
@@ -50,6 +55,9 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   sliding through the mirrors one way or the other (along the mirrors' own axis, which turns with the pattern).
   Whether that reads as zooming in or out depends on the pattern, hence the neutral names. Drift leaves only the
   look's own slow zoom breathing (set in Edit scene). Changes ease in and out.
+- **Hue.** Hue shift turns every colour a fixed amount around the colour wheel. Hue cycling keeps turning them
+  around the wheel from there; its slider shows how long a lap takes at the scene's speed (about a minute at the
+  top, up to an hour at the bottom).
 - **Global switches.** Turn off hue shifts, saturation changes, vignette, swirl, dynamic mirrors or outlines for every scene.
 - **macOS Aerials (video).** Every aerial in macOS's list shows up; the ones not on this Mac yet have a Download
   button (Kaleido fetches the video from Apple into its own folder, never macOS's). The slow-motion films macOS downloads for its moving wallpapers and screen
@@ -76,7 +84,7 @@ Native Swift · SwiftUI control window · Metal shader · No accounts, no cloud,
   per round) or in order.
 - **Good citizen.** 30 or 60 fps cap, 30 fps in Low Power Mode, optional pause on battery, pauses while the
   display is asleep or the screen is locked, and stops drawing when a window fully covers the desktop.
-- **Menu bar item** with Play/Stop, Next photo and Surprise me. Closing the window keeps playback running.
+- **Menu bar item** with Play/Stop, Next photo and New Random Scene. Closing the window keeps playback running.
 - A live preview in the control window shows what the desktop will look like.
 
 ## Install
@@ -96,7 +104,7 @@ Run the tests with `swift test`.
 
 1. Click **Add Folder…** or **Add Photos…** (or drop files on the window).
 2. Press **Play on Desktop** (⌘P). Move to an empty desktop, or use Mission Control's show-desktop, to see it.
-3. Tune the scene with Edit scene, or let Surprise me invent new ones.
+3. Tune the scene with Edit scene, or use the dice to invent new ones.
 4. **Stop** or quit to get your wallpaper back.
 
 Open an album and press **Play album** to play only its selected photos as a slideshow (the mini-player shows
