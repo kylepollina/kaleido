@@ -95,8 +95,10 @@
      time; they cross-fade when you flip between them and keep the handle where it was. */
   .compare-section { padding-top: 24px; text-align: center; }
   .compare-section .sub { margin-inline: auto; }
+  .compare-section + .compare-section { padding-top: 48px; }
   .compare { position: relative; max-width: 900px; margin: 0 auto; aspect-ratio: 1600 / 1005; border-radius: 20px; overflow: hidden;
     box-shadow: var(--shadow); --pos: 50%; user-select: none; touch-action: pan-y; }
+  .compare.wide { aspect-ratio: 16 / 9; }
   .compare .slide { position: absolute; inset: 0; opacity: 0; transition: opacity .6s ease; }
   .compare .slide.active { opacity: 1; }
   .compare img, .compare video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
@@ -205,7 +207,8 @@
     <p class="sub">Drag to compare the original with what Kaleido makes of it.</p>
     <!-- Each slide: Kaleido's window recorded as it played the photo (cropped to the picture, last 3 seconds cross-faded
          into the first so it loops), with the photo itself on top, clipped at the handle. Add a slide by copying one. -->
-    <div class="compare" id="compare">
+    <div class="carousel">
+    <div class="compare">
       <div class="slide active">
         <video muted loop playsinline preload="auto" poster="images/compare-dahlia-poster.jpg" aria-label="Kaleido playing the dahlia photo">
           <source src="images/compare-dahlia-av1.mp4" type='video/mp4; codecs="av01.0.08M.08"'>
@@ -239,9 +242,42 @@
       <input type="range" min="0" max="100" value="50" step="0.1" aria-label="Compare the original photo with the kaleidoscope">
     </div>
     <div class="carousel-nav">
-      <button class="arrow" id="prev" aria-label="Previous example">&lsaquo;</button>
-      <div class="dots" id="dots"></div>
-      <button class="arrow" id="next" aria-label="Next example">&rsaquo;</button>
+      <button class="arrow prev" aria-label="Previous example">&lsaquo;</button>
+      <div class="dots"></div>
+      <button class="arrow next" aria-label="Next example">&rsaquo;</button>
+    </div>
+    </div>
+  </div>
+</section>
+
+<section class="compare-section">
+  <div class="wrap">
+    <h2>And macOS's aerial films.</h2>
+    <p class="sub">The slow-motion aerials behind macOS's own screen savers play too, as moving kaleidoscopes.</p>
+    <!-- Stills: Kaleido playing an aerial, with the same moment in Original on top, both cropped to the 16:9 picture. -->
+    <div class="carousel">
+    <div class="compare wide">
+      <div class="slide active">
+        <img src="images/aerial-seafloor-kaleido.webp" alt="Kaleido playing the sea floor aerial" width="1600" height="900" loading="lazy">
+        <img class="before" src="images/aerial-seafloor-original.webp" alt="The sea floor aerial itself" width="1600" height="900" loading="lazy">
+      </div>
+      <div class="slide">
+        <img src="images/aerial-aurora-kaleido.webp" alt="Kaleido playing the aurora from orbit aerial" width="1600" height="900" loading="lazy">
+        <img class="before" src="images/aerial-aurora-original.webp" alt="The aurora from orbit aerial itself" width="1600" height="900" loading="lazy">
+      </div>
+      <div class="slide">
+        <img src="images/aerial-kelp-kaleido.webp" alt="Kaleido playing the kelp forest aerial" width="1600" height="900" loading="lazy">
+        <img class="before" src="images/aerial-kelp-original.webp" alt="The kelp forest aerial itself" width="1600" height="900" loading="lazy">
+      </div>
+      <span class="tag l">Original</span><span class="tag r">Kaleido</span>
+      <div class="handle"></div>
+      <input type="range" min="0" max="100" value="50" step="0.1" aria-label="Compare the aerial film with the kaleidoscope">
+    </div>
+    <div class="carousel-nav">
+      <button class="arrow prev" aria-label="Previous aerial">&lsaquo;</button>
+      <div class="dots"></div>
+      <button class="arrow next" aria-label="Next aerial">&rsaquo;</button>
+    </div>
     </div>
   </div>
 </section>
@@ -305,13 +341,13 @@
     v.pause();
   }
 
-  // The comparison: the range input covers the picture, so dragging anywhere (or the arrow keys) moves the line.
-  // Only the example on show plays, and only while it is on screen.
-  (function () {
-    var box = document.getElementById('compare');
+  // Each comparison: the range input covers the picture, so dragging anywhere (or the arrow keys) moves the line.
+  // Videos play only on the example on show, and only while it is on screen.
+  [].forEach.call(document.querySelectorAll('.carousel'), function (carousel) {
+    var box = carousel.querySelector('.compare');
     var input = box.querySelector('input');
     var slides = [].slice.call(box.querySelectorAll('.slide'));
-    var dots = document.getElementById('dots');
+    var dots = carousel.querySelector('.dots');
     var current = 0, visible = false;
     function setPos() { box.style.setProperty('--pos', input.value + '%'); }
     input.addEventListener('input', setPos);
@@ -320,6 +356,7 @@
     function sync() {
       slides.forEach(function (s, i) {
         var video = s.querySelector('video');
+        if (!video) return;
         if (i === current && visible && !reduceMotion) {
           video.preload = 'auto';
           var p = video.play(); if (p && p.catch) p.catch(function () {});
@@ -341,15 +378,15 @@
       d.addEventListener('click', function () { show(i); });
       dots.appendChild(d);
     });
-    document.getElementById('prev').addEventListener('click', function () { show(current - 1); });
-    document.getElementById('next').addEventListener('click', function () { show(current + 1); });
+    carousel.querySelector('.prev').addEventListener('click', function () { show(current - 1); });
+    carousel.querySelector('.next').addEventListener('click', function () { show(current + 1); });
     if ('IntersectionObserver' in window) {
       new IntersectionObserver(function (entries) { visible = entries[0].isIntersecting; sync(); }).observe(box);
     } else {
       visible = true;
     }
     show(0);
-  })();
+  });
 
   // Placeholder buttons shouldn't jump to the top of the page.
   document.querySelectorAll('a[aria-disabled="true"]').forEach(function (a) {
