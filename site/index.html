@@ -492,6 +492,11 @@
                 height: auto;
                 display: block;
             }
+            /* A full-screen shot has no window shadow of its own. */
+            .feature img.screen {
+                border-radius: 12px;
+                box-shadow: var(--shadow);
+            }
             @media (max-width: 760px) {
                 .feature,
                 .feature:nth-child(even) {
@@ -580,7 +585,7 @@
                         />Kaleido</a
                     >
                     <div class="links">
-                        <a class="hide-sm" href="#screenshots">Screenshots</a>
+                        <a class="hide-sm" href="#features">Features</a>
                         <a href="#download">Download</a>
                         <a
                             href="https://github.com/kylepollina/kaleido"
@@ -637,7 +642,7 @@
 
         <section class="compare-section">
             <div class="wrap">
-                <h2>One photo, folded through mirrors.</h2>
+                <h2>Bring life to your photos</h2>
                 <p class="sub">
                     Drag to compare the original with what Kaleido makes of it.
                 </p>
@@ -901,23 +906,36 @@
             </div>
         </section>
 
-        <section id="screenshots">
+        <section id="features">
             <div class="wrap">
-                <h2>See it in action</h2>
-                <p class="sub">
-                    Everything lives in one window, over the kaleidoscope it is
-                    playing.
-                </p>
+                <h2>Features</h2>
                 <div class="features">
+                    <div class="feature">
+                        <div class="text">
+                            <h3>Your desktop, alive.</h3>
+                            <p>
+                                Press Play and the kaleidoscope fills your
+                                desktop, slowly turning behind your icons and
+                                windows. Press Stop and your usual
+                                wallpaper is back.
+                            </p>
+                        </div>
+                        <img
+                            class="screen"
+                            src="images/feature-desktop.webp"
+                            alt="A Mac desktop with a flower kaleidoscope as its wallpaper, behind the menu bar and Dock"
+                            width="1600"
+                            height="1040"
+                            loading="lazy"
+                        />
+                    </div>
                     <div class="feature">
                         <div class="text">
                             <h3>Shape every pattern.</h3>
                             <p>
-                                Eight shapes, from Classic to Fractal. Set the
-                                mirrors (or let them change on their own), scale
-                                and swirl, and turn on guide lines to see
-                                exactly where the mirrors fall. Or hit
-                                Randomize.
+                                Have fun playing with the pattern editor! Many
+                                knobs and dials to tune. Or keep things random
+                                :)
                             </p>
                         </div>
                         <img
@@ -932,10 +950,8 @@
                         <div class="text">
                             <h3>Pick what plays.</h3>
                             <p>
-                                Your Photos albums and smart albums, folders on
-                                your Mac, and macOS's own wallpapers and
-                                aerials. Tick a whole album or single photos;
-                                nothing is copied or changed.
+                                Browse and choose your photos, built-in sets and
+                                smart albums to play as kaleidoscopes.
                             </p>
                         </div>
                         <img
