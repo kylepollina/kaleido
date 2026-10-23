@@ -1,161 +1,564 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kaleido: a kaleidoscope for your Mac desktop</title>
-<meta name="description" content="Your own photos, or macOS's slow-motion aerial films, as a slowly turning kaleidoscope on your Mac's desktop. Native Swift and Metal. No accounts, no cloud.">
-<meta name="color-scheme" content="light dark">
-<link rel="icon" href="images/icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #fff8fb;
-    --bg-alt: #fdeef5;
-    --ink: #2a1426;
-    --muted: #70566a;
-    --line: #f0d3e2;
-    --accent: #c2185b;
-    --accent2: #1f8a4c;
-    --accent-ink: #fff;
-    --card: #ffffff;
-    --shadow: 0 20px 50px rgba(194, 24, 91, .18), 0 3px 10px rgba(60, 10, 40, .1);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0b0710;
-      --bg-alt: #120b19;
-      --ink: #f7eaf2;
-      --muted: #b49bad;
-      --line: #2c1d36;
-      --accent: #ff6fae;
-      --accent2: #5be08c;
-      --accent-ink: #1b0614;
-      --card: #170f1f;
-      --shadow: 0 20px 60px rgba(255, 111, 174, .18), 0 3px 12px rgba(0, 0, 0, .6);
-    }
-  }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.65 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
-  a { color: var(--accent); }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
-  .serif { font-family: Fraunces, Georgia, "Times New Roman", serif; }
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Kaleido: a kaleidoscope for your Mac desktop</title>
+        <meta
+            name="description"
+            content="Your own photos, or macOS's slow-motion aerial films, as a slowly turning kaleidoscope on your Mac's desktop. Native Swift and Metal. No accounts, no cloud."
+        />
+        <meta name="color-scheme" content="light dark" />
+        <link rel="icon" href="images/icon.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg: #fff8fb;
+                --bg-alt: #fdeef5;
+                --ink: #2a1426;
+                --muted: #70566a;
+                --line: #f0d3e2;
+                --accent: #c2185b;
+                --accent2: #1f8a4c;
+                --accent-ink: #fff;
+                --card: #ffffff;
+                --shadow:
+                    0 20px 50px rgba(194, 24, 91, 0.18),
+                    0 3px 10px rgba(60, 10, 40, 0.1);
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --bg: #0b0710;
+                    --bg-alt: #120b19;
+                    --ink: #f7eaf2;
+                    --muted: #b49bad;
+                    --line: #2c1d36;
+                    --accent: #ff6fae;
+                    --accent2: #5be08c;
+                    --accent-ink: #1b0614;
+                    --card: #170f1f;
+                    --shadow:
+                        0 20px 60px rgba(255, 111, 174, 0.18),
+                        0 3px 12px rgba(0, 0, 0, 0.6);
+                }
+            }
+            * {
+                box-sizing: border-box;
+            }
+            html {
+                scroll-behavior: smooth;
+            }
+            body {
+                margin: 0;
+                background: var(--bg);
+                color: var(--ink);
+                font:
+                    17px/1.65 Inter,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    sans-serif;
+                -webkit-font-smoothing: antialiased;
+            }
+            a {
+                color: var(--accent);
+            }
+            .wrap {
+                max-width: 1040px;
+                margin: 0 auto;
+                padding: 0 20px;
+            }
+            .serif {
+                font-family: Fraunces, Georgia, "Times New Roman", serif;
+            }
 
-  nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 19px; color: var(--ink); text-decoration: none; }
-  .brand img { width: 32px; height: 32px; }
-  nav .links { display: flex; gap: 20px; font-size: 15px; }
-  nav .links a { color: var(--muted); text-decoration: none; }
-  nav .links a:hover { color: var(--ink); }
-  @media (max-width: 520px) { nav .links a.hide-sm { display: none; } }
+            nav {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 18px 0;
+            }
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-weight: 600;
+                font-size: 19px;
+                color: var(--ink);
+                text-decoration: none;
+            }
+            .brand img {
+                width: 32px;
+                height: 32px;
+            }
+            nav .links {
+                display: flex;
+                gap: 20px;
+                font-size: 15px;
+            }
+            nav .links a {
+                color: var(--muted);
+                text-decoration: none;
+            }
+            nav .links a:hover {
+                color: var(--ink);
+            }
+            @media (max-width: 520px) {
+                nav .links a.hide-sm {
+                    display: none;
+                }
+            }
 
-  .hero { text-align: center; padding: 40px 0 72px; }
-  .eyebrow { display: inline-block; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
-  h1 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(42px, 8vw, 80px); line-height: 1.02; letter-spacing: -.03em; margin: 0 auto 20px; max-width: 13em; }
-  h1 em { font-style: italic; font-weight: 400; background: linear-gradient(90deg, var(--accent), #b266ff 60%, var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
-  .btn { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 11px 22px; border-radius: 999px; text-decoration: none; font-weight: 600; font-size: 16px; line-height: 1.25; border: 1.5px solid var(--ink); color: var(--ink); }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-  .btn small { font-size: 12px; font-weight: 500; opacity: .8; }
-  .btn[aria-disabled="true"] { cursor: default; }
-  .btn:hover { transform: translateY(-1px); }
+            .hero {
+                text-align: center;
+                padding: 40px 0 72px;
+            }
+            .eyebrow {
+                display: inline-block;
+                font-size: 13px;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--accent);
+                margin-bottom: 16px;
+            }
+            h1 {
+                font-family: Fraunces, Georgia, serif;
+                font-weight: 400;
+                font-size: clamp(42px, 8vw, 80px);
+                line-height: 1.02;
+                letter-spacing: -0.03em;
+                margin: 0 auto 20px;
+                max-width: 13em;
+            }
+            h1 em {
+                font-style: italic;
+                font-weight: 300;
+                background: linear-gradient(
+                    90deg,
+                    var(--accent),
+                    #b266ff 60%,
+                    var(--accent2)
+                );
+                -webkit-background-clip: text;
+                background-clip: text;
+                color: transparent;
+            }
+            .cta {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: center;
+            }
+            .btn {
+                display: inline-flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 1px;
+                padding: 11px 22px;
+                border-radius: 999px;
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 16px;
+                line-height: 1.25;
+                border: 1.5px solid var(--ink);
+                color: var(--ink);
+            }
+            .btn.primary {
+                background: var(--accent);
+                border-color: var(--accent);
+                color: var(--accent-ink);
+            }
+            .btn small {
+                font-size: 12px;
+                font-weight: 500;
+                opacity: 0.8;
+            }
+            .btn[aria-disabled="true"] {
+                cursor: default;
+            }
+            .btn:hover {
+                transform: translateY(-1px);
+            }
 
-  /* The top of the page: the same pink -> purple -> green as the old headline, fading into the page below. */
-  .top {
-    color: #fff;
-    background:
-      linear-gradient(to bottom, transparent 82%, var(--bg)),
-      linear-gradient(115deg, #d81b6a 0%, #a23fd0 45%, #1f9a55 92%);
-  }
-  .top .brand, .top nav .links a { color: rgba(255, 255, 255, .88); }
-  .top nav .links a:hover { color: #fff; }
-  .top .eyebrow { color: rgba(255, 255, 255, .85); }
-  .top h1 em { background: none; color: inherit; }
-  .top .btn { border-color: rgba(255, 255, 255, .9); color: #fff; }
-  .top .btn.primary { background: #fff; border-color: #fff; color: #a3134f; }
-  .top :focus-visible { outline-color: #fff; }
+            /* The top of the page: the same pink -> purple -> green as the old headline, fading into the page below. */
+            .top {
+                color: #fff;
+                background:
+                    linear-gradient(to bottom, transparent 82%, var(--bg)),
+                    linear-gradient(
+                        115deg,
+                        #d81b6a 0%,
+                        #a23fd0 45%,
+                        #1f9a55 92%
+                    );
+            }
+            .top .brand,
+            .top nav .links a {
+                color: rgba(255, 255, 255, 0.88);
+            }
+            .top nav .links a:hover {
+                color: #fff;
+            }
+            .top .eyebrow {
+                color: rgba(255, 255, 255, 0.85);
+            }
+            .top h1 em {
+                background: none;
+                color: inherit;
+            }
+            .top .btn {
+                border-color: rgba(255, 255, 255, 0.9);
+                color: #fff;
+            }
+            .top .btn.primary {
+                background: #fff;
+                border-color: #fff;
+                color: #a3134f;
+            }
+            .top :focus-visible {
+                outline-color: #fff;
+            }
 
-  /* A MacBook drawn in CSS around the screen recording. Sizes are percentages of the width, so it scales. */
-  .macbook { margin: 56px auto 0; max-width: 900px; padding: 0 3%; }
-  .mb-lid { position: relative; background: #0c0c0e; border-radius: 3% / 4.6%; padding: 1.7% 1.7% 2.6%;
-    box-shadow: 0 0 0 1.5px #3a3a40 inset, 0 40px 80px rgba(40, 0, 30, .35); }
-  .mb-lid video, .mb-lid img { display: block; width: 100%; aspect-ratio: 1280 / 832; border-radius: .5% / .8%; background: #1a1a1a; object-fit: cover; }
-  .mb-notch { position: absolute; top: 1.7%; left: 50%; width: 12%; height: 4.6%; transform: translateX(-50%);
-    background: #0c0c0e; border-radius: 0 0 14px 14px; }
-  .mb-base { position: relative; height: 0; padding-bottom: 2.4%; margin: 0 -6.5%;
-    background: linear-gradient(#e9eaee, #b9bbc2 55%, #8e9097); border-radius: 2px 2px 40% 40% / 2px 2px 100% 100%;
-    box-shadow: 0 18px 30px rgba(40, 0, 30, .25); }
-  .mb-base::before { content: ""; position: absolute; top: 0; left: 50%; width: 15%; height: 45%; transform: translateX(-50%);
-    background: linear-gradient(#a7a9b0, #c9cbd1); border-radius: 0 0 10px 10px; }
+            /* A MacBook drawn in CSS around the screen recording. Sizes are percentages of the width, so it scales. */
+            .macbook {
+                margin: 56px auto 0;
+                max-width: 900px;
+                padding: 0 3%;
+            }
+            .mb-lid {
+                position: relative;
+                background: #0c0c0e;
+                border-radius: 3% / 4.6%;
+                padding: 1.7% 1.7% 2.6%;
+                box-shadow:
+                    0 0 0 1.5px #3a3a40 inset,
+                    0 40px 80px rgba(40, 0, 30, 0.35);
+            }
+            .mb-lid video,
+            .mb-lid img {
+                display: block;
+                width: 100%;
+                aspect-ratio: 1280 / 832;
+                border-radius: 0.5% / 0.8%;
+                background: #1a1a1a;
+                object-fit: cover;
+            }
+            .mb-notch {
+                position: absolute;
+                top: 1.7%;
+                left: 50%;
+                width: 12%;
+                height: 4.6%;
+                transform: translateX(-50%);
+                background: #0c0c0e;
+                border-radius: 0 0 14px 14px;
+            }
+            .mb-base {
+                position: relative;
+                height: 0;
+                padding-bottom: 2.4%;
+                margin: 0 -6.5%;
+                background: linear-gradient(#e9eaee, #b9bbc2 55%, #8e9097);
+                border-radius: 2px 2px 40% 40% / 2px 2px 100% 100%;
+                box-shadow: 0 18px 30px rgba(40, 0, 30, 0.25);
+            }
+            .mb-base::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 50%;
+                width: 15%;
+                height: 45%;
+                transform: translateX(-50%);
+                background: linear-gradient(#a7a9b0, #c9cbd1);
+                border-radius: 0 0 10px 10px;
+            }
 
-  /* Before / after: the photo on the left of the handle, Kaleido playing it on the right. A few examples, one at a
+            /* Before / after: the photo on the left of the handle, Kaleido playing it on the right. A few examples, one at a
      time; they cross-fade when you flip between them and keep the handle where it was. */
-  .compare-section { padding-top: 24px; text-align: center; }
-  .compare-section .sub { margin-inline: auto; }
-  .compare-section + .compare-section { padding-top: 48px; }
-  .compare { position: relative; max-width: 900px; margin: 0 auto; aspect-ratio: 1600 / 1005; border-radius: 20px; overflow: hidden;
-    box-shadow: var(--shadow); --pos: 50%; user-select: none; touch-action: pan-y; }
-  .compare.wide { aspect-ratio: 16 / 9; }
-  .compare .slide { position: absolute; inset: 0; opacity: 0; transition: opacity .6s ease; }
-  .compare .slide.active { opacity: 1; }
-  .compare img, .compare video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
-  .compare .before { clip-path: inset(0 calc(100% - var(--pos)) 0 0); }
-  .compare .handle { position: absolute; top: 0; bottom: 0; left: var(--pos); width: 2px; margin-left: -1px; background: #fff; pointer-events: none;
-    box-shadow: 0 0 12px rgba(0, 0, 0, .35); }
-  .compare .handle::after { content: "\2039\2002\203A"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, .92); color: #3a1030; display: grid; place-items: center;
-    font: 600 20px/1 Inter, sans-serif; box-shadow: 0 4px 16px rgba(0, 0, 0, .3); }
-  .compare .tag { position: absolute; top: 14px; padding: 3px 11px; border-radius: 999px; font-size: 13px; font-weight: 600;
-    color: #fff; background: rgba(0, 0, 0, .45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: none; }
-  .compare .tag.l { left: 14px; } .compare .tag.r { right: 14px; }
-  .compare input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
-  .compare:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 3px; }
-  .carousel-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; }
-  .carousel-nav button { font: inherit; cursor: pointer; }
-  .carousel-nav .arrow { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--card);
-    color: var(--ink); font-size: 20px; line-height: 1; display: grid; place-items: center; }
-  .carousel-nav .arrow:hover { border-color: var(--accent); color: var(--accent); }
-  .carousel-nav .dots { display: flex; gap: 8px; }
-  .carousel-nav .dot { width: 9px; height: 9px; padding: 0; border-radius: 50%; border: 0; background: var(--line); }
-  .carousel-nav .dot[aria-current="true"] { background: var(--accent); width: 22px; border-radius: 999px; }
+            .compare-section {
+                padding-top: 24px;
+                text-align: center;
+            }
+            .compare-section .sub {
+                margin-inline: auto;
+            }
+            .compare-section + .compare-section {
+                padding-top: 48px;
+            }
+            .compare {
+                position: relative;
+                max-width: 900px;
+                margin: 0 auto;
+                aspect-ratio: 1600 / 1005;
+                border-radius: 20px;
+                overflow: hidden;
+                box-shadow: var(--shadow);
+                --pos: 50%;
+                user-select: none;
+                touch-action: pan-y;
+            }
+            .compare.wide {
+                aspect-ratio: 16 / 9;
+            }
+            .compare .slide {
+                position: absolute;
+                inset: 0;
+                opacity: 0;
+                transition: opacity 0.6s ease;
+            }
+            .compare .slide.active {
+                opacity: 1;
+            }
+            .compare img,
+            .compare video {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+                pointer-events: none;
+            }
+            .compare .before {
+                clip-path: inset(0 calc(100% - var(--pos)) 0 0);
+            }
+            .compare .handle {
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: var(--pos);
+                width: 2px;
+                margin-left: -1px;
+                background: #fff;
+                pointer-events: none;
+                box-shadow: 0 0 12px rgba(0, 0, 0, 0.35);
+            }
+            .compare .handle::after {
+                content: "\2039\2002\203A";
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 44px;
+                height: 44px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.92);
+                color: #3a1030;
+                display: grid;
+                place-items: center;
+                font:
+                    600 20px/1 Inter,
+                    sans-serif;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            }
+            .compare .tag {
+                position: absolute;
+                top: 14px;
+                padding: 3px 11px;
+                border-radius: 999px;
+                font-size: 13px;
+                font-weight: 600;
+                color: #fff;
+                background: rgba(0, 0, 0, 0.45);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                pointer-events: none;
+            }
+            .compare .tag.l {
+                left: 14px;
+            }
+            .compare .tag.r {
+                right: 14px;
+            }
+            .compare input {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                opacity: 0;
+                cursor: ew-resize;
+            }
+            .compare:has(input:focus-visible) {
+                outline: 3px solid var(--accent);
+                outline-offset: 3px;
+            }
+            .carousel-nav {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 14px;
+                margin-top: 18px;
+            }
+            .carousel-nav button {
+                font: inherit;
+                cursor: pointer;
+            }
+            .carousel-nav .arrow {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                border: 1px solid var(--line);
+                background: var(--card);
+                color: var(--ink);
+                font-size: 20px;
+                line-height: 1;
+                display: grid;
+                place-items: center;
+            }
+            .carousel-nav .arrow:hover {
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+            .carousel-nav .dots {
+                display: flex;
+                gap: 8px;
+            }
+            .carousel-nav .dot {
+                width: 9px;
+                height: 9px;
+                padding: 0;
+                border-radius: 50%;
+                border: 0;
+                background: var(--line);
+            }
+            .carousel-nav .dot[aria-current="true"] {
+                background: var(--accent);
+                width: 22px;
+                border-radius: 999px;
+            }
 
-  section { padding: 72px 0; }
-  section.alt { background: var(--bg-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-  h2 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(30px, 5vw, 44px); line-height: 1.12; letter-spacing: -.02em; margin: 0 0 12px; }
-  .sub { color: var(--muted); max-width: 38em; margin: 0 0 40px; }
+            section {
+                padding: 72px 0;
+            }
+            section.alt {
+                background: var(--bg-alt);
+                border-top: 1px solid var(--line);
+                border-bottom: 1px solid var(--line);
+            }
+            h2 {
+                font-family: Fraunces, Georgia, serif;
+                font-weight: 600;
+                font-size: clamp(30px, 5vw, 44px);
+                line-height: 1.12;
+                letter-spacing: -0.02em;
+                margin: 0 0 12px;
+            }
+            .sub {
+                color: var(--muted);
+                max-width: 38em;
+                margin: 0 0 40px;
+            }
 
-  /* See it in action: one row per feature, the screenshot large beside a few words, alternating sides. */
-  .feature { display: grid; grid-template-columns: 1fr 2fr; gap: 40px; align-items: center; margin: 0 0 64px; }
-  .feature:last-child { margin-bottom: 0; }
-  .feature:nth-child(even) { grid-template-columns: 2fr 1fr; }
-  .feature:nth-child(even) .text { order: 2; }
-  .feature h3 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 28px; line-height: 1.15; margin: 0 0 10px; }
-  .feature p { margin: 0; color: var(--muted); }
-  .feature img { width: 100%; height: auto; display: block; }
-  @media (max-width: 760px) {
-    .feature, .feature:nth-child(even) { grid-template-columns: 1fr; gap: 16px; }
-    .feature:nth-child(even) .text { order: 0; }
-  }
+            /* See it in action: one row per feature, the screenshot large beside a few words, alternating sides. */
+            .feature {
+                display: grid;
+                grid-template-columns: 1fr 2fr;
+                gap: 40px;
+                align-items: center;
+                margin: 0 0 64px;
+            }
+            .feature:last-child {
+                margin-bottom: 0;
+            }
+            .feature:nth-child(even) {
+                grid-template-columns: 2fr 1fr;
+            }
+            .feature:nth-child(even) .text {
+                order: 2;
+            }
+            .feature h3 {
+                font-family: Fraunces, Georgia, serif;
+                font-weight: 600;
+                font-size: 28px;
+                line-height: 1.15;
+                margin: 0 0 10px;
+            }
+            .feature p {
+                margin: 0;
+                color: var(--muted);
+            }
+            .feature img {
+                width: 100%;
+                height: auto;
+                display: block;
+            }
+            @media (max-width: 760px) {
+                .feature,
+                .feature:nth-child(even) {
+                    grid-template-columns: 1fr;
+                    gap: 16px;
+                }
+                .feature:nth-child(even) .text {
+                    order: 0;
+                }
+            }
 
-  .download { text-align: center; }
-  .download .sub { margin-inline: auto; }
-  .download .btn { min-width: 240px; }
-  .download .cta { margin-top: 28px; }
-  .soon { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 1px 9px; margin-bottom: 2px; }
-  .btn.primary .soon { background: var(--accent-ink); color: var(--accent); }
-  .req { margin-top: 22px; color: var(--muted); font-size: 15px; }
+            .download {
+                text-align: center;
+            }
+            .download .sub {
+                margin-inline: auto;
+            }
+            .download .btn {
+                min-width: 240px;
+            }
+            .download .cta {
+                margin-top: 28px;
+            }
+            .soon {
+                display: inline-block;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                background: var(--accent);
+                color: var(--accent-ink);
+                border-radius: 999px;
+                padding: 1px 9px;
+                margin-bottom: 2px;
+            }
+            .btn.primary .soon {
+                background: var(--accent-ink);
+                color: var(--accent);
+            }
+            .req {
+                margin-top: 22px;
+                color: var(--muted);
+                font-size: 15px;
+            }
 
-  footer { padding: 36px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
-  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
-  footer a { color: var(--muted); }
-  :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 10px; }
-</style>
-</head>
-<body>
-<!--
+            footer {
+                padding: 36px 0 48px;
+                border-top: 1px solid var(--line);
+                color: var(--muted);
+                font-size: 14px;
+            }
+            footer .wrap {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-between;
+                gap: 12px;
+            }
+            footer a {
+                color: var(--muted);
+            }
+            :focus-visible {
+                outline: 3px solid var(--accent);
+                outline-offset: 3px;
+                border-radius: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <!--
   ============================  PLACEHOLDER LINKS  ============================
   Nothing is published yet. When the real URLs exist, edit ONLY these two lines:
     - the App Store button:   id="appstore-btn"  (href="#")
@@ -163,224 +566,503 @@
   Then remove aria-disabled and the "Coming soon" pill inside each button.
   =============================================================================
 -->
-<div class="top">
-<div class="wrap">
-  <nav>
-    <a class="brand" href="#top"><img src="images/icon.png" alt="" width="32" height="32">Kaleido</a>
-    <div class="links">
-      <a class="hide-sm" href="#screenshots">Screenshots</a>
-      <a href="#download">Download</a>
-      <a href="https://github.com/kylepollina/kaleido" rel="noopener">GitHub</a>
-    </div>
-  </nav>
+        <div class="top">
+            <div class="wrap">
+                <nav>
+                    <a class="brand" href="#top"
+                        ><img
+                            src="images/icon.png"
+                            alt=""
+                            width="32"
+                            height="32"
+                        />Kaleido</a
+                    >
+                    <div class="links">
+                        <a class="hide-sm" href="#screenshots">Screenshots</a>
+                        <a href="#download">Download</a>
+                        <a
+                            href="https://github.com/kylepollina/kaleido"
+                            rel="noopener"
+                            >GitHub</a
+                        >
+                    </div>
+                </nav>
 
-  <header class="hero" id="top">
-    <span class="eyebrow">For macOS 26</span>
-    <h1>re-experience your photos</h1>
-    <div class="cta">
-      <a class="btn primary" href="#download">Get Kaleido <small>Coming soon</small></a>
-      <a class="btn" href="https://github.com/kylepollina/kaleido" rel="noopener">View on GitHub</a>
-    </div>
-    <!-- A screen recording of Kaleido on the desktop. Its last seconds cross-fade (with Kaleido's zoom) into its first,
+                <header class="hero" id="top">
+                    <span class="eyebrow">For macOS 26</span>
+                    <h1><em>Reimagine</em> your photos</h1>
+                    <div class="cta">
+                        <a class="btn primary" href="#download"
+                            >Get Kaleido <small>Coming soon</small></a
+                        >
+                        <a
+                            class="btn"
+                            href="https://github.com/kylepollina/kaleido"
+                            rel="noopener"
+                            >View on GitHub</a
+                        >
+                    </div>
+                    <!-- A screen recording of Kaleido on the desktop. Its last seconds cross-fade (with Kaleido's zoom) into its first,
          so the loop never shows a seam. AV1 where supported, H.264 everywhere else. -->
-    <div class="macbook">
-      <div class="mb-lid">
-        <video id="hero-video" autoplay muted loop playsinline preload="auto" poster="images/desktop-poster.jpg"
-               aria-label="Kaleido playing a rose photo as a kaleidoscope on a Mac desktop">
-          <source src="images/desktop-loop-av1.mp4" type='video/mp4; codecs="av01.0.08M.08"'>
-          <source src="images/desktop-loop.mp4" type="video/mp4">
-        </video>
-        <div class="mb-notch"></div>
-      </div>
-      <div class="mb-base"></div>
-    </div>
-  </header>
-</div>
-</div>
+                    <div class="macbook">
+                        <div class="mb-lid">
+                            <video
+                                id="hero-video"
+                                autoplay
+                                muted
+                                loop
+                                playsinline
+                                preload="auto"
+                                poster="images/desktop-poster.jpg"
+                                aria-label="Kaleido playing a rose photo as a kaleidoscope on a Mac desktop"
+                            >
+                                <source
+                                    src="images/desktop-loop-av1.mp4"
+                                    type='video/mp4; codecs="av01.0.08M.08"'
+                                />
+                                <source
+                                    src="images/desktop-loop.mp4"
+                                    type="video/mp4"
+                                />
+                            </video>
+                            <div class="mb-notch"></div>
+                        </div>
+                        <div class="mb-base"></div>
+                    </div>
+                </header>
+            </div>
+        </div>
 
-<section class="compare-section">
-  <div class="wrap">
-    <h2>One photo, folded through mirrors.</h2>
-    <p class="sub">Drag to compare the original with what Kaleido makes of it.</p>
-    <!-- Each slide: Kaleido's window recorded as it played the photo (cropped to the picture, last 3 seconds cross-faded
+        <section class="compare-section">
+            <div class="wrap">
+                <h2>One photo, folded through mirrors.</h2>
+                <p class="sub">
+                    Drag to compare the original with what Kaleido makes of it.
+                </p>
+                <!-- Each slide: Kaleido's window recorded as it played the photo (cropped to the picture, last 3 seconds cross-faded
          into the first so it loops), with the photo itself on top, clipped at the handle. Add a slide by copying one. -->
-    <div class="carousel">
-    <div class="compare">
-      <div class="slide active">
-        <video muted loop playsinline preload="auto" poster="images/compare-dahlia-poster.jpg" aria-label="Kaleido playing the dahlia photo">
-          <source src="images/compare-dahlia-av1.mp4" type='video/mp4; codecs="av01.0.08M.08"'>
-          <source src="images/compare-dahlia.mp4" type="video/mp4">
-        </video>
-        <img class="before" src="images/compare-dahlia-original.webp" alt="A pink dahlia" width="1600" height="1005" loading="lazy">
-      </div>
-      <div class="slide">
-        <video muted loop playsinline preload="none" poster="images/compare-grevillea-poster.jpg" aria-label="Kaleido playing the grevillea photo">
-          <source src="images/compare-grevillea-av1.mp4" type='video/mp4; codecs="av01.0.08M.08"'>
-          <source src="images/compare-grevillea.mp4" type="video/mp4">
-        </video>
-        <img class="before" src="images/compare-grevillea-original.webp" alt="A red and yellow grevillea flower" width="1600" height="1005" loading="lazy">
-      </div>
-      <div class="slide">
-        <video muted loop playsinline preload="none" poster="images/compare-trees-poster.jpg" aria-label="Kaleido playing the autumn trees photo">
-          <source src="images/compare-trees-av1.mp4" type='video/mp4; codecs="av01.0.08M.08"'>
-          <source src="images/compare-trees.mp4" type="video/mp4">
-        </video>
-        <img class="before" src="images/compare-trees-original.webp" alt="Orange autumn trees against a blue sky" width="1600" height="1005" loading="lazy">
-      </div>
-      <div class="slide">
-        <video muted loop playsinline preload="none" poster="images/compare-wallpaper-poster.jpg" aria-label="Kaleido playing the macOS wallpaper photo">
-          <source src="images/compare-wallpaper-av1.mp4" type='video/mp4; codecs="av01.0.08M.08"'>
-          <source src="images/compare-wallpaper.mp4" type="video/mp4">
-        </video>
-        <img class="before" src="images/compare-wallpaper-original.webp" alt="A blue macOS wallpaper of curving folded shapes" width="1600" height="1005" loading="lazy">
-      </div>
-      <span class="tag l">Original</span><span class="tag r">Kaleido</span>
-      <div class="handle"></div>
-      <input type="range" min="0" max="100" value="50" step="0.1" aria-label="Compare the original photo with the kaleidoscope">
-    </div>
-    <div class="carousel-nav">
-      <button class="arrow prev" aria-label="Previous example">&lsaquo;</button>
-      <div class="dots"></div>
-      <button class="arrow next" aria-label="Next example">&rsaquo;</button>
-    </div>
-    </div>
-  </div>
-</section>
+                <div class="carousel">
+                    <div class="compare">
+                        <div class="slide active">
+                            <video
+                                muted
+                                loop
+                                playsinline
+                                preload="auto"
+                                poster="images/compare-dahlia-poster.jpg"
+                                aria-label="Kaleido playing the dahlia photo"
+                            >
+                                <source
+                                    src="images/compare-dahlia-av1.mp4"
+                                    type='video/mp4; codecs="av01.0.08M.08"'
+                                />
+                                <source
+                                    src="images/compare-dahlia.mp4"
+                                    type="video/mp4"
+                                />
+                            </video>
+                            <img
+                                class="before"
+                                src="images/compare-dahlia-original.webp"
+                                alt="A pink dahlia"
+                                width="1600"
+                                height="1005"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="slide">
+                            <video
+                                muted
+                                loop
+                                playsinline
+                                preload="none"
+                                poster="images/compare-grevillea-poster.jpg"
+                                aria-label="Kaleido playing the grevillea photo"
+                            >
+                                <source
+                                    src="images/compare-grevillea-av1.mp4"
+                                    type='video/mp4; codecs="av01.0.08M.08"'
+                                />
+                                <source
+                                    src="images/compare-grevillea.mp4"
+                                    type="video/mp4"
+                                />
+                            </video>
+                            <img
+                                class="before"
+                                src="images/compare-grevillea-original.webp"
+                                alt="A red and yellow grevillea flower"
+                                width="1600"
+                                height="1005"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="slide">
+                            <video
+                                muted
+                                loop
+                                playsinline
+                                preload="none"
+                                poster="images/compare-trees-poster.jpg"
+                                aria-label="Kaleido playing the autumn trees photo"
+                            >
+                                <source
+                                    src="images/compare-trees-av1.mp4"
+                                    type='video/mp4; codecs="av01.0.08M.08"'
+                                />
+                                <source
+                                    src="images/compare-trees.mp4"
+                                    type="video/mp4"
+                                />
+                            </video>
+                            <img
+                                class="before"
+                                src="images/compare-trees-original.webp"
+                                alt="Orange autumn trees against a blue sky"
+                                width="1600"
+                                height="1005"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="slide">
+                            <video
+                                muted
+                                loop
+                                playsinline
+                                preload="none"
+                                poster="images/compare-wallpaper-poster.jpg"
+                                aria-label="Kaleido playing the macOS wallpaper photo"
+                            >
+                                <source
+                                    src="images/compare-wallpaper-av1.mp4"
+                                    type='video/mp4; codecs="av01.0.08M.08"'
+                                />
+                                <source
+                                    src="images/compare-wallpaper.mp4"
+                                    type="video/mp4"
+                                />
+                            </video>
+                            <img
+                                class="before"
+                                src="images/compare-wallpaper-original.webp"
+                                alt="A blue macOS wallpaper of curving folded shapes"
+                                width="1600"
+                                height="1005"
+                                loading="lazy"
+                            />
+                        </div>
+                        <span class="tag l">Original</span
+                        ><span class="tag r">Kaleido</span>
+                        <div class="handle"></div>
+                        <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value="50"
+                            step="0.1"
+                            aria-label="Compare the original photo with the kaleidoscope"
+                        />
+                    </div>
+                    <div class="carousel-nav">
+                        <button
+                            class="arrow prev"
+                            aria-label="Previous example"
+                        >
+                            &lsaquo;
+                        </button>
+                        <div class="dots"></div>
+                        <button class="arrow next" aria-label="Next example">
+                            &rsaquo;
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-<section class="compare-section">
-  <div class="wrap">
-    <h2>And macOS's aerial films.</h2>
-    <p class="sub">The slow-motion aerials behind macOS's own screen savers play too, as moving kaleidoscopes.</p>
-    <!-- Stills: Kaleido playing an aerial, with the same moment in Original on top, both cropped to the 16:9 picture. -->
-    <div class="carousel">
-    <div class="compare wide">
-      <div class="slide active">
-        <img src="images/aerial-seafloor-kaleido.webp" alt="Kaleido playing the sea floor aerial" width="1600" height="900" loading="lazy">
-        <img class="before" src="images/aerial-seafloor-original.webp" alt="The sea floor aerial itself" width="1600" height="900" loading="lazy">
-      </div>
-      <div class="slide">
-        <img src="images/aerial-aurora-kaleido.webp" alt="Kaleido playing the aurora from orbit aerial" width="1600" height="900" loading="lazy">
-        <img class="before" src="images/aerial-aurora-original.webp" alt="The aurora from orbit aerial itself" width="1600" height="900" loading="lazy">
-      </div>
-      <div class="slide">
-        <img src="images/aerial-kelp-kaleido.webp" alt="Kaleido playing the kelp forest aerial" width="1600" height="900" loading="lazy">
-        <img class="before" src="images/aerial-kelp-original.webp" alt="The kelp forest aerial itself" width="1600" height="900" loading="lazy">
-      </div>
-      <span class="tag l">Original</span><span class="tag r">Kaleido</span>
-      <div class="handle"></div>
-      <input type="range" min="0" max="100" value="50" step="0.1" aria-label="Compare the aerial film with the kaleidoscope">
-    </div>
-    <div class="carousel-nav">
-      <button class="arrow prev" aria-label="Previous aerial">&lsaquo;</button>
-      <div class="dots"></div>
-      <button class="arrow next" aria-label="Next aerial">&rsaquo;</button>
-    </div>
-    </div>
-  </div>
-</section>
+        <section class="compare-section">
+            <div class="wrap">
+                <h2>And macOS's aerial films.</h2>
+                <p class="sub">
+                    The slow-motion aerials behind macOS's own screen savers
+                    play too, as moving kaleidoscopes.
+                </p>
+                <!-- Stills: Kaleido playing an aerial, with the same moment in Original on top, both cropped to the 16:9 picture. -->
+                <div class="carousel">
+                    <div class="compare wide">
+                        <div class="slide active">
+                            <img
+                                src="images/aerial-seafloor-kaleido.webp"
+                                alt="Kaleido playing the sea floor aerial"
+                                width="1600"
+                                height="900"
+                                loading="lazy"
+                            />
+                            <img
+                                class="before"
+                                src="images/aerial-seafloor-original.webp"
+                                alt="The sea floor aerial itself"
+                                width="1600"
+                                height="900"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="slide">
+                            <img
+                                src="images/aerial-aurora-kaleido.webp"
+                                alt="Kaleido playing the aurora from orbit aerial"
+                                width="1600"
+                                height="900"
+                                loading="lazy"
+                            />
+                            <img
+                                class="before"
+                                src="images/aerial-aurora-original.webp"
+                                alt="The aurora from orbit aerial itself"
+                                width="1600"
+                                height="900"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="slide">
+                            <img
+                                src="images/aerial-kelp-kaleido.webp"
+                                alt="Kaleido playing the kelp forest aerial"
+                                width="1600"
+                                height="900"
+                                loading="lazy"
+                            />
+                            <img
+                                class="before"
+                                src="images/aerial-kelp-original.webp"
+                                alt="The kelp forest aerial itself"
+                                width="1600"
+                                height="900"
+                                loading="lazy"
+                            />
+                        </div>
+                        <span class="tag l">Original</span
+                        ><span class="tag r">Kaleido</span>
+                        <div class="handle"></div>
+                        <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value="50"
+                            step="0.1"
+                            aria-label="Compare the aerial film with the kaleidoscope"
+                        />
+                    </div>
+                    <div class="carousel-nav">
+                        <button class="arrow prev" aria-label="Previous aerial">
+                            &lsaquo;
+                        </button>
+                        <div class="dots"></div>
+                        <button class="arrow next" aria-label="Next aerial">
+                            &rsaquo;
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-<section id="screenshots">
-  <div class="wrap">
-    <h2>See it in action</h2>
-    <p class="sub">Everything lives in one window, over the kaleidoscope it is playing.</p>
-    <div class="features">
-      <div class="feature">
-        <div class="text"><h3>Shape every pattern.</h3><p>Eight shapes, from Classic to Fractal. Set the mirrors (or let them change on their own), scale and swirl, and turn on guide lines to see exactly where the mirrors fall. Or hit Randomize.</p></div>
-        <img src="images/feature-editor.webp" alt="Kaleido's pattern editor beside a kaleidoscope with red guide lines showing the mirrors" width="1600" height="1050" loading="lazy">
-      </div>
-      <div class="feature">
-        <div class="text"><h3>Pick what plays.</h3><p>Your Photos albums and smart albums, folders on your Mac, and macOS's own wallpapers and aerials. Tick a whole album or single photos; nothing is copied or changed.</p></div>
-        <img src="images/feature-photos.webp" alt="The Photos browser listing built-in sets, smart albums and albums with selection badges" width="1600" height="1050" loading="lazy">
-      </div>
-      <div class="feature">
-        <div class="text"><h3>Keep the ones you love.</h3><p>Bookmark a scene to save the photo with its pattern. Star your favorites, then play your scenes as a playlist.</p></div>
-        <img src="images/feature-scenes.webp" alt="The Scenes list with thumbnails, stars and Play my scenes" width="1600" height="1050" loading="lazy">
-      </div>
-    </div>
-  </div>
-</section>
+        <section id="screenshots">
+            <div class="wrap">
+                <h2>See it in action</h2>
+                <p class="sub">
+                    Everything lives in one window, over the kaleidoscope it is
+                    playing.
+                </p>
+                <div class="features">
+                    <div class="feature">
+                        <div class="text">
+                            <h3>Shape every pattern.</h3>
+                            <p>
+                                Eight shapes, from Classic to Fractal. Set the
+                                mirrors (or let them change on their own), scale
+                                and swirl, and turn on guide lines to see
+                                exactly where the mirrors fall. Or hit
+                                Randomize.
+                            </p>
+                        </div>
+                        <img
+                            src="images/feature-editor.webp"
+                            alt="Kaleido's pattern editor beside a kaleidoscope with red guide lines showing the mirrors"
+                            width="1600"
+                            height="1050"
+                            loading="lazy"
+                        />
+                    </div>
+                    <div class="feature">
+                        <div class="text">
+                            <h3>Pick what plays.</h3>
+                            <p>
+                                Your Photos albums and smart albums, folders on
+                                your Mac, and macOS's own wallpapers and
+                                aerials. Tick a whole album or single photos;
+                                nothing is copied or changed.
+                            </p>
+                        </div>
+                        <img
+                            src="images/feature-photos.webp"
+                            alt="The Photos browser listing built-in sets, smart albums and albums with selection badges"
+                            width="1600"
+                            height="1050"
+                            loading="lazy"
+                        />
+                    </div>
+                    <div class="feature">
+                        <div class="text">
+                            <h3>Keep the ones you love.</h3>
+                            <p>
+                                Bookmark a scene to save the photo with its
+                                pattern. Star your favorites, then play your
+                                scenes as a playlist.
+                            </p>
+                        </div>
+                        <img
+                            src="images/feature-scenes.webp"
+                            alt="The Scenes list with thumbnails, stars and Play my scenes"
+                            width="1600"
+                            height="1050"
+                            loading="lazy"
+                        />
+                    </div>
+                </div>
+            </div>
+        </section>
 
-<section class="alt download" id="download">
-  <div class="wrap">
-    <h2>Get Kaleido</h2>
-    <p class="sub">Coming soon. Not available to download yet.</p>
-    <div class="cta">
-      <!-- TODO: replace "#" with the App Store URL when it exists -->
-      <a class="btn primary" id="appstore-btn" href="#" aria-disabled="true"><span class="soon">Coming soon</span>Download on the App Store</a>
-      <!-- TODO: replace "#" with the direct .dmg/.zip URL when it exists -->
-      <a class="btn" id="mac-btn" href="#" aria-disabled="true"><span class="soon">Coming soon</span>Download for Mac</a>
-    </div>
-    <p class="req">Requires macOS 26 or later. Source code is MIT licensed.</p>
-  </div>
-</section>
+        <section class="alt download" id="download">
+            <div class="wrap">
+                <h2>Get Kaleido</h2>
+                <p class="sub">Coming soon. Not available to download yet.</p>
+                <div class="cta">
+                    <!-- TODO: replace "#" with the App Store URL when it exists -->
+                    <a
+                        class="btn primary"
+                        id="appstore-btn"
+                        href="#"
+                        aria-disabled="true"
+                        ><span class="soon">Coming soon</span>Download on the
+                        App Store</a
+                    >
+                    <!-- TODO: replace "#" with the direct .dmg/.zip URL when it exists -->
+                    <a class="btn" id="mac-btn" href="#" aria-disabled="true"
+                        ><span class="soon">Coming soon</span>Download for
+                        Mac</a
+                    >
+                </div>
+                <p class="req">
+                    Requires macOS 26 or later. Source code is MIT licensed.
+                </p>
+            </div>
+        </section>
 
-<footer>
-  <div class="wrap">
-    <span>© Kyle · MIT License</span>
-    <span><a href="https://github.com/kylepollina/kaleido" rel="noopener">Source on GitHub</a></span>
-  </div>
-</footer>
-<script>
-  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        <footer>
+            <div class="wrap">
+                <span>© Kyle · MIT License</span>
+                <span
+                    ><a
+                        href="https://github.com/kylepollina/kaleido"
+                        rel="noopener"
+                        >Source on GitHub</a
+                    ></span
+                >
+            </div>
+        </footer>
+        <script>
+            var reduceMotion = window.matchMedia(
+                "(prefers-reduced-motion: reduce)",
+            ).matches;
 
-  // Respect "Reduce motion": show the still poster instead of the looping video.
-  if (reduceMotion) {
-    var v = document.getElementById('hero-video');
-    v.removeAttribute('autoplay');
-    v.pause();
-  }
+            // Respect "Reduce motion": show the still poster instead of the looping video.
+            if (reduceMotion) {
+                var v = document.getElementById("hero-video");
+                v.removeAttribute("autoplay");
+                v.pause();
+            }
 
-  // Each comparison: the range input covers the picture, so dragging anywhere (or the arrow keys) moves the line.
-  // Videos play only on the example on show, and only while it is on screen.
-  [].forEach.call(document.querySelectorAll('.carousel'), function (carousel) {
-    var box = carousel.querySelector('.compare');
-    var input = box.querySelector('input');
-    var slides = [].slice.call(box.querySelectorAll('.slide'));
-    var dots = carousel.querySelector('.dots');
-    var current = 0, visible = false;
-    function setPos() { box.style.setProperty('--pos', input.value + '%'); }
-    input.addEventListener('input', setPos);
-    setPos();
+            // Each comparison: the range input covers the picture, so dragging anywhere (or the arrow keys) moves the line.
+            // Videos play only on the example on show, and only while it is on screen.
+            [].forEach.call(
+                document.querySelectorAll(".carousel"),
+                function (carousel) {
+                    var box = carousel.querySelector(".compare");
+                    var input = box.querySelector("input");
+                    var slides = [].slice.call(box.querySelectorAll(".slide"));
+                    var dots = carousel.querySelector(".dots");
+                    var current = 0,
+                        visible = false;
+                    function setPos() {
+                        box.style.setProperty("--pos", input.value + "%");
+                    }
+                    input.addEventListener("input", setPos);
+                    setPos();
 
-    function sync() {
-      slides.forEach(function (s, i) {
-        var video = s.querySelector('video');
-        if (!video) return;
-        if (i === current && visible && !reduceMotion) {
-          video.preload = 'auto';
-          var p = video.play(); if (p && p.catch) p.catch(function () {});
-        } else {
-          video.pause();
-        }
-      });
-    }
-    function show(i) {
-      current = (i + slides.length) % slides.length;
-      slides.forEach(function (s, j) { s.classList.toggle('active', j === current); });
-      [].forEach.call(dots.children, function (d, j) { d.setAttribute('aria-current', j === current ? 'true' : 'false'); });
-      sync();
-    }
-    slides.forEach(function (_, i) {
-      var d = document.createElement('button');
-      d.className = 'dot';
-      d.setAttribute('aria-label', 'Example ' + (i + 1));
-      d.addEventListener('click', function () { show(i); });
-      dots.appendChild(d);
-    });
-    carousel.querySelector('.prev').addEventListener('click', function () { show(current - 1); });
-    carousel.querySelector('.next').addEventListener('click', function () { show(current + 1); });
-    if ('IntersectionObserver' in window) {
-      new IntersectionObserver(function (entries) { visible = entries[0].isIntersecting; sync(); }).observe(box);
-    } else {
-      visible = true;
-    }
-    show(0);
-  });
+                    function sync() {
+                        slides.forEach(function (s, i) {
+                            var video = s.querySelector("video");
+                            if (!video) return;
+                            if (i === current && visible && !reduceMotion) {
+                                video.preload = "auto";
+                                var p = video.play();
+                                if (p && p.catch) p.catch(function () {});
+                            } else {
+                                video.pause();
+                            }
+                        });
+                    }
+                    function show(i) {
+                        current = (i + slides.length) % slides.length;
+                        slides.forEach(function (s, j) {
+                            s.classList.toggle("active", j === current);
+                        });
+                        [].forEach.call(dots.children, function (d, j) {
+                            d.setAttribute(
+                                "aria-current",
+                                j === current ? "true" : "false",
+                            );
+                        });
+                        sync();
+                    }
+                    slides.forEach(function (_, i) {
+                        var d = document.createElement("button");
+                        d.className = "dot";
+                        d.setAttribute("aria-label", "Example " + (i + 1));
+                        d.addEventListener("click", function () {
+                            show(i);
+                        });
+                        dots.appendChild(d);
+                    });
+                    carousel
+                        .querySelector(".prev")
+                        .addEventListener("click", function () {
+                            show(current - 1);
+                        });
+                    carousel
+                        .querySelector(".next")
+                        .addEventListener("click", function () {
+                            show(current + 1);
+                        });
+                    if ("IntersectionObserver" in window) {
+                        new IntersectionObserver(function (entries) {
+                            visible = entries[0].isIntersecting;
+                            sync();
+                        }).observe(box);
+                    } else {
+                        visible = true;
+                    }
+                    show(0);
+                },
+            );
 
-  // Placeholder buttons shouldn't jump to the top of the page.
-  document.querySelectorAll('a[aria-disabled="true"]').forEach(function (a) {
-    a.addEventListener('click', function (e) { e.preventDefault(); });
-  });
-</script>
-</body>
+            // Placeholder buttons shouldn't jump to the top of the page.
+            document
+                .querySelectorAll('a[aria-disabled="true"]')
+                .forEach(function (a) {
+                    a.addEventListener("click", function (e) {
+                        e.preventDefault();
+                    });
+                });
+        </script>
+    </body>
 </html>
