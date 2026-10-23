@@ -12,6 +12,14 @@ so `loop` never shows a seam. Two encodes: AV1
 (`libsvtav1 -crf 38`, about 3.6 MB) for browsers that play it, H.264 (`libx264 -crf 27 -preset veryslow`, about
 5.3 MB) for the rest; `desktop-poster.jpg` is its first frame. With "Reduce motion" on, the poster shows instead.
 
+## The comparison carousel
+
+Each example is `compare-NAME-original.webp` (a window screenshot of Original, cropped to the photo) on top of
+`compare-NAME.mp4` / `-av1.mp4` (a window recording of Kaleido playing it, cropped to the same rectangle, scaled to
+1280×804, last 3 seconds cross-faded into the first like the hero video), with `compare-NAME-poster.jpg` as its first
+frame. Window recordings at 2236×1710 crop with `crop=2008:1261:114:168`; window screenshots at 2000×1530 with
+`crop=1796:1128:102:150`. To add one, copy a `.slide` in `index.html`; the dots fill in by themselves.
+
 ## Before it goes live
 
 - **Download buttons** are "Coming soon" placeholders. The two real URLs go in the `#appstore-btn` and `#mac-btn` links (see the comment at the top of `<body>`); then remove `aria-disabled` and the "Coming soon" pills.

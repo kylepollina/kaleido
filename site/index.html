@@ -91,12 +91,15 @@
   .mb-base::before { content: ""; position: absolute; top: 0; left: 50%; width: 15%; height: 45%; transform: translateX(-50%);
     background: linear-gradient(#a7a9b0, #c9cbd1); border-radius: 0 0 10px 10px; }
 
-  /* Before / after: the photo on the left of the handle, Kaleido's kaleidoscope on the right. */
+  /* Before / after: the photo on the left of the handle, Kaleido playing it on the right. A few examples, one at a
+     time; they cross-fade when you flip between them and keep the handle where it was. */
   .compare-section { padding-top: 24px; text-align: center; }
   .compare-section .sub { margin-inline: auto; }
   .compare { position: relative; max-width: 900px; margin: 0 auto; aspect-ratio: 1600 / 1005; border-radius: 20px; overflow: hidden;
     box-shadow: var(--shadow); --pos: 50%; user-select: none; touch-action: pan-y; }
-  .compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+  .compare .slide { position: absolute; inset: 0; opacity: 0; transition: opacity .6s ease; }
+  .compare .slide.active { opacity: 1; }
+  .compare img, .compare video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
   .compare .before { clip-path: inset(0 calc(100% - var(--pos)) 0 0); }
   .compare .handle { position: absolute; top: 0; bottom: 0; left: var(--pos); width: 2px; margin-left: -1px; background: #fff; pointer-events: none;
     box-shadow: 0 0 12px rgba(0, 0, 0, .35); }
@@ -108,6 +111,14 @@
   .compare .tag.l { left: 14px; } .compare .tag.r { right: 14px; }
   .compare input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
   .compare:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .carousel-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; }
+  .carousel-nav button { font: inherit; cursor: pointer; }
+  .carousel-nav .arrow { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--card);
+    color: var(--ink); font-size: 20px; line-height: 1; display: grid; place-items: center; }
+  .carousel-nav .arrow:hover { border-color: var(--accent); color: var(--accent); }
+  .carousel-nav .dots { display: flex; gap: 8px; }
+  .carousel-nav .dot { width: 9px; height: 9px; padding: 0; border-radius: 50%; border: 0; background: var(--line); }
+  .carousel-nav .dot[aria-current="true"] { background: var(--accent); width: 22px; border-radius: 999px; }
 
   section { padding: 72px 0; }
   section.alt { background: var(--bg-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -192,12 +203,31 @@
   <div class="wrap">
     <h2>One photo, folded through mirrors.</h2>
     <p class="sub">Drag to compare the original with what Kaleido makes of it.</p>
+    <!-- Each slide: Kaleido's window recorded as it played the photo (cropped to the picture, last 3 seconds cross-faded
+         into the first so it loops), with the photo itself on top, clipped at the handle. Add a slide by copying one. -->
     <div class="compare" id="compare">
-      <img src="images/compare-kaleido.webp" alt="The same dahlia photo as a kaleidoscope" width="1600" height="1005" loading="lazy">
-      <img class="before" src="images/compare-original.webp" alt="A pink dahlia photo" width="1600" height="1005" loading="lazy">
+      <div class="slide active">
+        <video muted loop playsinline preload="auto" poster="images/compare-dahlia-poster.jpg" aria-label="Kaleido playing the dahlia photo">
+          <source src="images/compare-dahlia-av1.mp4" type='video/mp4; codecs="av01.0.08M.08"'>
+          <source src="images/compare-dahlia.mp4" type="video/mp4">
+        </video>
+        <img class="before" src="images/compare-dahlia-original.webp" alt="A pink dahlia" width="1600" height="1005" loading="lazy">
+      </div>
+      <div class="slide">
+        <video muted loop playsinline preload="none" poster="images/compare-grevillea-poster.jpg" aria-label="Kaleido playing the grevillea photo">
+          <source src="images/compare-grevillea-av1.mp4" type='video/mp4; codecs="av01.0.08M.08"'>
+          <source src="images/compare-grevillea.mp4" type="video/mp4">
+        </video>
+        <img class="before" src="images/compare-grevillea-original.webp" alt="A red and yellow grevillea flower" width="1600" height="1005" loading="lazy">
+      </div>
       <span class="tag l">Original</span><span class="tag r">Kaleido</span>
       <div class="handle"></div>
       <input type="range" min="0" max="100" value="50" step="0.1" aria-label="Compare the original photo with the kaleidoscope">
+    </div>
+    <div class="carousel-nav">
+      <button class="arrow" id="prev" aria-label="Previous example">&lsaquo;</button>
+      <div class="dots" id="dots"></div>
+      <button class="arrow" id="next" aria-label="Next example">&rsaquo;</button>
     </div>
   </div>
 </section>
@@ -252,21 +282,60 @@
   </div>
 </footer>
 <script>
-  // The comparison slider: the range input covers the image, so dragging anywhere (or the arrow keys) moves the line.
-  (function () {
-    var box = document.getElementById('compare');
-    var input = box.querySelector('input');
-    function set() { box.style.setProperty('--pos', input.value + '%'); }
-    input.addEventListener('input', set);
-    set();
-  })();
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Respect "Reduce motion": show the still poster instead of the looping video.
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (reduceMotion) {
     var v = document.getElementById('hero-video');
     v.removeAttribute('autoplay');
     v.pause();
   }
+
+  // The comparison: the range input covers the picture, so dragging anywhere (or the arrow keys) moves the line.
+  // Only the example on show plays, and only while it is on screen.
+  (function () {
+    var box = document.getElementById('compare');
+    var input = box.querySelector('input');
+    var slides = [].slice.call(box.querySelectorAll('.slide'));
+    var dots = document.getElementById('dots');
+    var current = 0, visible = false;
+    function setPos() { box.style.setProperty('--pos', input.value + '%'); }
+    input.addEventListener('input', setPos);
+    setPos();
+
+    function sync() {
+      slides.forEach(function (s, i) {
+        var video = s.querySelector('video');
+        if (i === current && visible && !reduceMotion) {
+          video.preload = 'auto';
+          var p = video.play(); if (p && p.catch) p.catch(function () {});
+        } else {
+          video.pause();
+        }
+      });
+    }
+    function show(i) {
+      current = (i + slides.length) % slides.length;
+      slides.forEach(function (s, j) { s.classList.toggle('active', j === current); });
+      [].forEach.call(dots.children, function (d, j) { d.setAttribute('aria-current', j === current ? 'true' : 'false'); });
+      sync();
+    }
+    slides.forEach(function (_, i) {
+      var d = document.createElement('button');
+      d.className = 'dot';
+      d.setAttribute('aria-label', 'Example ' + (i + 1));
+      d.addEventListener('click', function () { show(i); });
+      dots.appendChild(d);
+    });
+    document.getElementById('prev').addEventListener('click', function () { show(current - 1); });
+    document.getElementById('next').addEventListener('click', function () { show(current + 1); });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (entries) { visible = entries[0].isIntersecting; sync(); }).observe(box);
+    } else {
+      visible = true;
+    }
+    show(0);
+  })();
 
   // Placeholder buttons shouldn't jump to the top of the page.
   document.querySelectorAll('a[aria-disabled="true"]').forEach(function (a) {
