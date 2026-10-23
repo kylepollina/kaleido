@@ -1,15 +1,15 @@
 # Notes for coding agents
 
 Kaleido is a native macOS app (SwiftUI + Metal, macOS 26, Liquid Glass) that shows the user's photos and videos as
-slowly turning kaleidoscopes on the desktop while it plays, like the Portal app. README.md describes every feature;
-this file is how to work on it.
+slowly turning kaleidoscopes on the desktop while it plays, like the Portal app. README.md is a short pitch plus
+install steps (it mirrors the site in `site/`); this file is how to work on it.
 
 ## Ground rules
 
 - Never write to the user's wallpaper settings, System Settings, other apps, or macOS's own folders (e.g.
   `~/Library/Application Support/com.apple.wallpaper` is read only; Kaleido's aerial downloads go to its own data
   folder). Only read the photos the user picked.
-- Commit and push every finished change on `main` (private repo kylepollina/kaleido), README updated alongside.
+- Commit and push every finished change on `main` (private repo kylepollina/kaleido).
 - Keep user-facing reports short. Don't run lots of display tests; one screenshot to check a layout is plenty.
 
 ## Build, test, install
