@@ -7,10 +7,10 @@ A one-page static site: `index.html` (inline CSS, one tiny inline script, Google
 ## The hero video
 
 `images/desktop-loop*.mp4` is a 40-second screen recording of Kaleido on the desktop, scaled to 1280×832 at 30 fps.
-Its last 3 seconds cross-fade into its first 3 with Kaleido's zoom (the incoming scene shrinks from 108% while it
-fades in; the menu bar, Dock and the top-left widget stay still), so `loop` never shows a seam. Two encodes: AV1
+Its last 3 seconds cross-fade into its first 3 (a plain fade, so the menu bar and Dock, the same in both, stay put),
+so `loop` never shows a seam. Two encodes: AV1
 (`libsvtav1 -crf 38`, about 3.6 MB) for browsers that play it, H.264 (`libx264 -crf 27 -preset veryslow`, about
-5.5 MB) for the rest; `desktop-poster.jpg` is its first frame. With "Reduce motion" on, the poster shows instead.
+5.3 MB) for the rest; `desktop-poster.jpg` is its first frame. With "Reduce motion" on, the poster shows instead.
 
 ## Before it goes live
 
