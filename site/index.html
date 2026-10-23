@@ -126,13 +126,6 @@
   section.alt { background: var(--bg-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   h2 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(30px, 5vw, 44px); line-height: 1.12; letter-spacing: -.02em; margin: 0 0 12px; }
   .sub { color: var(--muted); max-width: 38em; margin: 0 0 40px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 26px; }
-  .card .glyph { font-size: 24px; color: var(--accent); margin-bottom: 8px; line-height: 1; }
-  .card:nth-child(even) .glyph { color: var(--accent2); }
-  .card h3 { margin: 0 0 6px; font-size: 19px; }
-  .card p { margin: 0; color: var(--muted); font-size: 16px; }
-  kbd { font: 600 .88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg-alt); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
 
   /* See it in action: one row per feature, the screenshot large beside a few words, alternating sides. */
   .feature { display: grid; grid-template-columns: 1fr 2fr; gap: 40px; align-items: center; margin: 0 0 64px; }
@@ -175,7 +168,6 @@
   <nav>
     <a class="brand" href="#top"><img src="images/icon.png" alt="" width="32" height="32">Kaleido</a>
     <div class="links">
-      <a class="hide-sm" href="#features">Features</a>
       <a class="hide-sm" href="#screenshots">Screenshots</a>
       <a href="#download">Download</a>
       <a href="https://github.com/kylepollina/kaleido" rel="noopener">GitHub</a>
@@ -283,20 +275,6 @@
       <div class="dots"></div>
       <button class="arrow next" aria-label="Next aerial">&rsaquo;</button>
     </div>
-    </div>
-  </div>
-</section>
-
-<section class="alt" id="features">
-  <div class="wrap">
-    <h2>It never touches your wallpaper.</h2>
-    <p class="sub">Playback happens in borderless windows just above the wallpaper and below your desktop icons, only while the app is open and you have pressed Play. Mouse clicks pass through.</p>
-    <div class="grid">
-      <div class="card"><div class="glyph">✺</div><h3>Photos albums &amp; aerials</h3><p>Pick albums, smart albums, folders or single photos. Or play macOS's own aerial films, with the 240 fps footage slowed about 8×. Your photos are never copied or modified.</p></div>
-      <div class="card"><div class="glyph">❖</div><h3>Scenes &amp; Surprise me</h3><p>A scene is a photo with a look: shape, mirrors, swirl, color. Save your favorites, or let Surprise me mix them with new ones Kaleido invents. Scenes last 90 seconds and cross-fade over 12.</p></div>
-      <div class="card"><div class="glyph">⬡</div><h3>Patterns &amp; an editor</h3><p>Built-in patterns such as Mandala, Whirlpool, Hex Garden, Prism and Spiral Tunnel across eight shapes, plus an editor to tune swirl, hue, saturation and dynamic mirrors.</p></div>
-      <div class="card"><div class="glyph">◐</div><h3>Hands on, slow by default</h3><p>Drag the preview to move the photo inside the mirrors, flick it and it keeps gliding. Five speed stops from turtle to rabbit, and Push or Pull zoom.</p></div>
-      <div class="card"><div class="glyph">❀</div><h3>A good citizen</h3><p>30 or 60 fps cap, pauses on battery if you like, pauses when the display sleeps or the screen locks, with a menu bar item for Play, Next and Surprise me. Works across Spaces and multiple displays.</p></div>
     </div>
   </div>
 </section>
