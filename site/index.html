@@ -487,6 +487,16 @@
                 margin: 0;
                 color: var(--muted);
             }
+            .feature video {
+                width: 100%;
+                height: auto;
+                display: block;
+            }
+            /* A window recording, cropped to the window: round it like one. */
+            .feature video.window {
+                border-radius: 2.4% / 3.4%;
+                box-shadow: var(--shadow);
+            }
             .feature img {
                 width: 100%;
                 height: auto;
@@ -931,6 +941,34 @@
                     </div>
                     <div class="feature">
                         <div class="text">
+                            <h3>A new toy to play with.</h3>
+                            <p>
+                                Flip through scenes, drag the photo inside the
+                                mirrors and flick it to watch it glide. Click
+                                the scene and the controls fade away.
+                            </p>
+                        </div>
+                        <video
+                            class="window"
+                            autoplay
+                            muted
+                            loop
+                            playsinline
+                            preload="metadata"
+                            poster="images/feature-play-poster.jpg"
+                            width="1280"
+                            height="908"
+                            aria-label="Playing with Kaleido: changing scenes and dragging the photo inside the mirrors"
+                        >
+                            <source
+                                src="images/feature-play-av1.mp4"
+                                type='video/mp4; codecs="av01.0.08M.08"'
+                            />
+                            <source src="images/feature-play.mp4" type="video/mp4" />
+                        </video>
+                    </div>
+                    <div class="feature">
+                        <div class="text">
                             <h3>Shape every pattern.</h3>
                             <p>
                                 Have fun playing with the pattern editor! Many
@@ -1028,9 +1066,12 @@
 
             // Respect "Reduce motion": show the still poster instead of the looping video.
             if (reduceMotion) {
-                var v = document.getElementById("hero-video");
-                v.removeAttribute("autoplay");
-                v.pause();
+                document
+                    .querySelectorAll("video[autoplay]")
+                    .forEach(function (v) {
+                        v.removeAttribute("autoplay");
+                        v.pause();
+                    });
             }
 
             // Each comparison: the range input covers the picture, so dragging anywhere (or the arrow keys) moves the line.
