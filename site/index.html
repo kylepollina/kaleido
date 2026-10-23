@@ -56,23 +56,58 @@
   .eyebrow { display: inline-block; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
   h1 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(42px, 8vw, 80px); line-height: 1.02; letter-spacing: -.03em; margin: 0 auto 20px; max-width: 13em; }
   h1 em { font-style: italic; font-weight: 400; background: linear-gradient(90deg, var(--accent), #b266ff 60%, var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .lead { font-size: 20px; color: var(--muted); max-width: 34em; margin: 0 auto 28px; }
   .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
   .btn { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 11px 22px; border-radius: 999px; text-decoration: none; font-weight: 600; font-size: 16px; line-height: 1.25; border: 1.5px solid var(--ink); color: var(--ink); }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .btn small { font-size: 12px; font-weight: 500; opacity: .8; }
   .btn[aria-disabled="true"] { cursor: default; }
   .btn:hover { transform: translateY(-1px); }
-  .meta { margin-top: 18px; font-size: 14px; color: var(--muted); }
 
-  .art { margin: 56px auto 0; max-width: 640px; }
-  .art .disc { aspect-ratio: 1; border-radius: 50%; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); }
-  .art img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.04); }
-  .art figcaption { margin-top: 14px; font-size: 13px; color: var(--muted); }
-  @media (prefers-reduced-motion: no-preference) {
-    .art .disc img { animation: turn 120s linear infinite; }
-    @keyframes turn { to { transform: scale(1.3) rotate(360deg); } }
+  /* The top of the page: the same pink -> purple -> green as the old headline, fading into the page below. */
+  .top {
+    color: #fff;
+    background:
+      linear-gradient(to bottom, transparent 82%, var(--bg)),
+      linear-gradient(115deg, #d81b6a 0%, #a23fd0 45%, #1f9a55 92%);
   }
+  .top .brand, .top nav .links a { color: rgba(255, 255, 255, .88); }
+  .top nav .links a:hover { color: #fff; }
+  .top .eyebrow { color: rgba(255, 255, 255, .85); }
+  .top h1 em { background: none; color: inherit; }
+  .top .btn { border-color: rgba(255, 255, 255, .9); color: #fff; }
+  .top .btn.primary { background: #fff; border-color: #fff; color: #a3134f; }
+  .top :focus-visible { outline-color: #fff; }
+
+  /* A MacBook drawn in CSS around the screen recording. Sizes are percentages of the width, so it scales. */
+  .macbook { margin: 56px auto 0; max-width: 900px; padding: 0 3%; }
+  .mb-lid { position: relative; background: #0c0c0e; border-radius: 3% / 4.6%; padding: 1.7% 1.7% 2.6%;
+    box-shadow: 0 0 0 1.5px #3a3a40 inset, 0 40px 80px rgba(40, 0, 30, .35); }
+  .mb-lid video, .mb-lid img { display: block; width: 100%; aspect-ratio: 1280 / 832; border-radius: .5% / .8%; background: #1a1a1a; object-fit: cover; }
+  .mb-notch { position: absolute; top: 1.7%; left: 50%; width: 12%; height: 4.6%; transform: translateX(-50%);
+    background: #0c0c0e; border-radius: 0 0 14px 14px; }
+  .mb-base { position: relative; height: 0; padding-bottom: 2.4%; margin: 0 -6.5%;
+    background: linear-gradient(#e9eaee, #b9bbc2 55%, #8e9097); border-radius: 2px 2px 40% 40% / 2px 2px 100% 100%;
+    box-shadow: 0 18px 30px rgba(40, 0, 30, .25); }
+  .mb-base::before { content: ""; position: absolute; top: 0; left: 50%; width: 15%; height: 45%; transform: translateX(-50%);
+    background: linear-gradient(#a7a9b0, #c9cbd1); border-radius: 0 0 10px 10px; }
+
+  /* Before / after: the photo on the left of the handle, Kaleido's kaleidoscope on the right. */
+  .compare-section { padding-top: 24px; text-align: center; }
+  .compare-section .sub { margin-inline: auto; }
+  .compare { position: relative; max-width: 900px; margin: 0 auto; aspect-ratio: 1600 / 1005; border-radius: 20px; overflow: hidden;
+    box-shadow: var(--shadow); --pos: 50%; user-select: none; touch-action: pan-y; }
+  .compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+  .compare .before { clip-path: inset(0 calc(100% - var(--pos)) 0 0); }
+  .compare .handle { position: absolute; top: 0; bottom: 0; left: var(--pos); width: 2px; margin-left: -1px; background: #fff; pointer-events: none;
+    box-shadow: 0 0 12px rgba(0, 0, 0, .35); }
+  .compare .handle::after { content: "\2039\2002\203A"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, .92); color: #3a1030; display: grid; place-items: center;
+    font: 600 20px/1 Inter, sans-serif; box-shadow: 0 4px 16px rgba(0, 0, 0, .3); }
+  .compare .tag { position: absolute; top: 14px; padding: 3px 11px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    color: #fff; background: rgba(0, 0, 0, .45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: none; }
+  .compare .tag.l { left: 14px; } .compare .tag.r { right: 14px; }
+  .compare input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+  .compare:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 3px; }
 
   section { padding: 72px 0; }
   section.alt { background: var(--bg-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -117,6 +152,7 @@
   Then remove aria-disabled and the "Coming soon" pill inside each button.
   =============================================================================
 -->
+<div class="top">
 <div class="wrap">
   <nav>
     <a class="brand" href="#top"><img src="images/icon.png" alt="" width="32" height="32">Kaleido</a>
@@ -130,19 +166,41 @@
 
   <header class="hero" id="top">
     <span class="eyebrow">For macOS 26</span>
-    <h1>Your photos, as a <em>slowly turning</em> kaleidoscope.</h1>
-    <p class="lead">Kaleido plays an animated background on your Mac's desktop, built from your Photos albums or macOS's slow-motion aerial films. Press Stop and your normal wallpaper is simply back.</p>
+    <h1>Re-experience <em>your photos.</em></h1>
     <div class="cta">
       <a class="btn primary" href="#download">Get Kaleido <small>Coming soon</small></a>
       <a class="btn" href="https://github.com/kylepollina/kaleido" rel="noopener">View on GitHub</a>
     </div>
-    <p class="meta">Native Swift and Metal · macOS 26 or later · No accounts, no cloud</p>
-    <figure class="art">
-      <div class="disc"><img src="images/hero-kaleidoscope.jpg" alt="A pink rhododendron photo folded through kaleidoscope mirrors into a mandala"></div>
-      <figcaption>A frame rendered by Kaleido's own shader from a flower photo.</figcaption>
-    </figure>
+    <!-- A screen recording of Kaleido on the desktop. Its last seconds cross-fade (with Kaleido's zoom) into its first,
+         so the loop never shows a seam. AV1 where supported, H.264 everywhere else. -->
+    <div class="macbook">
+      <div class="mb-lid">
+        <video id="hero-video" autoplay muted loop playsinline preload="auto" poster="images/desktop-poster.jpg"
+               aria-label="Kaleido playing a rose photo as a kaleidoscope on a Mac desktop">
+          <source src="images/desktop-loop-av1.mp4" type='video/mp4; codecs="av01.0.08M.08"'>
+          <source src="images/desktop-loop.mp4" type="video/mp4">
+        </video>
+        <div class="mb-notch"></div>
+      </div>
+      <div class="mb-base"></div>
+    </div>
   </header>
 </div>
+</div>
+
+<section class="compare-section">
+  <div class="wrap">
+    <h2>One photo, folded through mirrors.</h2>
+    <p class="sub">Drag to compare the original with what Kaleido makes of it.</p>
+    <div class="compare" id="compare">
+      <img src="images/compare-kaleido.webp" alt="The same dahlia photo as a kaleidoscope" width="1600" height="1005" loading="lazy">
+      <img class="before" src="images/compare-original.webp" alt="A pink dahlia photo" width="1600" height="1005" loading="lazy">
+      <span class="tag l">Original</span><span class="tag r">Kaleido</span>
+      <div class="handle"></div>
+      <input type="range" min="0" max="100" value="50" step="0.1" aria-label="Compare the original photo with the kaleidoscope">
+    </div>
+  </div>
+</section>
 
 <section class="alt" id="features">
   <div class="wrap">
@@ -194,6 +252,22 @@
   </div>
 </footer>
 <script>
+  // The comparison slider: the range input covers the image, so dragging anywhere (or the arrow keys) moves the line.
+  (function () {
+    var box = document.getElementById('compare');
+    var input = box.querySelector('input');
+    function set() { box.style.setProperty('--pos', input.value + '%'); }
+    input.addEventListener('input', set);
+    set();
+  })();
+
+  // Respect "Reduce motion": show the still poster instead of the looping video.
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    var v = document.getElementById('hero-video');
+    v.removeAttribute('autoplay');
+    v.pause();
+  }
+
   // Placeholder buttons shouldn't jump to the top of the page.
   document.querySelectorAll('a[aria-disabled="true"]').forEach(function (a) {
     a.addEventListener('click', function (e) { e.preventDefault(); });
