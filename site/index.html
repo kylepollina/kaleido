@@ -134,13 +134,18 @@
   .card p { margin: 0; color: var(--muted); font-size: 16px; }
   kbd { font: 600 .88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg-alt); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
 
-  .shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-  .shot { margin: 0; }
-  .shot .frame { aspect-ratio: 16 / 10; min-height: 200px; border: 2px dashed var(--line); border-radius: 20px; background: var(--card); display: grid; place-items: center; text-align: center; padding: 20px; color: var(--muted); font-size: 15px; }
-  .shot .frame b { display: block; font: 600 24px Fraunces, Georgia, serif; color: var(--accent); margin-bottom: 4px; }
-  .shot img { width: 100%; height: auto; border-radius: 20px; box-shadow: var(--shadow); display: block; }
-  .shot figcaption { margin-top: 10px; font-size: 14px; color: var(--muted); }
-  /* When real screenshots exist: replace each <div class="frame">…</div> with <img src="images/shot-N.png" alt="…"> */
+  /* See it in action: one row per feature, the screenshot large beside a few words, alternating sides. */
+  .feature { display: grid; grid-template-columns: 1fr 2fr; gap: 40px; align-items: center; margin: 0 0 64px; }
+  .feature:last-child { margin-bottom: 0; }
+  .feature:nth-child(even) { grid-template-columns: 2fr 1fr; }
+  .feature:nth-child(even) .text { order: 2; }
+  .feature h3 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 28px; line-height: 1.15; margin: 0 0 10px; }
+  .feature p { margin: 0; color: var(--muted); }
+  .feature img { width: 100%; height: auto; display: block; }
+  @media (max-width: 760px) {
+    .feature, .feature:nth-child(even) { grid-template-columns: 1fr; gap: 16px; }
+    .feature:nth-child(even) .text { order: 0; }
+  }
 
   .download { text-align: center; }
   .download .sub { margin-inline: auto; }
@@ -179,7 +184,7 @@
 
   <header class="hero" id="top">
     <span class="eyebrow">For macOS 26</span>
-    <h1>Re-experience <em>your photos.</em></h1>
+    <h1>re-experience your photos</h1>
     <div class="cta">
       <a class="btn primary" href="#download">Get Kaleido <small>Coming soon</small></a>
       <a class="btn" href="https://github.com/kylepollina/kaleido" rel="noopener">View on GitHub</a>
@@ -299,14 +304,20 @@
 <section id="screenshots">
   <div class="wrap">
     <h2>See it in action</h2>
-    <p class="sub">Placeholders for now. Real screenshots coming.</p>
-    <div class="shots">
-      <!-- SCREENSHOT 1: replace the .frame div with <img src="images/shot-1-desktop.png" alt="Kaleido playing on a Mac desktop"> -->
-      <figure class="shot"><div class="frame"><div><b>Screenshot</b>The kaleidoscope playing full-screen on the desktop, with icons and the menu bar visible</div></div><figcaption>On the desktop.</figcaption></figure>
-      <!-- SCREENSHOT 2 -->
-      <figure class="shot"><div class="frame"><div><b>Screenshot</b>The control window: Home with preview, Back / Play / Next, Surprise me</div></div><figcaption>The control window.</figcaption></figure>
-      <!-- SCREENSHOT 3 -->
-      <figure class="shot"><div class="frame"><div><b>Screenshot</b>The Photos album browser with cover cards and badges</div></div><figcaption>Choosing albums.</figcaption></figure>
+    <p class="sub">Everything lives in one window, over the kaleidoscope it is playing.</p>
+    <div class="features">
+      <div class="feature">
+        <div class="text"><h3>Shape every pattern.</h3><p>Eight shapes, from Classic to Fractal. Set the mirrors (or let them change on their own), scale and swirl, and turn on guide lines to see exactly where the mirrors fall. Or hit Randomize.</p></div>
+        <img src="images/feature-editor.webp" alt="Kaleido's pattern editor beside a kaleidoscope with red guide lines showing the mirrors" width="1600" height="1050" loading="lazy">
+      </div>
+      <div class="feature">
+        <div class="text"><h3>Pick what plays.</h3><p>Your Photos albums and smart albums, folders on your Mac, and macOS's own wallpapers and aerials. Tick a whole album or single photos; nothing is copied or changed.</p></div>
+        <img src="images/feature-photos.webp" alt="The Photos browser listing built-in sets, smart albums and albums with selection badges" width="1600" height="1050" loading="lazy">
+      </div>
+      <div class="feature">
+        <div class="text"><h3>Keep the ones you love.</h3><p>Bookmark a scene to save the photo with its pattern. Star your favorites, then play your scenes as a playlist.</p></div>
+        <img src="images/feature-scenes.webp" alt="The Scenes list with thumbnails, stars and Play my scenes" width="1600" height="1050" loading="lazy">
+      </div>
     </div>
   </div>
 </section>
