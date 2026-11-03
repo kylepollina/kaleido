@@ -9,7 +9,7 @@ install steps (it mirrors the site in `docs/`); this file is how to work on it.
 - Never write to the user's wallpaper settings, System Settings, other apps, or macOS's own folders (e.g.
   `~/Library/Application Support/com.apple.wallpaper` is read only; Kaleido's aerial downloads go to its own data
   folder). Only read the photos the user picked.
-- Commit and push every finished change on `main` (private repo kylepollina/kaleido).
+- Commit and push every finished change on `main` (public repo kylepollina/kaleido; pushes that change `docs/` update the live site).
 - Keep user-facing reports short. Don't run lots of display tests; one screenshot to check a layout is plenty.
 
 ## Build, test, install
