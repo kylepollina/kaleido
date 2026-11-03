@@ -134,7 +134,7 @@ final class KaleidoRenderer {
     let device: MTLDevice
     let queue: MTLCommandQueue
     private let pipeline: MTLRenderPipelineState
-    private let log = Logger(subsystem: "local.kaleido.app", category: "render")
+    private let log = Logger(subsystem: "app.getkaleido.kaleido", category: "render")
 
     weak var provider: PhotoProvider?
     var targetLook = Look()

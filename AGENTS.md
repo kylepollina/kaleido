@@ -19,6 +19,7 @@ swift build                 # quick compile check
 swift test                  # KaleidoCore unit tests (about 60)
 ./scripts/build.sh          # build/Kaleido.app (release, signed)
 ./scripts/install.sh        # build, install to /Applications, quit and relaunch a running copy
+./scripts/release.sh        # build/Kaleido-<version>.dmg; see the script's header for signing and notarizing
 ```
 
 The shader in `Sources/Kaleido/Shaders.swift` compiles at runtime, so `swift build` does not check it. After a

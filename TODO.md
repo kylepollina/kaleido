@@ -1,8 +1,11 @@
 # To do
 
-- **Downloadable release.** Waiting on Apple Developer Program enrollment (signed up 2026-10-29). Then: Developer ID
-  Application certificate, sign with hardened runtime + Photos entitlement in `scripts/build.sh`, notarize and staple,
-  package a `.dmg`, host it (e.g. GitHub Releases) and point the site's `#mac-btn` at it.
+- **Downloadable release.** Waiting on Apple Developer Program enrollment (signed up 2026-10-29). `scripts/release.sh`
+  is ready but its signing and notarizing path hasn't run yet. Then: Developer ID Application certificate, store the
+  notary login, run the script with `KALEIDO_SIGN_IDENTITY`, host the `.dmg` (e.g. GitHub Releases) and point the
+  site's `#mac-btn` at it.
+- **Landing site.** Host it at getkaleido.app. Remove or fix the GitHub links (the repo is private), and say near the
+  download button that it needs macOS 26.
 
 # Feature requests
 

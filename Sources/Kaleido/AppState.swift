@@ -62,7 +62,7 @@ final class AppState: ObservableObject, PhotoProvider {
     private var saveTask: Task<Void, Never>?
     private var libraryObserver: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
-    private let log = Logger(subsystem: "local.kaleido.app", category: "app")
+    private let log = Logger(subsystem: "app.getkaleido.kaleido", category: "app")
 
     private var screensAsleep = false, systemAsleep = false, sessionInactive = false, screenLocked = false
 

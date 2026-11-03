@@ -27,9 +27,16 @@ vtool -set-build-version macos 26.0 "$(xcrun --show-sdk-version)" -replace \
     -output "$APP/Contents/MacOS/Kaleido" "$APP/Contents/MacOS/Kaleido"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-# Ad-hoc signing normally ties macOS privacy grants (Photos) to this exact build, so every rebuild would
-# ask again. A fixed designated requirement keeps the grant across rebuilds.
-codesign --force --sign - --requirements '=designated => identifier "local.kaleido.app"' "$APP" >/dev/null
+# Every build uses the hardened runtime and entitlements notarization needs, so local builds match releases.
+if [ -n "${KALEIDO_SIGN_IDENTITY:-}" ]; then
+    codesign --force --options runtime --timestamp --entitlements Resources/Kaleido.entitlements \
+        --sign "$KALEIDO_SIGN_IDENTITY" "$APP" >/dev/null
+else
+    # Ad-hoc signing normally ties macOS privacy grants (Photos) to this exact build, so every rebuild would
+    # ask again. A fixed designated requirement keeps the grant across rebuilds.
+    codesign --force --options runtime --entitlements Resources/Kaleido.entitlements --sign - \
+        --requirements '=designated => identifier "app.getkaleido.kaleido"' "$APP" >/dev/null
+fi
 
 echo "Built $APP"
 

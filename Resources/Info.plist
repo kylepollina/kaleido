@@ -7,7 +7,7 @@
     <key>CFBundleDisplayName</key>
     <string>Kaleido</string>
     <key>CFBundleIdentifier</key>
-    <string>local.kaleido.app</string>
+    <string>app.getkaleido.kaleido</string>
     <key>CFBundleExecutable</key>
     <string>Kaleido</string>
     <key>CFBundleIconFile</key>

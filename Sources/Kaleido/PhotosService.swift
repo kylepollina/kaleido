@@ -23,7 +23,7 @@ final class PhotosService: NSObject, ObservableObject, PHPhotoLibraryChangeObser
     @Published private(set) var status: PHAuthorizationStatus
     @Published private(set) var albums: [AlbumInfo] = []
     var onLibraryChange: (() -> Void)?
-    private let log = Logger(subsystem: "local.kaleido.app", category: "photos")
+    private let log = Logger(subsystem: "app.getkaleido.kaleido", category: "photos")
 
     /// Per-album cap on how many photos are pulled in (most recent first), to keep huge libraries light.
     nonisolated static let albumCap = 3000
