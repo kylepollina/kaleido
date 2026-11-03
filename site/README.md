@@ -22,7 +22,7 @@ frame. Window recordings at 2236×1710 crop with `crop=2008:1261:114:168`; windo
 
 ## Before it goes live
 
-- **Download buttons** are "Coming soon" placeholders. The two real URLs go in the `#appstore-btn` and `#mac-btn` links (see the comment at the top of `<body>`); then remove `aria-disabled` and the "Coming soon" pills.
+- **Downloads** aren't offered yet: the hero and the `#download` section just say "Coming soon". Add the real download link to both when a signed build exists.
 - **Screenshots** are placeholders. Capture them, save into `images/`, and swap each `<div class="frame">` for an `<img>` (the comments show where).
 - Check the footer name and the GitHub link.
 

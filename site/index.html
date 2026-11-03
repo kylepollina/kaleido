@@ -176,15 +176,7 @@
                 border-color: var(--accent);
                 color: var(--accent-ink);
             }
-            .btn small {
-                font-size: 12px;
-                font-weight: 500;
-                opacity: 0.8;
-            }
-            .btn[aria-disabled="true"] {
-                cursor: default;
-            }
-            .btn:hover {
+            a.btn:hover {
                 transform: translateY(-1px);
             }
 
@@ -524,28 +516,6 @@
             .download .sub {
                 margin-inline: auto;
             }
-            .download .btn {
-                min-width: 240px;
-            }
-            .download .cta {
-                margin-top: 28px;
-            }
-            .soon {
-                display: inline-block;
-                font-size: 11px;
-                font-weight: 700;
-                letter-spacing: 0.08em;
-                text-transform: uppercase;
-                background: var(--accent);
-                color: var(--accent-ink);
-                border-radius: 999px;
-                padding: 1px 9px;
-                margin-bottom: 2px;
-            }
-            .btn.primary .soon {
-                background: var(--accent-ink);
-                color: var(--accent);
-            }
             .req {
                 margin-top: 22px;
                 color: var(--muted);
@@ -575,14 +545,6 @@
         </style>
     </head>
     <body>
-        <!--
-  ============================  PLACEHOLDER LINKS  ============================
-  Nothing is published yet. When the real URLs exist, edit ONLY these two lines:
-    - the App Store button:   id="appstore-btn"  (href="#")
-    - the direct download:    id="mac-btn"       (href="#")
-  Then remove aria-disabled and the "Coming soon" pill inside each button.
-  =============================================================================
--->
         <div class="top">
             <div class="wrap">
                 <nav>
@@ -596,7 +558,6 @@
                     >
                     <div class="links">
                         <a class="hide-sm" href="#features">Features</a>
-                        <a href="#download">Download</a>
                         <a
                             href="https://github.com/kylepollina/kaleido"
                             rel="noopener"
@@ -609,9 +570,7 @@
                     <span class="eyebrow">For macOS 26</span>
                     <h1><em>Reimagine</em> your photos</h1>
                     <div class="cta">
-                        <a class="btn primary" href="#download"
-                            >Get Kaleido <small>Coming soon</small></a
-                        >
+                        <span class="btn primary">Coming soon</span>
                         <a
                             class="btn"
                             href="https://github.com/kylepollina/kaleido"
@@ -798,10 +757,10 @@
 
         <section class="compare-section">
             <div class="wrap">
-                <h2>And macOS's aerial films.</h2>
+                <h2>And macOS's aerial films</h2>
                 <p class="sub">
                     The slow-motion aerials behind macOS's own screen savers
-                    play too, as moving kaleidoscopes.
+                    play too, as moving kaleidoscopes
                 </p>
                 <!-- Stills: Kaleido playing an aerial, with the same moment in Original on top, both cropped to the 16:9 picture. -->
                 <div class="carousel">
@@ -1025,24 +984,7 @@
 
         <section class="alt download" id="download">
             <div class="wrap">
-                <h2>Get Kaleido</h2>
-                <p class="sub">Coming soon. Not available to download yet.</p>
-                <div class="cta">
-                    <!-- TODO: replace "#" with the App Store URL when it exists -->
-                    <a
-                        class="btn primary"
-                        id="appstore-btn"
-                        href="#"
-                        aria-disabled="true"
-                        ><span class="soon">Coming soon</span>Download on the
-                        App Store</a
-                    >
-                    <!-- TODO: replace "#" with the direct .dmg/.zip URL when it exists -->
-                    <a class="btn" id="mac-btn" href="#" aria-disabled="true"
-                        ><span class="soon">Coming soon</span>Download for
-                        Mac</a
-                    >
-                </div>
+                <h2>Coming soon</h2>
                 <p class="req">
                     Requires macOS 26 or later. Source code is MIT licensed.
                 </p>
@@ -1149,15 +1091,6 @@
                     show(0);
                 },
             );
-
-            // Placeholder buttons shouldn't jump to the top of the page.
-            document
-                .querySelectorAll('a[aria-disabled="true"]')
-                .forEach(function (a) {
-                    a.addEventListener("click", function (e) {
-                        e.preventDefault();
-                    });
-                });
         </script>
     </body>
 </html>
