@@ -4,7 +4,6 @@
   is ready but its signing and notarizing path hasn't run yet. Then: Developer ID Application certificate, store the
   notary login, run the script with `KALEIDO_SIGN_IDENTITY`, host the `.dmg` (e.g. GitHub Releases) and add the
   link to the site's Coming soon spots.
-- **Landing site.** Host `docs/` at getkaleido.app with GitHub Pages.
 
 # Feature requests
 
