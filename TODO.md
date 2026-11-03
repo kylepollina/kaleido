@@ -4,8 +4,7 @@
   is ready but its signing and notarizing path hasn't run yet. Then: Developer ID Application certificate, store the
   notary login, run the script with `KALEIDO_SIGN_IDENTITY`, host the `.dmg` (e.g. GitHub Releases) and point the
   site's `#mac-btn` at it.
-- **Landing site.** Host it at getkaleido.app. Remove or fix the GitHub links (the repo is private), and say near the
-  download button that it needs macOS 26.
+- **Landing site.** Make the repo public, then host `site/` at getkaleido.app with GitHub Pages.
 
 # Feature requests
 

@@ -51,13 +51,17 @@ your scenes as a playlist.
 
 ## Install
 
-Requires macOS 26 or later (it uses Liquid Glass) and Xcode (or the Swift toolchain).
+A ready-to-download app is coming soon. For now, build it from source. You need macOS 26 or later (it uses Liquid
+Glass) and Xcode 26 or later.
 
 ```sh
-cd ~/Projects/kaleido
-./scripts/build.sh            # builds build/Kaleido.app
-./scripts/install.sh          # builds and installs to /Applications (quits and relaunches a running copy)
-open build/Kaleido.app
+git clone https://github.com/kylepollina/kaleido.git
+cd kaleido
+./scripts/install.sh          # builds Kaleido and installs it to /Applications
+open /Applications/Kaleido.app
 ```
 
-Run the tests with `swift test`.
+The first time you choose photos, macOS asks for permission to read your Photos library.
+
+To build without installing, run `./scripts/build.sh`, which creates `build/Kaleido.app`. Run the tests with
+`swift test`.
