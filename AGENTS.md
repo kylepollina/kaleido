@@ -2,7 +2,7 @@
 
 Kaleido is a native macOS app (SwiftUI + Metal, macOS 26, Liquid Glass) that shows the user's photos and videos as
 slowly turning kaleidoscopes on the desktop while it plays, like the Portal app. README.md is a short pitch plus
-install steps (it mirrors the site in `site/`); this file is how to work on it.
+install steps (it mirrors the site in `docs/`); this file is how to work on it.
 
 ## Ground rules
 
