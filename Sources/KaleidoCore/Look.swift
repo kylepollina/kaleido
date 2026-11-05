@@ -103,6 +103,9 @@ public struct Look: Codable, Equatable, Sendable {
     }
     /// The scene's speed: an index into `Settings.speedMultipliers` (turtle to rabbit), for every movement.
     public var speedStep = Settings.defaultSpeedStep
+    /// Super slow motion (the tortoise): every movement at an eighth of the slowest stop, whatever `speedStep` says,
+    /// and videos at an eighth of real time. Only saved scenes bring it back; new scenes always start without it.
+    public var superSlow = false
     /// How the view zooms in this scene (Drift, Push or Pull).
     public var zoomMotion: ZoomMotion = .drift
     public var saturation: Double = 1.1
@@ -136,6 +139,7 @@ public struct Look: Codable, Equatable, Sendable {
         hueShift = try c.decodeIfPresent(Double.self, forKey: .hueShift) ?? d.hueShift
         hueSpeed = try c.decodeIfPresent(Double.self, forKey: .hueSpeed) ?? d.hueSpeed
         speedStep = try c.decodeIfPresent(Int.self, forKey: .speedStep) ?? d.speedStep
+        superSlow = try c.decodeIfPresent(Bool.self, forKey: .superSlow) ?? d.superSlow
         zoomMotion = (try? c.decodeIfPresent(ZoomMotion.self, forKey: .zoomMotion)) ?? d.zoomMotion
         saturation = try c.decodeIfPresent(Double.self, forKey: .saturation) ?? d.saturation
         vignette = try c.decodeIfPresent(Double.self, forKey: .vignette) ?? d.vignette

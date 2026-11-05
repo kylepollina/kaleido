@@ -124,9 +124,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public var playOnLaunch = false
     /// While playing, stop the display from going to sleep on its own (a screensaver-style keep-awake).
     public var keepScreenAwake = false
-    /// Super slow motion (the tortoise in the mini-player): every movement at an eighth of the slowest stop,
-    /// whatever the slider says, and videos at an eighth of real time.
-    public var superSlow = false
+    /// What `Look.superSlow` plays at.
     public static let superSlowMultiplier = 0.25
     public static let superSlowVideoRate: Float = 0.125
     /// Desktop drawing resolution (the preview always draws sharp).
@@ -163,7 +161,7 @@ public struct Settings: Codable, Equatable, Sendable {
 
     /// The multiplier on every movement for a look: its own speed stop, or the tortoise's fixed crawl.
     public func speedMultiplier(for l: Look) -> Double {
-        superSlow ? Settings.superSlowMultiplier : Settings.speedMultipliers[min(max(l.speedStep, 0), Settings.speedMultipliers.count - 1)]
+        l.superSlow ? Settings.superSlowMultiplier : Settings.speedMultipliers[min(max(l.speedStep, 0), Settings.speedMultipliers.count - 1)]
     }
 
     /// The look the renderer should actually use: the chosen look with the global switches and speed applied.
@@ -196,7 +194,6 @@ public struct Settings: Codable, Equatable, Sendable {
         limitInLowPowerMode = try c.decodeIfPresent(Bool.self, forKey: .limitInLowPowerMode) ?? d.limitInLowPowerMode
         playOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .playOnLaunch) ?? d.playOnLaunch
         keepScreenAwake = try c.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? d.keepScreenAwake
-        superSlow = (try? c.decodeIfPresent(Bool.self, forKey: .superSlow)) ?? false
         surprise = try c.decodeIfPresent(Bool.self, forKey: .surprise) ?? d.surprise
         playSource = (try? c.decodeIfPresent(PlaySource.self, forKey: .playSource)) ?? d.playSource
         sharpness = (try? c.decodeIfPresent(Sharpness.self, forKey: .sharpness)) ?? d.sharpness

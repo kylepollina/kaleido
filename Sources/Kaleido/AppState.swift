@@ -220,18 +220,20 @@ final class AppState: ObservableObject, PhotoProvider {
         if let h = holdArriving, h == photoID {
             // Play now: keep the look on screen and stay on this photo until Next or Back.
             holdArriving = nil
+            settings.look.superSlow = false
             markTweaked()
             return
         }
         // A new scene: this photo with an invented pattern (Random patterns), otherwise the pattern on screen.
-        let look = surprisePending || settings.surprise ? inventedLook() : settings.look
+        var look = surprisePending || settings.surprise ? inventedLook() : settings.look
+        look.superSlow = false
         surprisePending = false
         activeSceneID = nil
         settings.look = look
     }
 
     /// An invented pattern, from the shapes allowed in Settings. Speed and zoom are the viewer's: it keeps the
-    /// ones on screen.
+    /// ones on screen. Super slow motion is not: only a saved scene brings it back.
     private func inventedLook() -> Look {
         var g = SystemRandomNumberGenerator()
         var look = Look.random(shapes: settings.inventedShapes, using: &g)
@@ -286,17 +288,20 @@ final class AppState: ObservableObject, PhotoProvider {
         markTweaked()
     }
 
-    /// Edit scene's Randomize: an invented pattern on the photo showing (shapes as allowed in Settings).
+    /// Edit scene's Randomize: an invented pattern on the photo showing (shapes as allowed in Settings). It is the
+    /// same scene, so super slow motion stays as it is.
     func randomizeScene() {
-        let look = inventedLook()
+        var look = inventedLook()
+        look.superSlow = settings.look.superSlow
         tweakScene { $0 = look }
     }
 
-    /// Speed and zoom belong to the scene but save themselves: on a saved scene the change is written straight to
-    /// it (no Save needed), and it stays the same scene.
-    func setSceneMotion(speedStep: Int? = nil, zoomMotion: ZoomMotion? = nil) {
+    /// Speed, super slow motion and zoom belong to the scene but save themselves: on a saved scene the change is
+    /// written straight to it (no Save needed), and it stays the same scene.
+    func setSceneMotion(speedStep: Int? = nil, superSlow: Bool? = nil, zoomMotion: ZoomMotion? = nil) {
         var l = settings.look
         if let speedStep { l.speedStep = speedStep }
+        if let superSlow { l.superSlow = superSlow }
         if let zoomMotion { l.zoomMotion = zoomMotion }
         l.clamp()
         guard l != settings.look else { return }
@@ -305,6 +310,7 @@ final class AppState: ObservableObject, PhotoProvider {
         if let id, let s = scenes.scene(id) {
             var saved = s.look
             saved.speedStep = l.speedStep
+            saved.superSlow = l.superSlow
             saved.zoomMotion = l.zoomMotion
             scenes.update(id, name: s.name, look: saved, pan: nil)
         }
@@ -616,7 +622,7 @@ final class AppState: ObservableObject, PhotoProvider {
         renderer.secondsPerPhoto = settings.secondsPerPhoto
         renderer.transitionSeconds = settings.transitionSeconds
         renderer.transitionStyle = settings.transition
-        renderer.videoRate = settings.superSlow ? Settings.superSlowVideoRate : 1
+        renderer.videoRate = settings.look.superSlow ? Settings.superSlowVideoRate : 1
         renderer.zoomFlow = settings.look.zoomMotion.direction
         queue.shuffle = settings.shuffle
         updateHold()

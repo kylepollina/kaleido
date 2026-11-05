@@ -640,19 +640,18 @@ private struct GlassTabLabelStyle: LabelStyle {
     }
 }
 
-/// The scene's speed: five stops from turtle to rabbit, like the trackpad speed setting (saved scenes keep it). The
-/// tortoise toggles super slow motion: an eighth of the slowest stop, videos too. Mini-player and Edit scene alike.
+/// The scene's speed: five stops from turtle to rabbit, like the trackpad speed setting. The tortoise toggles super
+/// slow motion: an eighth of the slowest stop, videos too. Saved scenes keep both. Mini-player and Edit scene alike.
 struct SpeedSlider: View {
     @EnvironmentObject var app: AppState
     var sliderWidth: CGFloat = 96
 
     var body: some View {
-        let slow = app.settings.superSlow
+        let slow = app.settings.look.superSlow
         HStack(spacing: 6) {
             Button {
                 // Super slow motion goes below the slowest stop, so the slider drops to the bottom with it.
-                if !slow { app.setSceneMotion(speedStep: 0) }
-                app.settings.superSlow.toggle()
+                if slow { app.setSceneMotion(superSlow: false) } else { app.setSceneMotion(speedStep: 0, superSlow: true) }
             } label: {
                 Image(systemName: "tortoise.fill")
                     .font(.system(size: slow ? 13 : 12, weight: .semibold))
@@ -664,7 +663,7 @@ struct SpeedSlider: View {
             .buttonStyle(.plain)
             .tip(slow ? "Super slow motion: on" : "Super slow motion")
             Slider(value: Binding(get: { Double(app.settings.look.speedStep) },
-                                  set: { app.setSceneMotion(speedStep: Int($0.rounded())); app.settings.superSlow = false }),
+                                  set: { app.setSceneMotion(speedStep: Int($0.rounded()), superSlow: false) }),
                    in: 0...Double(Settings.speedMultipliers.count - 1), step: 1)
                 .controlSize(.small)
                 .frame(width: sliderWidth)

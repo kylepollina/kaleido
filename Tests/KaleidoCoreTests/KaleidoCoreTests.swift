@@ -269,11 +269,18 @@ final class SettingsTests: XCTestCase {
     func testSuperSlowIsAnEighthOfTheSlowestStop() throws {
         var s = Settings()
         s.look.speedStep = 4
-        s.superSlow = true
+        s.look.superSlow = true
         XCTAssertEqual(s.speedMultiplier(for: s.look), Settings.speedMultipliers[0] / 8, "whatever the slider says")
-        XCTAssertEqual(s.effectiveLook(Look()).motion, Look().motion * Settings.speedMultipliers[0] / 8)
-        XCTAssertTrue(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)).superSlow)
-        XCTAssertFalse(Settings().superSlow)
+        XCTAssertEqual(s.effectiveLook(s.look).motion, s.look.motion * Settings.speedMultipliers[0] / 8)
+        XCTAssertEqual(s.effectiveLook(Look()).motion, Look().motion * Settings.speedMultipliers[Settings.defaultSpeedStep],
+                       "only the look it belongs to crawls")
+        XCTAssertFalse(Settings().look.superSlow)
+        XCTAssertFalse(Look.random().superSlow, "invented patterns never start in super slow motion")
+    }
+
+    func testTheOldGlobalSuperSlowIsDropped() throws {
+        let old = try JSONDecoder().decode(Settings.self, from: Data(#"{"version": 6, "superSlow": true, "look": {}}"#.utf8))
+        XCTAssertFalse(old.look.superSlow)
     }
 
     func testDesktopSharpness() throws {
@@ -802,6 +809,27 @@ final class SceneTests: XCTestCase {
 
         lib.delete(id)
         XCTAssertNil(SceneLibrary(fileURL: file).scene(id))
+    }
+
+    func testScenesKeepTheirSpeedAndSuperSlow() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("scenes.json")
+        let lib = SceneLibrary(fileURL: file)
+        var look = Look(); look.speedStep = 4
+        let id = lib.add(name: "Lake", photoID: UUID(), look: look)
+        XCTAssertEqual(SceneLibrary(fileURL: file).scene(id)?.look.speedStep, 4)
+        XCTAssertEqual(SceneLibrary(fileURL: file).scene(id)?.look.superSlow, false)
+
+        look.superSlow = true
+        lib.update(id, name: "Lake", look: look, pan: nil)
+        XCTAssertEqual(SceneLibrary(fileURL: file).scene(id)?.look.superSlow, true)
+        // Scenes saved before super slow motion belonged to them start without it.
+        let old = #"[{"id": "\#(UUID().uuidString)", "name": "Old", "photoID": "\#(UUID().uuidString)", "look": {"speedStep": 1}, "panX": 0, "panY": 0, "isFavorite": false, "created": 0}]"#
+        let decoded = try XCTUnwrap(try JSONDecoder().decode([SavedScene].self, from: Data(old.utf8)).first)
+        XCTAssertFalse(decoded.look.superSlow)
+        XCTAssertEqual(decoded.look.speedStep, 1)
     }
 
     func testScenesRememberTheirPhotoAndCanBeRepaired() throws {
